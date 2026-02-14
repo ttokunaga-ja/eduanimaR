@@ -1,0 +1,203 @@
+# Frontend Agent Rules
+
+## Context
+- Date: 2026-02-11
+- Stack (SSOT): `docs/02_tech_stack/STACK.md`
+   - Runtime: Node.js (LTS preferred)
+   - Framework: Next.js (App Router / RSC)
+   - Language: TypeScript
+   - UI: MUI + Pigment CSS (zero-runtime)
+   - Server state: TanStack Query
+   - API client: Orval (OpenAPI contract-first)
+   - Validation/Forms: Zod + React Hook Form
+   - Testing: Vitest + Playwright
+   - Lint: ESLint + eslint-plugin-boundaries
+- Architecture: Next.js（App Router / RSC）+ FSD + Orval(OpenAPI) + TanStack Query + MUI(Pigment CSS)
+
+## How to Read (Docs)
+Treat `docs/README.md` as the portal (reading order / link hub).
+
+Skill docs (agent playbooks) live under `docs/skills/`.
+Start here: `docs/skills/README.md`.
+
+Fastest path to understand this template (recommended):
+- `docs/00_quickstart/QUICKSTART.md`
+- `docs/00_quickstart/PROJECT_DECISIONS.md`
+- `docs/02_tech_stack/STACK.md`
+- `docs/01_architecture/FSD_OVERVIEW.md`
+- `docs/01_architecture/FSD_LAYERS.md`
+- `docs/01_architecture/DATA_ACCESS_LAYER.md`
+- `docs/01_architecture/CACHING_STRATEGY.md`
+- `docs/02_tech_stack/SSR_HYDRATION.md`
+- `docs/02_tech_stack/STATE_QUERY.md`
+- `docs/02_tech_stack/MUI_PIGMENT.md`
+- `docs/03_integration/API_GEN.md`
+- `docs/03_integration/API_CONTRACT_WORKFLOW.md`
+- `docs/03_integration/ERROR_HANDLING.md`
+- `docs/03_integration/ERROR_CODES.md`
+- `docs/03_integration/SECURITY_CSP.md`
+
+Operations / security (recommended):
+- `docs/05_operations/OBSERVABILITY.md`
+- `docs/05_operations/RELEASE.md`
+- `docs/05_operations/CI_CD.md`
+- `docs/05_operations/SLO_ALERTING.md`
+- `docs/05_operations/VULNERABILITY_MANAGEMENT.md`
+- `docs/05_operations/SUPPLY_CHAIN_SECURITY.md`
+- `docs/05_operations/SECRETS_KEY_MANAGEMENT.md`
+
+## Skill Docs (Location & Names)
+All Skill docs must be placed under `docs/skills/`.
+
+Portal:
+- `docs/skills/README.md`
+
+Canonical Skill files:
+- `docs/skills/SKILL_NEXTJS_APP_ROUTER.md`
+- `docs/skills/SKILL_NEXTJS_TURBOPACK.md`
+- `docs/skills/SKILL_MUI_PIGMENT_CSS.md`
+- `docs/skills/SKILL_TANSTACK_QUERY.md`
+- `docs/skills/SKILL_ORVAL_OPENAPI.md`
+- `docs/skills/SKILL_ESLINT_BOUNDARIES.md`
+- `docs/skills/SKILL_TESTING_VITEST.md`
+- `docs/skills/SKILL_TESTING_PLAYWRIGHT.md`
+- `docs/skills/SKILL_TYPESCRIPT.md`
+- `docs/skills/SKILL_NODE_DOCKER_RUNTIME.md`
+- `docs/skills/SKILL_ZOD_RHF_FORMS.md`
+
+## Skill Docs (Rule)
+- Before proposing or implementing changes, open the relevant Skill doc(s) and follow the “Must / 禁止 / Checklist”.
+- If you introduce a new tool/pattern, update `docs/02_tech_stack/STACK.md` and add/extend the corresponding Skill doc.
+
+## How to Read (Source Code)
+This template assumes strict FSD boundaries and Next.js App Router as a thin shell.
+
+### 0) Decide what to read first
+- Start with `docs/01_architecture/SLICES_MAP.md` (what slices exist and why).
+- If you are changing import structure, re-check `docs/01_architecture/FSD_LAYERS.md` first.
+
+### 1) Routing shell (thin adapter)
+- `src/app/**/page.tsx`
+   - Must be a thin adapter that imports and renders `src/pages/**`.
+   - Do not implement business UI here.
+   - Avoid Dynamic APIs in root layouts unless the route must be dynamic (see caching docs).
+
+### 2) Page composition
+- `src/pages/**`
+   - Compose widgets/features/entities.
+   - Page-level data orchestration belongs here (or in server-only DAL), not in low layers.
+
+### 3) Widget composition (integration point)
+- `src/widgets/**`
+   - Compose multiple features/entities into a cohesive UI block (header, panels, dashboards).
+   - Prefer putting cross-slice composition here instead of creating `features → features` imports.
+
+### 4) Use cases (user value)
+- `src/features/**`
+   - Forms, mutations, validation, success/failure branching.
+
+### 5) Domain presentation
+- `src/entities/**`
+   - Domain entity presentation + minimal logic.
+
+### 6) Shared foundation
+- `src/shared/**`
+   - UI primitives, generated API, libs, config.
+
+### 7) Contracts & codegen boundaries
+- OpenAPI-driven API clients live under `src/shared/api` (generated + thin hand-written adapters).
+- Treat `docs/03_integration/API_GEN.md` and `docs/03_integration/API_CONTRACT_WORKFLOW.md` as the SSOT for workflow.
+
+### 8) Cross-cutting concerns (operations-critical)
+- SSR/Hydration decisions: `docs/02_tech_stack/SSR_HYDRATION.md`
+- Cache/revalidation policy: `docs/01_architecture/CACHING_STRATEGY.md`
+- Error normalization: `docs/03_integration/ERROR_HANDLING.md` + `ERROR_CODES.md`
+- CSP/headers: `docs/03_integration/SECURITY_CSP.md`
+
+### 9) Read behavior via tests
+- Unit: `shared/lib` / pure helpers.
+- Component: UI behavior, forms, error states (Vitest).
+- E2E: critical flows (Playwright).
+
+## Additional Best Practices (2026)
+These are high-leverage practices commonly used in production frontend systems.
+
+### A) Dependency & vulnerability management (Node/TS)
+- Prefer minimal, reviewable upgrades; avoid broad version bumps without a clear need.
+- Keep installs reproducible (`package-lock.json` or lockfile discipline); prefer CI using clean installs.
+- When security issues arise, prioritize fixes that are reachable from runtime code paths.
+
+### B) SSR/Hydration safety
+- Treat Server/Client boundaries as part of the architecture: Server for composition/data shaping, Client only for interactivity.
+- Watch for hydration mismatches by keeping Client props stable and avoiding non-deterministic rendering.
+
+### C) Supply-chain hygiene (frontend)
+- Pin codegen/tooling behavior where possible to keep regeneration reproducible.
+- Avoid editing generated artifacts; regenerate and review diffs instead.
+
+### D) Safe change management (contracts)
+- Prefer backward-compatible contract evolution (OpenAPI). If breaking changes are needed, follow explicit versioning/deprecation docs.
+
+## Critical Instructions (MUST)
+
+- **UIに表示する文字列はすべて翻訳キー（変数）として管理すること。** 表示内容は各言語の JSON ファイル（例：`public/locales/{lang}/common.json` または `src/locales/{lang}.json`）から読み出し、UIへの直書き（ハードコーディング）を禁止する。未翻訳・未使用キーの検出は CI で実施（例: `npm run i18n:check` / `i18next-scanner` 等）し、CIゲートでブロックすること（詳細: `docs/03_integration/I18N_LOCALE.md`）。
+
+### 1) FSD Boundaries (Strict)
+- Import direction is strictly one-way:
+   `app` → `pages` → `widgets` → `features` → `entities` → `shared`
+- No cross-slice imports within the same layer (especially `features/*` → `features/*`).
+- Public API only: import from slice/segment `index.ts`. Never deep-import internals.
+- Before creating a new slice, update `docs/01_architecture/SLICES_MAP.md`.
+
+### 2) API Development (Contract First)
+- OpenAPI is the contract SSOT.
+- Use Orval generated clients/hooks via `src/shared/api` only.
+- Process:
+   1. Update/obtain OpenAPI.
+   2. Run `npm run api:generate`.
+   3. Implement using generated clients/hooks.
+- Rule: Never edit generated code under `src/shared/api/generated/`.
+
+### 3) Next.js (RSC-first)
+- Prefer Server Components by default; add `"use client"` only for actual interaction/browser APIs.
+- Do NOT call Route Handlers from RSC (avoid unnecessary HTTP hops inside the server).
+- Server-only secrets must not be referenced from Client Components.
+
+### 4) Data Access Layer (DAL) & DTO minimization
+- Server data fetching must go through DAL (server-only) as the review/audit choke point.
+- Minimize DTOs: do not pass backend response objects directly into Client Components.
+- UI props should be stable, explicit types; avoid leaking generated API types into UI components.
+
+### 5) Caching / Revalidation
+- Follow `docs/01_architecture/CACHING_STRATEGY.md`.
+- Mutations must invalidate at the mutation boundary (Server Action / Route Handler). Do not “randomly refresh” from UI.
+- Avoid accidentally making whole routes dynamic by using Dynamic API in root layout.
+
+### 6) API Integration (No manual fetch)
+- Never write manual `fetch` / `axios` calls in components.
+- If you need baseURL/headers/auth behavior, implement it once in `src/shared/api/client.ts` (or equivalent), not per feature.
+
+### 7) Error Handling (Standardized)
+- Treat error codes as SSOT for branching; never branch on message strings.
+- Map failures consistently (RSC/Route Handler/Client) per `docs/03_integration/ERROR_HANDLING.md`.
+
+### 8) Security / Secrets
+- `NEXT_PUBLIC_*` is public. Never put secrets there.
+- Follow CSP/headers policy in `docs/03_integration/SECURITY_CSP.md`.
+- Logs must not include secrets/tokens.
+
+## Coding Standards (Template Defaults)
+
+### Pigment CSS
+- USE: `import { styled } from '@mui/material-pigment-css';`
+- FORBIDDEN: Emotion / `makeStyles` / runtime CSS-in-JS.
+- Keep dynamic styling centralized in `shared/ui` (avoid `sx` sprawl).
+
+### Components
+- Use functional components.
+- Prefer stable, explicit props types; do not leak generated API types into UI props.
+
+## Output Quality Bar
+- Keep changes minimal and consistent with the existing architecture.
+- When behavior/contracts change, update docs (and skills) first-class.
+- Prefer reproducible changes that pass CI gates (`lint/typecheck/test/build`).

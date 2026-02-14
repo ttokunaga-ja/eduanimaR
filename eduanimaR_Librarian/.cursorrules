@@ -1,0 +1,197 @@
+# Backend Agent Rules
+
+## Context
+- Date: 2026-02-11
+- Stack: Go 1.25.7, gRPC, Echo v5.0.1 (Gateway layer), PostgreSQL 18.1, Atlas v1.0.0, sqlc 1.30.0, pgx v5.8.0, Elasticsearch 9.2.4, Debezium CDC, Testcontainers v0.40.1.
+- Architecture: Microservices + Clean Architecture + gRPC (internal) + HTTP/JSON (external via Gateway).
+
+## How to Read (Docs)
+Treat `docs/README.md` as the portal (reading order / link hub).
+
+Skill docs (agent playbooks) live under `docs/skills/`.
+Start here: `docs/skills/README.md`.
+
+Fastest path to understand the system (recommended):
+- `docs/00_quickstart/QUICKSTART.md`
+- `docs/00_quickstart/PROJECT_DECISIONS.md`
+- `docs/02_tech_stack/STACK.md`
+- `docs/01_architecture/MICROSERVICES_MAP.md`
+- `docs/01_architecture/CLEAN_ARCHITECTURE.md`
+- `docs/03_integration/INTER_SERVICE_COMM.md`
+- `docs/03_integration/API_CONTRACT_WORKFLOW.md`
+- `docs/03_integration/PROTOBUF_GRPC_STANDARDS.md`
+- `docs/01_architecture/SYNC_STRATEGY.md`
+
+Operations / security (recommended):
+- `docs/05_operations/OBSERVABILITY.md`
+- `docs/05_operations/SLO_ALERTING.md`
+- `docs/05_operations/API_SECURITY.md`
+- `docs/05_operations/SUPPLY_CHAIN_SECURITY.md`
+- `docs/05_operations/DATA_PROTECTION_DR.md`
+
+## Skill Docs (Location & Names)
+All Skill docs must be placed under `docs/skills/`.
+
+Portal:
+- `docs/skills/README.md`
+
+Canonical Skill files:
+- `docs/skills/SKILL_STACK_SSOT.md`
+- `docs/skills/SKILL_GO_1_25_BACKEND.md`
+- `docs/skills/SKILL_DB_ATLAS_SQLC_PGX.md`
+- `docs/skills/SKILL_CONTRACTS_PROTO_GRPC_BUF.md`
+- `docs/skills/SKILL_CONTRACTS_OPENAPI_ORVAL.md`
+- `docs/skills/SKILL_RESILIENCY_TIMEOUTS_RETRIES_IDEMPOTENCY.md`
+- `docs/skills/SKILL_OBSERVABILITY_OTEL_SLO.md`
+- `docs/skills/SKILL_API_SECURITY_OWASP.md`
+- `docs/skills/SKILL_SUPPLY_CHAIN_SLSA_SBOM.md`
+- `docs/skills/SKILL_SEARCH_ELASTICSEARCH.md`
+- `docs/skills/SKILL_EVENTS_CDC_KAFKA.md`
+
+Rule:
+- Before proposing or implementing changes, open the relevant Skill doc(s) and follow the “Safe defaults” + “Checklist”.
+- If you introduce a new tool/pattern, update `docs/02_tech_stack/STACK.md` and add/extend the corresponding Skill doc.
+
+## How to Read (Source Code)
+This architecture assumes (1) clear microservice boundaries and (2) Clean Architecture dependency direction.
+Repository layout may vary by project; the reading approach below applies to both:
+- **Service-root layout**: `<repo>/<service>/cmd/...` / `<repo>/<service>/internal/...`
+- **src/ layout**: `<repo>/src/<service>/cmd/...` / `<repo>/src/<service>/internal/...`
+
+### 0) Decide which service to read
+- Start with `docs/01_architecture/MICROSERVICES_MAP.md` (responsibilities / dependencies / exposed interfaces).
+- If you are debugging an external HTTP API, start from the Gateway; if it is internal integration, start from the owning microservice.
+
+### 1) Entry point (composition)
+- `cmd/<service>/main.go` (or `src/<service>/cmd/<service>/main.go`)
+  - Read only DI (dependency injection) wiring and boot configuration.
+  - Ensure business logic is not implemented here.
+
+### 2) Adapter layer (I/O boundaries)
+- HTTP (Gateway): `internal/handler/`
+  - Routing, request/response mapping, coarse authN/authZ, validation, error mapping.
+- gRPC (domain services): `internal/service/`
+  - Implementation of generated gRPC server interfaces; correct deadline/cancellation handling.
+
+### 3) Usecase (most important)
+- `internal/usecase/`
+  - The center of behavior: state transitions, permissions, edge cases.
+  - As defense against BOLA/BFLA, enforce **ownership checks and business-flow constraints** here.
+  - External I/O goes through interfaces (ports). Do not depend directly on implementations (DB/ES/Kafka).
+
+### 4) Domain (rules and types)
+- `internal/domain/`
+  - Entities, value objects, domain errors.
+  - Ensure no dependency on frameworks (Echo/pgx/sqlc).
+
+### 5) Repository (implementation details)
+- `internal/repository/`
+  - Implementations for DB/ES/Kafka/external APIs.
+  - SQL is the source of truth for DB access (next section). Never use an ORM.
+
+### 6) Database (SQL as SSOT)
+- Atlas: `schema.hcl`
+- SQL: `sql/queries/*.sql` (inputs for sqlc)
+- Generated code: never edit sqlc outputs manually.
+
+### 7) Contracts (service boundaries)
+- Internal contract: `.proto` (backward compatible; deadlines required)
+- External contract: `docs/openapi.yaml` (published by the Gateway; frontend uses generated code)
+
+### 8) Cross-cutting concerns (operations-critical)
+- Log/trace correlation (`request_id` / `trace_id`): middleware / interceptor.
+- timeout/retry/idempotency: treat `docs/01_architecture/RESILIENCY.md` as the SSOT and follow implementations accordingly.
+- SLO/alerting: `docs/05_operations/SLO_ALERTING.md`
+
+### 9) Read behavior via tests
+- Unit: read specifications in usecase/domain tests.
+- Integration: verify repository/sqlc/migrations behavior (Testcontainers).
+
+## Additional Best Practices (2026)
+These are high-leverage practices commonly used in production microservice systems.
+
+### A) Vulnerability management (Go)
+- Prefer Gos official vulnerability workflow: run `govulncheck` in CI and prioritize issues that are actually reachable from your code paths.
+- When updating dependencies, prefer minimal, reviewable diffs; avoid broad version bumps without clear need.
+
+### B) Fuzzing (targeted)
+- Add Go fuzz tests for input-heavy code (parsers, validators, mappers, deserializers) where bugs can become security issues.
+- Keep fuzz targets pure and deterministic; avoid external I/O in fuzz tests.
+
+### C) Supply-chain security (SLSA-aligned)
+- Prefer builds that produce verifiable provenance (who built it, how, and from what inputs).
+- Prefer generating and storing SBOM for released artifacts (or at least for container images).
+- Pin build/codegen tooling versions to keep regeneration reproducible.
+
+### D) Repository security posture (Scorecard-style)
+If the hosting platform supports it (e.g., GitHub), align repo hygiene with common baseline checks:
+- Branch protection and required reviews for default/release branches.
+- Least-privilege CI tokens (read-only by default; elevate only where necessary).
+- Avoid committing binaries and generated artifacts that can hide malicious changes.
+
+### E) gRPC operational best practices
+In addition to deadlines and health checks:
+- Use interceptors for cross-cutting behavior (auth, logging, tracing, deadline enforcement).
+- Support graceful shutdown to avoid failing in-flight RPCs.
+- Be deliberate about keepalive/connection settings to reduce cascading failures.
+- Use metadata consistently for correlation (`request_id`, `trace_id`) and idempotency where applicable.
+
+### F) Configuration & secrets
+- Configuration must be injected (env vars / secret managers). Never hardcode secrets or credentials.
+- Ensure logs never include secrets/PII; prefer structured logs with explicit allowlists of fields.
+
+### G) Safe change management
+- Prefer backward-compatible contract evolution (Proto/OpenAPI). If breaking changes are necessary, use explicit versioning.
+- For DB changes, prefer expand/contract migrations and plan rollbacks (see `docs/05_operations/RELEASE_DEPLOY.md`).
+
+## Critical Instructions (MUST)
+
+### 1) Database Access (Strict)
+- Rule: NEVER use an ORM (GORM, ent, etc.).
+- Rule: SQL is the source of truth for data access.
+- Process:
+  1. Modify `schema.hcl` (Atlas) for table definitions.
+  2. Write standard SQL in `sql/queries/*.sql`.
+  3. Run `sqlc generate`.
+  4. Use generated structs/interfaces in `internal/repository`.
+- Null handling: prefer NOT NULL + defaults; when NULL is required, use generated nullable types (pgx/pgtype) consistently.
+
+### 2) API Development (Contract First)
+- **Internal Services**: Protocol Buffers (.proto) is SSOT.
+  - Process:
+    1. Define/update `.proto` files (services/rpcs/messages).
+    2. Run `protoc` to generate Go code.
+    3. Implement gRPC server interfaces in `internal/service`.
+- **Gateway**: Converts gRPC to OpenAPI (HTTP/JSON).
+  - Use grpc-gateway or connectrpc for gRPC→HTTP transformation.
+  - Gateway exposes `docs/openapi.yaml` for frontend (Next.js/Orval).
+- Rule: Never change generated handler/service signatures manually.
+
+#### 2.1) Proto / gRPC Standards
+- Rule: Keep `.proto` backward compatible (never reuse field numbers; use versioning for breaking changes).
+- Rule: Every RPC must set a deadline (no infinite waits).
+- Rule: Implement health checking (`grpc.health.v1.Health`) (recommended).
+- CI: Enforce `.proto` quality/compatibility with `buf lint` / `buf breaking` (recommended).
+- Note: Changes to custom options like `google.api.http` are not covered by Buf breaking checks; detect them via regenerated OpenAPI diffs.
+
+#### 2.2) Tooling (Go 1.24+)
+- Prefer tracking codegen tools via the `tool` directive in `go.mod` (recommended)
+  - Purpose: pin protoc/plugin/grpc-gateway versions for reproducibility.
+
+### 3) Error Handling
+- Rule: Return typed domain errors from usecases; map to HTTP in handlers.
+- Rule: Use `errors.Join` for multi-error composition.
+- Rule: Keep gRPC status codes (internal) and HTTP status codes (external) consistently mapped (see `docs/03_integration/ERROR_HANDLING.md`).
+
+### 4) Go 1.25 Guidelines
+- Prefer iterators / range-over-func where it improves clarity and avoids allocations.
+- Use `log/slog` for structured logging.
+
+### 5) Search (Elasticsearch)
+- Use typed clients.
+- Define mappings in versioned JSON (e.g. `configs/es/mapping.json`).
+- Avoid heavy aggregations in PostgreSQL when Elasticsearch can serve them.
+
+## Output Quality Bar
+- Keep changes minimal and consistent with existing architecture.
+- Update docs when behavior or contracts change.
