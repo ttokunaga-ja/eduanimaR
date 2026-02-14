@@ -14,7 +14,7 @@
 - 保存が成功した時点で、以降の再処理が可能になる（原本が正）
 
 ### 2) 派生（PostgreSQL）
-- OCR結果、Markdown、要約、Chunk、Embedding は “派生” として世代管理できる設計にする
+- Markdown、Chunk、Embedding（必要ならSummary等）は “派生” として世代管理できる設計にする
 - 不整合の修復は「再解析（再ジョブ投入）」で行えること
 
 ## Ingestion Loop（整合性の考え方）
@@ -22,9 +22,8 @@
 2. Upload: GCSへ保存（gcs_uri と checksum を確定）
 3. Produce: Kafkaへ `IngestJob` を publish
 4. Consume: ワーカーが consume
-5. OCR/Vision: Gemini 2.0 Flash
-6. Structure/Embed-prep: Gemini 2.5 Flash-Lite
-7. Store: Postgresへ永続化
+5. Ingestion（Vision→Chunks）: Gemini 3 Flash（Structured Outputsで `chunks[]` を生成。Summaryは原則なし）
+6. Store: Postgresへ永続化
 
 ## 冪等（Idempotency）（MUST）
 Kafka は at-least-once を前提にするため、同一ジョブが複数回実行されても結果が増殖しないようにする。

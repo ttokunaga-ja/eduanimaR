@@ -9,7 +9,7 @@ Professor（OpenAPI + SSE / Kafka Worker / DB/GCS）と Librarian（gRPC）か�
 - Professor ↔ Cloud SQL(PostgreSQL/pgvector)
 - Professor ↔ GCS
 - Professor ↔ Kafka（produce/consume）
-- Professor ↔ Gemini API（OCR/構造化/最終生成）
+- Professor ↔ Gemini API（Ingestion/Plan/Search/最終生成）
 
 ## 基本原則（MUST）
 - **Timeout は必須**（無限待ち禁止）。上流の deadline/cancellation を下流へ伝播する
@@ -31,7 +31,13 @@ Professor（OpenAPI + SSE / Kafka Worker / DB/GCS）と Librarian（gRPC）か�
 ### DB/GCS/Kafka/Gemini
 - DB: クエリは常に deadline 付き（subject_id/user_id の物理絞り込み前提）
 - Kafka: consume は graceful shutdown を実装し、in-flight の扱い（ack/commit）を定義する
-- Gemini: モデル別（2.0 Flash / 2.5 Flash-Lite / 3.0 Pro）に timeout と並列数を分ける（bulkhead）
+- Gemini: **フェーズ別**に timeout と並列数を分ける（bulkhead）
+	- Ingestion（3 Flash）: 重い入力（PDF/画像）を想定し timeout を長め、並列数は控えめ
+	- Phase 2（3 Flash）: 短時間でPlan生成。並列は上げても良いが rate limit を尊重
+	- Phase 3（3 Flash）: ループ回数が増えるため 1回あたりのtimeoutを短め＋MaxRetryで上限を固定
+	- Phase 4（3 Pro）: 最終生成は高コストなので並列を強く絞る
+
+> 注: Phase 1〜3 は同一モデル（Gemini 3 Flash）でも、**用途別にキュー/並列数/timeout を分離**して連鎖障害を防ぐ。モデルIDは環境変数で上書き可能。
 
 ## Retry / 再処理
 ### HTTP
@@ -41,6 +47,12 @@ Professor（OpenAPI + SSE / Kafka Worker / DB/GCS）と Librarian（gRPC）か�
 ### Kafka（Ingestion）
 - at-least-once を前提に、**結果側（DB永続化）を冪等**にする
 - DLQ を用意し、手動リドライブ（再投入）で復旧できるようにする
+
+### Phase 3（検索ループ）の無限ループ対策（MUST）
+- LangGraph の `MaxRetry`（回数）に加え、Professor 側で wall-clock の上限時間も設ける
+- **推奨 MaxRetry: 5回（3回 + 2回のリカバリ）**。それ以上は「嘘の検索」やコスト増のリスクが上がる
+- 停止条件に達しない場合でも、Librarian は「不足している情報」を明示して終了できること（早期諦め/無限ループを防ぐ）
+- Phase 3は `thinking_level: Low` を基本にし、**最終回のみ Medium に上げて“本当に見つからないか”を再検討**してよい
 
 ## Bulkhead / Rate Limit（推奨）
 - Gemini・DB・Librarian を別々の同時実行数/キューで隔離し、連鎖障害を防ぐ

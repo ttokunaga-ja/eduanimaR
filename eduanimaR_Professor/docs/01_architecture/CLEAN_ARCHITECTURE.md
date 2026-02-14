@@ -29,7 +29,7 @@ Professor（Go）を「司令塔 + データの守護者」として成長させ
   - `gcs/`
   - `kafka/`（producer/consumer）
   - `librariangrpc/`（gRPC client）
-  - `gemini/`（2.0 Flash / 2.5 Flash-Lite / 3.0 Pro の呼び出し実装）
+  - `gemini/`（3 Flash / 3 Pro の呼び出し実装。モデルは環境変数で切替）
 - `pkg/`
   - 横断共有してよい（かつ安定）なライブラリのみ（乱用禁止）
 

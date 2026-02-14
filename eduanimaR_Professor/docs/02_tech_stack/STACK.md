@@ -25,9 +25,31 @@
 
 | フェーズ | タスク | 使用モデル |
 | :--- | :--- | :--- |
-| ① PDF解析 | OCR・図版認識 | **Gemini 2.0 Flash** |
-| ② 構造化 | Markdown整理・要約・Embedding用ドキュメント生成 | **Gemini 2.5 Flash-Lite** |
-| ③ 生成・推論 | 最終回答生成（引用元を含める） | **Gemini 3.0 Pro** |
+| Ingestion（前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力） | **Gemini 3 Flash** |
+| Phase 2（解析/Plan） | 質問の意図解釈・検索戦略立案・停止条件（終了条件）定義（JSON） | **Gemini 3 Flash** |
+| Phase 3（検索/Loop） | 再検索ループ・情報十分性判断（チャンク＋前後で評価） | **Gemini 3 Flash** |
+| Phase 4（回答/RAG） | 選定資料の全文Markdownを読み込み最終回答生成 | **Gemini 3 Pro** |
+
+### 要件（運用ポリシー）
+- Summary（要約）は **原則生成しない**（検索精度は詳細Chunkを正とする）。大量ファイルからの高速選別が必要になった場合のみ「ファイル単位Summary」を追加する。
+- Phase 3（検索）中は **チャンク＋前後**を使い、Phase 4（回答）で初めて **選定資料の全文Markdown** を読み込む。
+
+### LangGraph ループ設定（推奨）
+- `MaxRetry`（検索ステップ上限）: **5回（3回 + 2回リカバリ）**
+- 5回で停止条件に達しない場合: 「現時点の根拠で回答へ進む」または「不足を明記して終了」を許可する（無限ループ回避）
+
+### thinking_level（推奨）
+- Ingestion: `Minimal`（定型変換なので推論を最小化）
+- Phase 2: `Medium`（戦略ミスが全体コストに直結するため）
+- Phase 3: `Low`（速度優先。最終回のみ `Medium` に上げて再検討してよい）
+
+### モデル設定（環境変数）
+モデルは環境変数で切り替え可能（値は Gemini API に渡す **モデルID文字列**）。
+
+- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: Gemini 3 Flash）
+- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: Gemini 3 Flash）
+- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: Gemini 3 Flash）
+- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: Gemini 3 Pro）
 
 ## 通信スタック（SSOT）
 - Frontend ↔ Professor: **HTTP/JSON（OpenAPI）** + **SSE**
