@@ -1,6 +1,8 @@
 # Docs Portal
 
-この `docs/` 配下は「マイクロサービス + Gateway + 契約駆動 + 運用」を前提にした設計/運用ドキュメント集です。
+この `docs/` 配下は **Professor（Go）側**の設計/運用/契約（SSOT）ドキュメント集です。
+
+他コンポーネント（例: フロントエンド / Librarian 推論サービス）については、このリポジトリでは **通信（契約）と役割（責務境界）** のみを扱い、実装詳細は扱いません。
 
 ## Quickstart（最短で開発開始）
 0. `00_quickstart/QUICKSTART.md`
@@ -54,8 +56,10 @@
 
 ## フロントエンド（同居/分離どちらでも）
 - FSD層: `01_architecture/FSD_LAYERS.md`
-- コンポーネント設計: `01_architecture/COMPONENT_ARCHITECTURE.md`
 - TSの位置づけ: `02_tech_stack/TS_GUIDE.md`
+
+> 注: フロントエンド実装詳細（コンポーネント設計など）は本リポジトリの対象外です。
+> 本リポジトリでは、Professor（Go）側で必要な「契約（OpenAPI）と責務境界」のみを扱います。
 
 ## Skills（Agent向けの実務ルール集）
 このテンプレートの前提（SSOT/禁止事項/安全なデフォルト/チェックリスト）を短くまとめた Skill ドキュメントです。

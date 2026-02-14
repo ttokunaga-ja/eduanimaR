@@ -5,13 +5,12 @@ API を安全に提供するための **最低限の設計・実装・運用ル�
 OWASP API Security Top 10 の観点を、日々の設計/レビュー/実装に落とし込む。
 
 ## 適用範囲
-- Browser ↔ Next.js(BFF)
-- Next.js(BFF) ↔ Go API Gateway
-- Go API Gateway ↔ Go Microservices（gRPC）
+- Frontend ↔ Professor（HTTP/JSON + SSE）
+- Professor ↔ Librarian（gRPC）
 
 ## 基本原則（MUST）
 - **認可は二段構え**
-  - Gateway: 認証・大枠の権限（ロール/スコープ/テナント）
+  - Transport: 認証・大枠の権限（ロール/スコープ/テナント）
   - Usecase: **最終的な所有者/状態遷移/業務フローの正当性** を検証（BOLA/BFLA の最後の防波堤）
 - **入力は必ず検証**（型・範囲・長さ・列挙・正規化）し、拒否時は共通エラー形式に統一する（関連: ERROR_HANDLING）。
 - **リソース消費を必ず制限**（タイムアウト/ページング上限/レート制限/最大ボディサイズ）。
@@ -32,13 +31,17 @@ OWASP API Security Top 10 の観点を、日々の設計/レビュー/実装に�
 - 内部通信は service-to-service 認証（mTLS / workload identity）を必須化（関連: IDENTITY_ZERO_TRUST / INTER_SERVICE_COMM）
 
 ### C. リソース消費（Unrestricted Resource Consumption）
-- すべての外部 I/O に timeout がある（HTTP/gRPC/DB/ES/Kafka）
+- すべての外部 I/O に timeout がある（HTTP/SSE/gRPC/DB/GCS/Kafka/LLM）
 - ページングはデフォルト値と上限を持つ（例: `limit <= 100`）
 - ソート/フィルタは許容リスト方式（任意フィールド指定を許さない）
 - アップロードや大きいリクエストは **最大サイズ** を決める
 
+SSE（追加観点）:
+- 同時接続数や接続時間を制限する（必要なら）
+- クライアント切断時にキャンセルを伝播し、無駄な処理を継続しない
+
 ### D. セキュリティ設定ミス（Misconfiguration）
-- CORS/CSRF/セキュリティヘッダの責務（BFF or Gateway）を決めている
+- CORS/CSRF/セキュリティヘッダの責務（Professor）を決めている
 - 本番で debug エンドポイント、reflection（gRPC）、詳細エラーを無効化
 - 依存先接続文字列/秘密情報がログに出ない
 

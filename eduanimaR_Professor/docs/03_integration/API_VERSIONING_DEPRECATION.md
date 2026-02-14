@@ -4,8 +4,11 @@
 外部API（OpenAPI）を長期運用するため、互換性・バージョニング・非推奨/廃止（deprecation）を標準化する。
 
 ## 適用範囲
-- Browser ↔ Next.js(BFF)
-- Next.js(BFF) ↔ Go API Gateway（外向き API / OpenAPI SSOT）
+- Frontend ↔ Professor（外向き API / OpenAPI SSOT）
+
+## 補足: gRPC/Proto（内部）
+- Professor ↔ Librarian の内部契約は `.proto` の `package` バージョン（例: `librarian.v1`）で進化させる
+- 互換性は `buf breaking` 等で機械的に検査する
 
 ## 原則（MUST）
 - **互換性を壊さない**のが基本。破壊的変更は最後の手段。

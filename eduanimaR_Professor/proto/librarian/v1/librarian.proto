@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package librarian.v1;
+
+option go_package = "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/proto/librarian/v1;librarianv1";
+
+// Professor ↔ Librarian internal contract (SSOT).
+//
+// Librarian is a stateless reasoning service.
+// - MUST NOT access DB/GCS directly.
+// - MUST treat all provided context as untrusted input.
+service LibrarianService {
+  // Professor opens a bidirectional reasoning session.
+  // Librarian can request searches; Professor executes them with enforced physical constraints
+  // (user_id / subject_id / is_active etc.) and returns results to Librarian.
+  rpc Reason(stream ReasoningInput) returns (stream ReasoningOutput);
+}
+
+message ReasoningInput {
+  string request_id = 1;
+  oneof payload {
+    Start start = 10;
+    SearchResult search_result = 11;
+    Cancel cancel = 12;
+  }
+}
+
+message ReasoningOutput {
+  string request_id = 1;
+  oneof payload {
+    Progress progress = 10;
+    SearchRequest search_request = 11;
+    Final final = 12;
+  }
+}
+
+message Start {
+  // Auth context decided by Professor (SSOT boundary).
+  string user_id = 1;
+  string subject_id = 2;
+
+  string question = 3;
+
+  // Safety/limits controlled by Professor.
+  int32 max_search_steps = 10;
+}
+
+message Cancel {
+  string reason = 1;
+}
+
+message Progress {
+  string stage = 1;   // e.g., "planning" | "searching" | "synthesizing"
+  string message = 2; // user-safe text
+}
+
+enum SearchMode {
+  SEARCH_MODE_UNSPECIFIED = 0;
+  SEARCH_MODE_KEYWORD = 1;
+  SEARCH_MODE_VECTOR = 2;
+  SEARCH_MODE_HYBRID = 3;
+}
+
+message SearchRequest {
+  // Correlates request/response within a session.
+  string step_id = 1;
+
+  SearchMode mode = 2;
+  string query_text = 3;
+  int32 top_k = 4;
+
+  // Optional hints; Professor MUST enforce physical constraints regardless.
+  // Librarian MUST NOT assume these are applied unless returned in results metadata.
+  repeated string keywords = 5;
+}
+
+message SearchResult {
+  string step_id = 1;
+  repeated EvidenceChunk chunks = 2;
+}
+
+message EvidenceChunk {
+  // IDs are strings for compatibility (UUID as string).
+  string material_id = 1;
+
+  // Citation pointers (best-effort). Professor populates from derived data.
+  int32 page_start = 2;
+  int32 page_end = 3;
+
+  // Snippet for reasoning (markdown/text).
+  string snippet_markdown = 4;
+
+  double score = 5;
+}
+
+message Final {
+  string answer_markdown = 1;
+  repeated string material_ids = 2;
+}

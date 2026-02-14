@@ -1,41 +1,48 @@
-# SYNC_STRATEGY
+# SYNC_STRATEGY（MVP: GCS / Kafka / PostgreSQL）
 
 ## 目的
-PostgreSQL と Elasticsearch のデータ整合性を、運用可能なコストで維持するための同期戦略を定義する。
+原本（GCS）と派生データ（PostgreSQL: Markdown/Chunk/Embedding 等）の整合性を、運用可能なコストで維持するための同期・再処理戦略を定義する。
 
-## 前提
-- 検索/集計は Elasticsearch 9.2.4 を第一候補とする
-- 差分同期は Debezium CDC（Kafka経由）を基本とする
+## 前提（MVP）
+- 検索は PostgreSQL（pgvector）を正とする
+- 資料解析は Kafka を用いた非同期（IngestJob）で実行する
+- DB/GCSへ直接アクセスできるのは Professor のみ
+- MVPでは Elasticsearch は使用しない
 
-## 代表的パターンと採用指針
-### 1) Debezium CDC（推奨）
-- 概要: PostgreSQL の論理レプリケーション → Debezium → Kafka → Indexer → Elasticsearch
-- 長所: アプリの書き込み経路を汚さない、再処理がしやすい
-- 注意:
-  - スキーマ変更時の互換性（トピック/イベント）
-  - 冪等（idempotency）と順序保証
+## 整合性の単位
+### 1) 原本（GCS）
+- 保存が成功した時点で、以降の再処理が可能になる（原本が正）
 
-### 2) Transactional Outbox
-- 概要: アプリがDB書き込みと同一Txで outbox にイベントを書き、別プロセスが配送
-- 長所: 整合性が取りやすい
-- 注意: outbox掃除/再配送/遅延の設計が必要
+### 2) 派生（PostgreSQL）
+- OCR結果、Markdown、要約、Chunk、Embedding は “派生” として世代管理できる設計にする
+- 不整合の修復は「再解析（再ジョブ投入）」で行えること
 
-### 3) Dual Write（非推奨）
-- 概要: アプリがDBとESへ同時書き込み
-- リスク: 部分失敗で不整合が発生しやすい
+## Ingestion Loop（整合性の考え方）
+1. Receive: Professor がファイル受領（user_id/subject_id を確定）
+2. Upload: GCSへ保存（gcs_uri と checksum を確定）
+3. Produce: Kafkaへ `IngestJob` を publish
+4. Consume: ワーカーが consume
+5. OCR/Vision: Gemini 2.0 Flash
+6. Structure/Embed-prep: Gemini 2.5 Flash-Lite
+7. Store: Postgresへ永続化
 
-## 整合性レベル（定義必須）
-- 検索は結果整合（eventual consistency）を許容するか
-- 許容遅延（例: P95で5秒以内等）
-- 不整合検知とリカバリ（フルリインデックス手順）
+## 冪等（Idempotency）（MUST）
+Kafka は at-least-once を前提にするため、同一ジョブが複数回実行されても結果が増殖しないようにする。
 
-> SLO/アラート（遅延・DLQ）は `05_operations/SLO_ALERTING.md` を参照。
+- 推奨: 原本由来の冪等キーを持つ
+  - 例: `(user_id, subject_id, source_checksum, derivative_version)`
+- “ジョブを冪等にする”よりも、**結果の永続化を冪等にする**ことを優先する
+
+## 不整合の検知と復旧
+- 検知例
+  - GCSに原本はあるが、DBに派生がない
+  - materialはあるが embedding が欠けている
+- 復旧原則
+  - `IngestJob` を再投入して再生成する（DLQ/リドライブ前提）
 
 ## 失敗時の原則
-- Indexerは冪等に実装し、同一イベント再処理で結果が変わらないこと
-- デッドレター（DLQ）を用意し、手動介入で復旧できること
-
-> イベント契約・DLQ・再処理は `03_integration/EVENT_CONTRACTS.md` を参照。
+- DLQ（デッドレター）を用意し、手動介入で復旧できること
+- 再処理時も subject_id/user_id の物理制約を破らないこと
 
 ## 関連
 - `03_integration/EVENT_CONTRACTS.md`

@@ -20,7 +20,7 @@ MUI v6 + Pigment CSS の採用方針と制約を定義し、フロントエン�
 
 ## 制約（バックエンドとの関係）
 - バックエンド（Go）が返すデータ構造は、フロントエンドの表示ロジックに影響する
-- 例: `user.status` が `active` / `inactive` / `suspended` の3値を取る場合、フロントエンドは事前に対応する色を定義しておく必要がある
+- 例: 回答に添付する Source の種類（GCS URL / LMS URL / ファイルパス）に応じて、フロントエンドは表示（クリック可能、ページ番号等）を事前に定義しておく必要がある
 - この対応関係は `ERROR_CODES.md` と同様に、バックエンド・フロントエンド間で同期させる
 
 ## アップグレード時の確認観点
@@ -32,5 +32,5 @@ MUI v6 + Pigment CSS の採用方針と制約を定義し、フロントエン�
 - `GO_1_25_GUIDE.md`: Go の標準ライブラリ優先（`log/slog`, `errors` 等）
 - `SQLC_QUERY_RULES.md`: ORM 禁止、sqlc による型生成
 - `ECHO_HANDLERS.md`: Echo v5 のハンドラー実装ルール
-- `ELASTICSEARCH_OPS.md`: Elasticsearch のインデックス設計・運用
+- `ELASTICSEARCH_OPS.md`: Post-MVP（MVPでは使用しない）
 

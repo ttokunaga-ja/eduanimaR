@@ -1,31 +1,25 @@
-# SLICES_MAP
+# SLICES_MAP（Frontend slices ↔ Professor API）
 
 ## 位置づけ
-フロントエンド（Next.js + FSD）の **機能スライス (slices)** と、バックエンド（Go）の **マイクロサービス境界** の対応関係を定義する。
+フロントエンド（Web / Chrome拡張）の **機能スライス (slices)** と、バックエンド（Professor）の **公開IF（OpenAPI + SSE）** の対応関係を定義する。
 
-## FSD における「スライス」とは
-- FSD の各階層（entities / features / widgets / pages）は、さらに**機能単位のディレクトリ（スライス）**に分割される
-- 例:
-  - `entities/user/` ← これが1つのスライス
-  - `features/auth/login-form/` ← これも1つのスライス
+## 前提
+- Frontend は Professor のみを直接呼ぶ（Librarianは内部サービスであり直接呼ばない）
+- 外向き契約は OpenAPI（`docs/openapi.yaml`）を正とする
 
-## バックエンドとの対応
-| FE Slice | BE Microservice | 説明 |
+## 対応表（例）
+| FE Slice | Professor API / Stream | 説明 |
 | --- | --- | --- |
-| `entities/user/` | User Service | ユーザー情報の取得・表示 |
-| `entities/product/` | Product Service | 商品情報の取得・表示 |
-| `entities/order/` | Order Service | 注文情報の取得・表示 |
-| `features/auth/login-form/` | User Service (Auth API) | ログインフォーム |
-| `features/cart/add-to-cart/` | Order Service | カート追加 |
-| `features/search/search-bar/` | Search Service (Elasticsearch) | 検索バー |
-
-> 注: 上表は例。実プロジェクトの実態に合わせて必ず更新すること。
+| `entities/subject/` | subjects API | 科目の取得・表示 |
+| `entities/material/` | materials API | 資料一覧・メタデータ表示 |
+| `features/auth/` | auth API | OIDCログイン/セッション管理 |
+| `features/ingest/upload/` | ingest API | アップロード → GCS → Kafka投入 |
+| `features/chat/ask/` | chat API + SSE | 質問送信 + 進捗/回答/引用のストリーミング |
+| `widgets/chat-panel/` | SSE consumer | ストリーミングUI（再接続を考慮） |
+| `widgets/materials-tree/` | subjects/materials | 科目ツリー + 資料ブラウズ |
 
 ## 最小ルール
-- 新機能追加時は、まず「どのバックエンドサービスから取得するか」を `MICROSERVICES_MAP.md` で判断する
-- その後、フロントエンド側の「どの階層・スライスに置くべきか」を決める
-  - データ取得・表示だけなら `entities`
-  - ユーザー操作（フォーム送信等）があれば `features`
-  - 複数の機能を組み合わせた大きなUIブロックなら `widgets`
-- それでも不明な場合は、ドメイン境界（責務）の再定義を検討する
+- 新機能追加時は、まず Professor 側の責務（usecase）を決める
+- 次に slice の配置（entities/features/widgets）を決める
+- “検索” は Professor が DB を検索する（MVPで Elasticsearch は使用しない）
 

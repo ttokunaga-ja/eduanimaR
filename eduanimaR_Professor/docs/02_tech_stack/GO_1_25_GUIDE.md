@@ -7,6 +7,13 @@ Go 1.25.7 の機能を活かしつつ、読みやすさ・型安全性・運用�
 - 可読性が最優先（賢いワンライナーより、意図が伝わるコード）
 - 標準ライブラリ優先（`log/slog`, `errors` 等）
 
+## context（MUST）
+Professor は HTTP（OpenAPI）/SSE と gRPC（Librarian）をまたぐため、`context.Context` の扱いを統一する。
+
+- handler/transport で受けた `context` を usecase → repository/adapter へ必ず伝播する
+- gRPC クライアント呼び出しは deadline 必須（無限待ち禁止）
+- SSE はクライアント切断を前提にし、切断後に goroutine が残り続けないようにする
+
 ## エラー
 - 原則: sentinel error よりも型付きエラー（domain error）を使う
 - 複数エラーの合成は `errors.Join` を使う（独自multi-error禁止）

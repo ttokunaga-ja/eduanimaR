@@ -5,8 +5,8 @@
 レビューの目視だけに頼らず **CI で機械的に検出**する。
 
 ## 対象
-- 外向き契約: OpenAPI（Gateway → BFF/Frontend）
-- 内部契約: Protocol Buffers（Gateway ↔ Microservices）
+- 外向き契約: OpenAPI（Frontend ↔ Professor）
+- 内部契約: Protocol Buffers（Professor ↔ Librarian）
 - 非同期契約: Event schema（Kafka）
 
 ## 原則（MUST）
@@ -51,9 +51,12 @@
 
 ## CI への組み込み（例）
 - Stage: Contract
-  - OpenAPI: 再生成差分 + breaking check
+  - OpenAPI: lint + breaking check
   - Proto: lint + breaking + 生成差分
   - Event: schema compatibility check
+
+## Goテスト（このリポジトリでの最小ガード）
+- `go test ./...` で SSOT ファイル（`docs/openapi.yaml`, `proto/**/*.proto`）の存在/最低限の形を検査する（例: `internal/contracttest`）
 
 > 具体ツール（buf / openapi-diff / schema registry 等）はプロジェクトで決める。
 > 本テンプレは“何を検査すべきか”を標準化する。

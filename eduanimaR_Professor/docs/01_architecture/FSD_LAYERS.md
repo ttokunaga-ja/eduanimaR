@@ -27,11 +27,15 @@
 | FE (FSD) | BE (Clean Architecture) |
 | --- | --- |
 | `app` (routing) | `cmd/` (entry point) |
-| `pages` (page composition) | `handler` (HTTP layer) |
+| `pages` (page composition) | `transport/http` (OpenAPI + SSE) |
 | `features` (use cases) | `usecase` (business logic) |
 | `entities` (business entities) | `domain` (entities) |
 | `shared/api` (generated) | `repository` interface |
 | `shared/ui` (MUI components) | （該当なし） |
+
+## eduanima+R 固有の注意（MUST）
+- Frontend が直接呼ぶバックエンドは Professor のみ（OpenAPI + SSE）
+- 生成回答は必ず Source を表示する（クリック可能な path/url + ページ番号等）
 
 ## ディレクトリ例
 ```

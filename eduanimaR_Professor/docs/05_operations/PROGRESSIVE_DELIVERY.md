@@ -5,8 +5,9 @@
 SLO を守りながら安全にリリースするための段階的デリバリー標準を定義する。
 
 ## 適用範囲
-- API Gateway / Microservices
-- 非同期（Indexer / Consumer）
+- Professor（外向きHTTP API / SSE）
+- Professor の非同期処理（Kafka consumer / worker）
+- Professor → Librarian（gRPC client 依存）
 - DB マイグレーション（関連: `05_operations/MIGRATION_FLOW.md`）
 
 ## 原則（MUST）
@@ -38,12 +39,20 @@ SLO を守りながら安全にリリースするための段階的デリバリ�
 - 監視:
   - エラー率（HTTP 5xx / gRPC status）
   - p95/p99 レイテンシ
-  - 依存先（DB/ES/Kafka）の失敗率/レイテンシ
+  - 依存先（DB/Kafka/GCS/Librarian gRPC）の失敗率/レイテンシ
 - 相関:
   - `request_id` / `trace_id` が追える
 - ロールバック:
   - アプリのロールバック手順がある
   - DB は expand/contract に沿っている（下記）
+
+## SSE を含むリリース注意点（MUST）
+- 切替時の挙動を定義する:
+  - 既存 SSE 接続は切断され得る（再接続・再送設計はクライアント契約に含める）
+  - シャットダウン時は可能なら graceful に close し、処理中のリクエストをキャンセル伝播する
+- 監視で追う:
+  - 同時接続数、切断率、再接続率
+  - ストリーム処理のエラー率（ハンドラ内部の失敗/コンテキストキャンセル）
 
 ## 自動ロールバック（推奨）
 - カナリア中は SLO/SLI をゲートにする
@@ -62,13 +71,13 @@ SLO を守りながら安全にリリースするための段階的デリバリ�
 
 > Atlas の運用は `05_operations/MIGRATION_FLOW.md`。
 
-## 非同期（CDC/Indexer）のリリース
+## 非同期（Kafka consumer / worker）のリリース
 - 互換性:
-  - イベントスキーマは後方互換（フィールド追加は任意）
+  - イベントスキーマは後方互換（フィールド追加は任意、既存 consumer が壊れない）
 - カナリア:
   - consumer グループを分ける、もしくは一部パーティションのみ処理するなど段階導入
 - 監視:
-  - DLQ 増加、遅延（DB→検索反映）をゲートにする
+  - DLQ 増加、処理遅延（lag）、リトライ増加をゲートにする
 
 ## リリースチェックリスト（テンプレ）
 - 変更種別: API/DB/イベント/インフラ

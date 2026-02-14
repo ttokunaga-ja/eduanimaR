@@ -7,8 +7,8 @@
 監査ログは “デバッグログ” や “アプリログ” と目的が異なる。
 
 ## 適用範囲
-- 外部API（Gateway）
-- 内部API（gRPC）
+- 外部API（Professor: HTTP API / SSE）
+- 内部API（Professor → Librarian: gRPC）
 - 管理操作（運用API/管理画面）
 - 重要データの参照・更新
 
@@ -36,6 +36,10 @@
   - 対象リソース種別/ID（例: `order_id`）
 - `request_id` / `trace_id`
 - `source_ip`（外部操作の場合）
+
+### SSE の扱い（推奨）
+- SSE の「接続開始/切断」は監査ログではなく運用ログ/メトリクスで扱うことが多い
+- ただし、SSE 経由で“ユーザーの意思決定に影響するイベント”を送る場合は、送信した事実（event種別/対象/actor/request_id）を監査対象に含める
 
 ### 禁止（MUST NOT）
 - PII の丸ごと記録（氏名、住所、決済情報など）

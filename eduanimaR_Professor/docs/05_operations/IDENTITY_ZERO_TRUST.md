@@ -1,16 +1,16 @@
 # IDENTITY_ZERO_TRUST
 
 ## 目的
-マイクロサービス環境で「誰が誰と通信しているか」を**強く**証明し、
+2サービス構成（Professor / Librarian）で「誰が誰と通信しているか」を**強く**証明し、
 横移動・秘密情報漏えい・設定ミスによる侵害拡大を防ぐ。
 
 本書は **Zero Trust（ネットワークを信用しない）** を前提に、
 サービス間（workload-to-workload）通信の identity / 認証 / 認可 / 運用を標準化する。
 
 ## 適用範囲
-- Go API Gateway ↔ Go Microservices（gRPC）
-- Microservices ↔ Microservices（将来の直呼び含む）
-- 非同期（Kafka consumer / Indexer / バッチ）
+- Professor ↔ Librarian（gRPC）
+- Professor の非同期処理（Kafka consumer / worker / バッチ）
+- 外向き（Frontend ↔ Professor: HTTP/SSE）は `05_operations/API_SECURITY.md` を主に参照
 
 ## 用語
 - **End-user identity**: 人（ユーザー）を表すID（JWTのsub等）
@@ -56,16 +56,17 @@
 
 ## 認可（Authorization）
 ### 責務分界（推奨）
-- **Gateway**: end-user の認証/大枠の認可（ロール/テナント等）
-- **各サービス**: workload identity を前提に、
+- **Professor（外向きHTTP/SSE）**: end-user の認証/大枠の認可（ロール/テナント等）
+- **Professor（内向きgRPC client / worker）**: workload identity を前提に、
   - 呼び出し元サービスの許可
   - メソッド単位の権限
   - 業務上の所有者チェック/状態遷移チェック（BOLA/BFLA）
 
 ### 最小ポリシー（テンプレ）
-- `api-gateway` → `user` の `UserService/*` は許可
-- `api-gateway` → `order` の `OrderService/CreateOrder` は許可
-- `product` → `order` の直呼びは原則禁止（必要時は明示し、監査ログ対象）
+- `professor` → `librarian` の `LibrarianService/Reason` は許可
+- `librarian` → `professor` の inbound（逆向き呼び出し）は原則禁止（必要なら明示し、監査ログ対象）
+
+> Librarian はDB/GCSへ直接アクセスしない。アクセス権（secret）を付与しないことで境界を強める。
 
 > 実装は OPA 等の policy engine を使ってもよいし、
 > 静的な allowlist（サービス×メソッド）から始めてもよい。

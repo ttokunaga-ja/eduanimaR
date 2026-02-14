@@ -1,7 +1,7 @@
 # API_GEN
 
 ## 目的
-本リポジトリ（バックエンド）で定義した OpenAPI 契約を前提に、フロントエンド（Next.js + TypeScript）が **Orval** を使って安全に型生成できる状態を維持する。
+本リポジトリ（Professor: Go）で定義した OpenAPI 契約を前提に、consumer（例: フロントエンド）がクライアント/型生成ツールを使って安全に統合できる状態を維持する。
 
 ## 原則
 - OpenAPI が正（`API_CONTRACT_WORKFLOW.md`）
@@ -9,26 +9,16 @@
 - **手書きの型定義・fetch 関数を禁止** し、生成に統一する
 
 ## フロントエンド側の生成ツール（確定）
-- **Orval** (推奨): OpenAPI から TypeScript 型 + React Query Hooks を生成
-- または **OpenAPI Generator**: 汎用的だが、Orval の方が React Query 統合が優れている
+consumer 側で OpenAPI からクライアント/型生成を行う場合がある（ツールは consumer 側の裁量）。
 
 ## バックエンド側の責務
-1. 常に最新の `openapi.yaml` (または JSON) をエクスポートする
+1. 常に最新の `docs/openapi.yaml` を SSOT として維持する
 2. 変更時は以下を明記する：
    - **Breaking Changes**: 既存クライアントが壊れる変更（必須フィールド追加、型変更、エンドポイント削除等）
    - **Compatible Changes**: 後方互換（任意フィールド追加、新エンドポイント等）
 3. エラーコードは `ERROR_CODES.md` をSSOTとして、フロントエンドと同期する
 
 ## 受け手（フロントエンド）との連携
-- バックエンドが `openapi.yaml` を更新したら、フロントエンドは `npm run api:generate` を実行
+Professor 側が `docs/openapi.yaml` を更新したら、consumer 側は必要に応じてクライアント/型生成を再実行する。
 - 生成されたコードは `src/shared/api/` に配置され、FSD の上位層（entities/features）から import される
-- **型定義の手書きは禁止**。すべて生成物を使う。
-
-## 配置例（フロントエンド側）
-```
-src/shared/api/
-├── user.gen.ts       # Orval生成: User型 + useGetUser() Hook
-├── product.gen.ts    # Orval生成: Product型 + useGetProducts() Hook
-└── order.gen.ts      # Orval生成: Order型 + useCreateOrder() Hook
-```
 

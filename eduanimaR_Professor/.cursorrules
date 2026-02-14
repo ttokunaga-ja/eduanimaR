@@ -2,8 +2,8 @@
 
 ## Context
 - Date: 2026-02-11
-- Stack: Go 1.25.7, gRPC, Echo v5.0.1 (Gateway layer), PostgreSQL 18.1, Atlas v1.0.0, sqlc 1.30.0, pgx v5.8.0, Elasticsearch 9.2.4, Debezium CDC, Testcontainers v0.40.1.
-- Architecture: Microservices + Clean Architecture + gRPC (internal) + HTTP/JSON (external via Gateway).
+- Stack: Go 1.25.7, gRPC, Echo v5.0.1, PostgreSQL 18.1, Atlas v1.0.0, sqlc 1.30.0, pgx v5.8.0, Testcontainers v0.40.1.
+- Architecture: 2 services (Professor: Go / Librarian: reasoning service). Professor is the data guardian (direct DB/GCS access). External: HTTP/JSON + SSE (OpenAPI SSOT). Internal: gRPC (Proto SSOT). Elasticsearch / Debezium CDC are deferred.
 
 ## How to Read (Docs)
 Treat `docs/README.md` as the portal (reading order / link hub).
@@ -96,7 +96,7 @@ Repository layout may vary by project; the reading approach below applies to bot
 
 ### 7) Contracts (service boundaries)
 - Internal contract: `.proto` (backward compatible; deadlines required)
-- External contract: `docs/openapi.yaml` (published by the Gateway; frontend uses generated code)
+- External contract: `docs/openapi.yaml` (published by Professor; consumers may use generated code)
 
 ### 8) Cross-cutting concerns (operations-critical)
 - Log/trace correlation (`request_id` / `trace_id`): middleware / interceptor.

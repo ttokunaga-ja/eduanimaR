@@ -3,6 +3,10 @@
 ## 目的
 PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（型/制約/インデックス）を統一する。
 
+## データ所有（最重要）
+- Cloud SQL（PostgreSQL）と GCS の直接アクセス権限は **Professor のみに付与**する
+- Librarian は DB/GCS の資格情報を持たない（設計・運用の不変条件）
+
 ## ID戦略（UUID + NanoID）
 - 内部主キー: UUID（推奨: UUIDv7 / `uuidv7()` を利用）
 - 外部公開ID: NanoID（URL/ログ/問い合わせで扱いやすい短ID）
@@ -35,3 +39,14 @@ PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（�
 ## Atlas運用前提
 - スキーマ変更は `schema.hcl` が唯一の正
 - 手動 `ALTER TABLE` は禁止（差分が壊れる）
+
+## マルチテナント/物理制約（MUST）
+- 検索・参照の主経路は「user_id / subject_id による物理絞り込み」を前提にする
+- 主要テーブルは原則として以下のカラムを持つこと
+  - `user_id`
+  - `subject_id`
+  - `is_active` または `deleted_at`
+
+## LLM派生データの世代管理（推奨）
+- OCR/構造化/Embedding は将来のモデル更新で再生成される
+- 「原本（GCS）」と「派生（DB）」を分け、派生は version/generation を持てる設計にする

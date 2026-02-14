@@ -4,21 +4,26 @@
 秘密情報（secrets）と暗号鍵（keys）を安全に扱い、漏えい時の影響を最小化する。
 
 ## 適用範囲
-- アプリ設定（DB接続、外部APIキー、Kafka認証、TLS鍵など）
+- Professor のアプリ設定（DB接続、GCS認証、外部APIキー、Kafka認証、TLS/mTLS鍵など）
 - 署名鍵（JWT/セッショントークン等）
 - 暗号鍵（PIIの暗号化、KMS、Envelope encryption）
+
+> このリポジトリは Professor（Go）側が主対象。Librarian は別サービスのため、Librarian が保持すべき秘密情報（内部実装用の鍵等）はここでは扱わない。
 
 ## 分類
 ### Secret（秘密情報）
 - DB パスワード / 接続情報
+- GCS 認証（サービスアカウント等。可能ならワークロードアイデンティティで鍵レス化）
 - 外部 API キー
+- LLM プロバイダAPIキー（Professor が直接呼ぶ場合）
 - OAuth client secret
 - Webhook secret
+- Kafka 認証情報（SASL等を使う場合）
 
 ### Key（鍵）
 - 署名鍵（JWT signing key 等）
 - 暗号鍵（データ暗号化、フィールド暗号化）
-- mTLS 証明書の private key
+- mTLS 証明書の private key（Professor ↔ Librarian 間など）
 
 ### 非Secret（設定）
 - feature flag の ON/OFF
@@ -41,6 +46,8 @@
 - コンテナ起動時に secret manager から注入
 - アプリは `os.Getenv` 等で読む
 
+> 可能なら「短命クレデンシャル（OIDC等）+ ワークロードID」で、長期鍵を減らす。
+
 ### 2) ファイルマウント（SHOULD）
 - TLS 証明書など、ファイルの方が扱いやすいものに向く
 - パーミッションは最小にする
@@ -53,7 +60,9 @@
 ### ローテ対象（最低限）
 - 外部 API キー
 - DB ユーザー（可能ならアプリ専用）
+- Kafka 認証情報（利用している場合）
 - 署名鍵（JWT 等）
+- mTLS 証明書（Professor ↔ Librarian 間）
 
 ### 方式（推奨）
 - **二重運用（dual key）**:
@@ -67,6 +76,11 @@
 - 3) 監査ログ確認（いつ誰がアクセスしたか）
 - 4) 二次被害の封じ込め（レート制限、IP制限、権限削減）
 - 5) ポストモーテム（関連: `05_operations/INCIDENT_POSTMORTEM.md`）
+
+## 境界（Professor / Librarian）
+- Professor は DB/GCS/Kafka への直接アクセス権を持つ（データの守護者）。該当 secret は Professor のみが取得できるようにする
+- Librarian は原則ステートレスで、DB/GCS の secret を持たない
+- Professor → Librarian の通信に必要な情報（エンドポイント、mTLS設定等）は Professor 側の設定として管理する
 
 ## 署名鍵（JWT等）の追加ルール
 - 鍵ID（`kid`）を使い、ローテーションを前提にする

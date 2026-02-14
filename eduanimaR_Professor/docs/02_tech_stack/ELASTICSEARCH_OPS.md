@@ -1,7 +1,11 @@
-# ELASTICSEARCH_OPS
+# ELASTICSEARCH_OPS（Post-MVP / Deferred）
 
 ## 目的
-Elasticsearch 9.2.4 のインデックス設計・運用・検索クエリの規約を定義する。
+将来 Elasticsearch を採用する場合に備え、インデックス設計・運用・検索クエリの規約を保持する。
+
+## 重要（MVPでは使わない）
+- **MVPでは Elasticsearch は使用しない**（検索は PostgreSQL/pgvector を正とする）
+- このドキュメントは参照用に残すが、MVPの実装判断の根拠にしない
 
 ## 基本方針
 - DBは正、ESは検索/集計の投影（projection）

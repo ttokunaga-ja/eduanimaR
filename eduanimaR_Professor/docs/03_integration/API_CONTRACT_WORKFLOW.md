@@ -1,58 +1,46 @@
 # API_CONTRACT_WORKFLOW
 
 ## 目的
-OpenAPI を正（SSOT）とし、そこからサーバー実装（Echo）とクライアント実装（Next.js/TypeScript）の両方に必要な型/インターフェースを生成することで、契約逸脱を防ぐ。
+Frontend ↔ Professor（Go）の外向きAPIを **OpenAPI（SSOT）** で契約駆動にし、契約逸脱を防ぐ。
 
-## 前提:2段階ゲートウェイ構成 + gRPC内部通信
-本プロジェクトは以下の構成を採用する:
+補足: Professor ↔ Librarian（推論サービス）の内部通信は gRPC/Proto を SSOT とし、本ドキュメントでは外向き OpenAPI を主対象とする。
+
+## 前提（確定）
+本プロジェクトの通信は以下を採用する:
 
 ```
-Browser → Next.js (BFF) → Go API Gateway → Go Microservices (User/Product/Order...)
-         [HTTP/JSON]        [HTTP/JSON]     [gRPC]
-         [OpenAPI]                          [Protocol Buffers]
+Frontend ↔ Professor
+[HTTP/JSON + SSE]
+[OpenAPI SSOT]
 ```
 
-- **Next.js(BFF)**: UI向けゲートウェイ。データ整形・集約・Cookie/Session管理。
-- **Go API Gateway**: システム全体のゲートウェイ。認証/認可/レート制限/ルーティング。
-  - **gRPC → OpenAPI 変換**を担当(grpc-gateway等を使用)
-  - 外向きはHTTP/JSON(OpenAPI)、内向きはgRPC(Protocol Buffers)
-- **Go Microservices**: ビジネスロジック実装。DB/ES等への永続化。
-  - **gRPCサービス**として実装(.protoが契約)
+## SSOT
+- 外向き（OpenAPI）: `docs/openapi.yaml`
+- エラー形式/コード: `ERROR_HANDLING.md` / `ERROR_CODES.md`
 
 ## 原則（MUST）
-- **ハンドラーのシグネチャを手動で変更しない**
 - 変更は必ず OpenAPI 定義から始める（Contract First）
 - 生成物は手編集しない（再生成で消える）
-- **フロントエンドは Orval で生成された型・Hooks のみを使用する**（手書き型定義禁止）
+- Consumer 側でクライアント生成を行う場合、生成物を正とし手書き型定義を避ける
+- SSE を含む外向き契約は「破壊的変更を避ける」を基本とする（必要なら versioning/deprecation を行う）
 
 ## フロー（推奨）
-### バックエンド側
-#### A) 内部サービス (gRPC) の開発
-1. `.proto` ファイルを定義・更新する
-   - service / rpc / message を定義
-   - 必要に応じて grpc-gateway の annotations を付与(HTTP mapping用)
-2. `protoc` でGoコードを生成する
-3. `internal/service` で生成されたgRPCサーバーインターフェースを実装する
+### Professor（Go）側
+1. `docs/openapi.yaml` を更新する
+2. Professor の HTTP handler / SSE を実装し、契約と整合させる
+3. エラー形式/コードを `ERROR_HANDLING.md` / `ERROR_CODES.md` と整合させる
+4. 破壊的変更が必要な場合は `API_VERSIONING_DEPRECATION.md` の手順に従う
 
-#### B) Gateway (gRPC → OpenAPI) の構成
-1. Gateway が内部gRPCサービスを呼び出せるように設定
-2. grpc-gateway または connectrpc を使って、gRPCをHTTP/JSONに変換
-3. 変換結果として `docs/openapi.yaml` を生成・公開する
-4. `ERROR_HANDLING.md` の共通形式に沿ってHTTPエラーをマッピングする
-5. 破壊的変更の場合は、バージョニング（`/v1` 等）か互換運用の方針を決める
-
-### フロントエンド側（Orval による自動生成）
-1. バックエンドが出力した `openapi.yaml` (または JSON) を取得
-2. `npm run api:generate` (Orval) を実行
-3. `src/shared/api/` 配下に TypeScript の型・React Hooks が生成される
-4. FSD の `entities` / `features` 層で生成された Hooks（`useGetUser` 等）を使用
-5. **手書きで `fetch` や `axios` を書かない**（生成に統一）
+### Consumer（例: フロントエンド）側
+1. `docs/openapi.yaml` を取得する
+2. 必要に応じてクライアント/型を生成し、生成物を正として利用する
 
 ## レビュー観点
 - 互換性: 既存クライアントに影響する変更か（必須/任意、型変更、enum削除等）
 - セキュリティ: 認証/認可が明示されているか（scope/role等）
 - 例外系: 4xx/5xx のレスポンスが定義されているか
-- **命名規則**: フロントエンドが理解しやすい名前か（`user_id` vs `userId` 等、camelCase統一を推奨）
+- SSE: イベント名/形が安定しているか（再接続や順序の前提を壊していないか）
+- **命名規則**: consumer が理解しやすい名前か（例: `user_id` vs `userId`）
 
 ## APIライフサイクル（推奨）
 - 廃止（deprecation）の方針（期間、告知、削除手順）を決める

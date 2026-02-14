@@ -18,10 +18,10 @@
 ## トレース（推奨）
 - OpenTelemetry を標準とし、サービス間（HTTP/gRPC）で trace context を伝播する
 - Span の最小要件:
-	- Gateway（HTTPハンドラ）: 入口 span
-	- Gateway→Microservices（gRPC client）: client span
-	- Microservices（gRPC server）: server span
-	- DB（pgx）/外部API（ES等）: child span
+	- Professor（HTTP handler / SSE）: 入口 span
+	- Professor→Librarian（gRPC client）: client span
+	- Kafka worker（consume→処理→永続化）: root span（message span）
+	- DB（pgx）/外部API（GCS/LLM等）: child span
 - 属性は OpenTelemetry の semantic conventions（特に RPC/HTTP/DB）に寄せる
 
 ## Semantic Conventions（推奨）
@@ -42,11 +42,15 @@ OpenTelemetry Semantic Conventions を実装のSSOTとして扱う。
 	- リクエスト数（RPS）
 	- レイテンシ（p50/p95/p99）
 	- エラー率（gRPC status / HTTP status）
-	- 依存先（DB/ES/Kafka）の失敗率・レイテンシ
-- CDC / Indexer:
-	- エンドツーエンド遅延（DB更新→検索反映）
+	- 依存先（DB/Kafka/GCS/LLM）の失敗率・レイテンシ
+
+- Kafka worker:
+	- consumer lag
 	- DLQ 件数・滞留時間
-	- リトライ回数
+	- 再試行回数（必要なら）
+
+- Ingestion（E2Eの遅延）:
+	- ingest開始→DB永続化完了までの遅延（p95）
 
 ## エラー監視
 - 5xx は原則アラート対象
@@ -54,10 +58,10 @@ OpenTelemetry Semantic Conventions を実装のSSOTとして扱う。
 
 ## 相関（ログ↔トレース）
 - `request_id` と `trace_id` をログに必ず出し、障害時に相互に辿れるようにする
-- Gateway で生成/受領した `request_id` は下流へ伝播する（HTTP header / gRPC metadata）
+- Professor で生成/受領した `request_id` は下流へ伝播する（HTTP header / gRPC metadata / Kafka message）
 
-## 同期遅延監視（CDC/Indexer）
-- Debezium/Kafka/Indexer のレイテンシを計測し、許容範囲を定義する
+## 遅延監視（Kafka worker）
+- Kafka consumer lag と処理遅延を計測し、許容範囲を定義する
 - DLQ 件数・滞留時間を監視し、運用で復旧できる導線を用意する
 
 ## 参考（一次情報）

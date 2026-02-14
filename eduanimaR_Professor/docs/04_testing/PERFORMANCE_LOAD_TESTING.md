@@ -5,11 +5,11 @@
 負荷試験・容量計画・性能回帰検知の最小標準を定義する。
 
 ## 対象
-- 外部API（Gateway: HTTP）
-- 内部API（gRPC）
+- 外部API（Professor: HTTP/JSON + SSE）
+- 内部依存（Professor → Librarian: gRPC）
 - DB（PostgreSQL）
-- Elasticsearch
 - Kafka（consumer lag / DLQ）
+- GCS（アップロード/ダウンロード/依存障害）
 
 ## 原則（MUST）
 - SLO の指標（成功率/レイテンシ）と一致する形で測る
@@ -23,7 +23,7 @@
 - スパイク: 急増時の挙動（レート制限/バックプレッシャ）
 
 ## ワークロード設計（MUST）
-- 重要ユーザージャーニーを列挙（例: 検索→詳細→注文）
+- 重要ユーザージャーニーを列挙（例: ingest開始→処理完了、質問→SSEで回答、検索→表示）
 - 比率（Mix）を決める（例: read 90% / write 10%）
 - データ条件を揃える（キャッシュ有無、ホット/コールド等）
 
@@ -35,8 +35,8 @@
 - サチュレーション
   - CPU/メモリ
   - DB connection pool
-  - ES thread pool / queue
   - Kafka consumer lag
+  - gRPC concurrency / queue（Librarian呼び出し）
 
 ## ゲート（推奨）
 - リリース前に “性能回帰” を検知できるようにする
@@ -49,14 +49,17 @@
   - インデックス不足
   - ロック競合
   - コネクション枯渇
-- ES:
-  - 不適切なクエリ（集計/スクリプト）
-  - インデックス設計不整合
+- SSE:
+  - クライアント切断後も処理が継続してしまう（キャンセル伝播漏れ）
+  - 1接続あたりのメモリ/バッファ肥大
 - gRPC:
   - deadline 未設定
   - 直列呼び出しの増加
-- 同期系:
-  - Indexer が追いつかない（E2E遅延増大）
+- Kafka/worker:
+  - consumer が追いつかない（lag増大）
+  - DLQ増加（恒久エラーの混入）
+- 外部依存（GCS/LLM等）:
+  - 依存障害によるタイムアウト連鎖
 
 ## 実行環境
 - 可能なら本番相当の構成（スケール、制限、設定）で行う
@@ -67,6 +70,7 @@
 
 ## 推奨ツール（例）
 - HTTP: k6 / vegeta
+- SSE: 最小の負荷クライアント（HTTPストリームを読み切る）を用意する
 - gRPC: ghz
 - プロファイル: Go pprof
 

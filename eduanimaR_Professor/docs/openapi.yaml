@@ -1,0 +1,237 @@
+openapi: 3.1.0
+info:
+  title: eduanimaR Professor API
+  version: 0.1.0
+  description: |
+    Frontend ↔ Professor（Go）の外向きAPI。
+    このファイルが SSOT（契約の正）であり、HTTP/JSON エンドポイントと SSE ストリームを含む。
+servers:
+  - url: /
+tags:
+  - name: Questions
+    description: Q&A and SSE streaming
+  - name: Materials
+    description: Upload and ingestion
+  - name: Health
+    description: Health endpoints
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      responses:
+        "200":
+          description: OK
+  /v1/questions:
+    post:
+      tags: [Questions]
+      summary: Start reasoning session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartQuestionRequest"
+      responses:
+        "202":
+          description: Accepted (SSE will stream progress/answer)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartQuestionResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/questions/{request_id}/events:
+    get:
+      tags: [Questions]
+      summary: SSE stream for a reasoning session
+      description: |
+        Server-Sent Events stream.
+        - Content-Type: text/event-stream
+        - Events MUST be idempotent (client may reconnect).
+        - Data payload is JSON per line (data: {...}).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                example:
+                  summary: Example SSE frames
+                  value: |
+                    event: progress
+                    data: {"type":"progress","stage":"searching","message":"Searching..."}
+
+                    event: answer
+                    data: {"type":"answer","delta_markdown":"..."}
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/materials:
+    post:
+      tags: [Materials]
+      summary: Upload a material and enqueue ingestion job
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadMaterialRequest"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadMaterialResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Payload too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    StartQuestionRequest:
+      type: object
+      required: [subject_id, question]
+      properties:
+        subject_id:
+          type: string
+          description: |
+            Subject scope for physical filtering (MUST).
+            NOTE: user_id is derived from the validated access token (Professor enforces).
+        question:
+          type: string
+          minLength: 1
+    StartQuestionResponse:
+      type: object
+      required: [request_id, events_url]
+      properties:
+        request_id:
+          type: string
+        events_url:
+          type: string
+          description: SSE endpoint URL
+    UploadMaterialRequest:
+      type: object
+      required: [subject_id, file]
+      properties:
+        subject_id:
+          type: string
+        file:
+          type: string
+          format: binary
+        filename_hint:
+          type: string
+    UploadMaterialResponse:
+      type: object
+      required: [ingest_job_id]
+      properties:
+        ingest_job_id:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              description: Stable application error code (see docs/03_integration/ERROR_CODES.md)
+            message:
+              type: string
+              description: User-facing message (no secrets / no internal details)
+            details:
+              type: object
+              additionalProperties: true
+            request_id:
+              type: string

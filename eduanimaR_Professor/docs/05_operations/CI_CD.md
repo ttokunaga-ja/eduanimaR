@@ -53,8 +53,9 @@
 	- `buf breaking`（推奨。比較対象は `main` またはリリースタグ）
 	- `protoc` / `buf generate` の再実行で差分が出ないこと（生成物手編集の検出）
 - OpenAPI を更新/生成した場合:
-	- `docs/openapi.yaml` の再生成で差分が出ないこと
-	- Orval 等のフロント向け生成を前提に、破壊的変更がないこと（レビューで確認）
+	- `docs/openapi.yaml` の lint（推奨）
+	- breaking change の検出（推奨。方式はプロジェクトで統一）
+	- 最低限、`go test ./...` で SSOT の存在/最低限の形が検査できること（例: `internal/contracttest`）
 
 推奨（運用ルール）：
 - `.github/workflows/contract-codegen-check.yml` は **PRで必ず実行**し、差分が出た場合は PR をブロックする
@@ -64,7 +65,7 @@
 
 ### 3) Tests
 - `go test ./...`
-- Integration（DB/ES 等）: Testcontainers で必要最小の範囲を実行
+- Integration（DB 等）: Testcontainers で必要最小の範囲を実行
 
 ### 4) Provenance / Attestation（推奨）
 - SBOM と provenance（出自）を生成し、成果物に紐づける

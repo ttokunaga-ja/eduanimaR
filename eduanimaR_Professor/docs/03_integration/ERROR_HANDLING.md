@@ -26,7 +26,7 @@
 ## gRPC（内部）との整合
 - 内部 gRPC は status code を必ず返す（成功=OK、失敗=適切な code）
 - 外部（HTTP/OpenAPI）に返す `error.code`（アプリケーションコード）は **安定ID** として扱い、gRPC/HTTP の両方で同一のコード体系を用いる
-- Gateway は gRPC の status code / details を、外部の HTTP ステータス + 共通レスポンス形式へ変換する
+- Professor は Librarian（gRPC）の status code / details を、外部の HTTP ステータス + 共通レスポンス形式へ変換する
   - 例: gRPC `NOT_FOUND` → HTTP 404
   - 例: gRPC `INVALID_ARGUMENT` → HTTP 400
 
