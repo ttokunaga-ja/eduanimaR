@@ -1,7 +1,7 @@
 # DB_SCHEMA_TABLES
 
 ## 目的
-eduanima-professor（Professor）が管理するPostgreSQL 18.1 + pgvectorのテーブル定義（案）を記載する。
+最終承認されたDB設計を反映する。eduanima-professor（Professor）が管理するPostgreSQL 18.1 + pgvectorのテーブル定義。
 
 > 本ファイルは `DB_SCHEMA_DESIGN.md` の原則に基づいた具体的なテーブル定義のSSOT。
 
@@ -15,20 +15,14 @@ eduanima-professor（Professor）が管理するPostgreSQL 18.1 + pgvectorのテ
 ## テーブル一覧
 
 ### コアエンティティ
-1. **users** - ユーザー（OAuth/OIDC由来）
-2. **subjects** - 科目/コース  
-3. **materials** - 資料（文書/ファイル）メタデータ
-4. **material_pages** - 資料のページ情報（OCR/抽出結果の単位）
-5. **chunks** - 意味単位のテキスト断片（Markdown化済み）
-6. **chunk_embeddings** - チャンクのベクトル表現（pgvector）
-
-### セッション・推論
-7. **reasoning_sessions** - 質問・検索セッション
-8. **search_steps** - セッション内の検索ステップ（Librarian連携履歴）
-9. **session_evidence** - セッションで選定された根拠（引用）
+1. **users** - ユーザー（OAuth/OIDC由来、個人情報非収集）
+2. **subjects** - 科目/コース
+3. **raw_files** - 原本ファイル（GCS保存、自動取り込み対応）
+4. **materials** - 資料チャンク（Markdown化済み、ベクトル埋め込み済み）
+5. **chats** - 質問・検索セッション（Phase 2〜4の統合）
 
 ### 非同期処理
-10. **ingest_jobs** - 資料取込ジョブ（Kafka連携）
+6. **jobs** - 非同期処理ジョブ（ファイル取込、バッチ処理等）
 
 ---
 
@@ -42,29 +36,63 @@ CREATE TYPE user_role AS ENUM (
   'admin'
 );
 
--- 資料タイプ
-CREATE TYPE material_type AS ENUM (
+-- 原本ファイルタイプ（Gemini APIがサポートする形式）
+CREATE TYPE file_type AS ENUM (
+  -- ドキュメント（ネイティブ対応）
   'pdf',
-  'powerpoint',
-  'word',
-  'image',
-  'video',
-  'url',
+  'text',
+  
+  -- スクリプト・コード（ネイティブ対応）
+  'python',
+  'go',
+  'javascript',
+  'html',
+  'css',
+  'json',
+  'markdown',
+  'csv',
+  
+  -- 画像（ネイティブ対応）
+  'png',
+  'jpeg',
+  'webp',
+  'heic',
+  'heif',
+  
+  -- MS Office（Drive API経由で変換が必要）
+  'docx',
+  'xlsx',
+  'pptx',
+  
+  -- Google Workspace（Drive API経由で変換が必要）
+  'google_docs',
+  'google_sheets',
+  'google_slides',
+  
+  -- その他
   'other'
 );
 
--- 資料ステータス
-CREATE TYPE material_status AS ENUM (
-  'uploading',
-  'pending_ingestion',
-  'ingesting',
-  'ready',
-  'failed',
-  'archived'
+-- 原本ファイルステータス
+CREATE TYPE file_status AS ENUM (
+  'uploading',      -- アップロード中
+  'uploaded',       -- アップロード完了
+  'processing',     -- 処理中（Vision Reasoning実行中）
+  'completed',      -- 処理完了
+  'failed',         -- 処理失敗
+  'archived'        -- アーカイブ済み
 );
 
--- IngestJobステータス
-CREATE TYPE ingest_job_status AS ENUM (
+-- Jobタイプ
+CREATE TYPE job_type AS ENUM (
+  'file_ingestion',      -- ファイル取込（GCS → Vision Reasoning → チャンク化）
+  'ai_batch_processing', -- AIバッチ処理（再Embedding等）
+  'search_optimization', -- 検索最適化（インデックス再構築等）
+  'maintenance'          -- その他メンテナンス
+);
+
+-- Jobステータス
+CREATE TYPE job_status AS ENUM (
   'pending',
   'processing',
   'completed',
@@ -79,12 +107,10 @@ CREATE TYPE search_mode AS ENUM (
   'hybrid'
 );
 
--- 推論セッションステータス
-CREATE TYPE session_status AS ENUM (
-  'active',
-  'completed',
-  'failed',
-  'cancelled'
+-- ユーザーフィードバック
+CREATE TYPE chat_feedback AS ENUM (
+  'good',
+  'bad'
 );
 
 -- Gemini使用フェーズ
@@ -112,9 +138,7 @@ CREATE TABLE users (
   provider TEXT NOT NULL,
   provider_user_id TEXT NOT NULL,
   
-  -- ユーザー情報
-  email TEXT NOT NULL,
-  display_name TEXT,
+  -- ユーザーロール
   role user_role NOT NULL DEFAULT 'student',
   
   -- 監査
@@ -130,7 +154,6 @@ CREATE TABLE users (
 );
 
 CREATE INDEX idx_users_provider ON users(provider, provider_user_id) WHERE is_active;
-CREATE INDEX idx_users_email ON users(email) WHERE is_active;
 CREATE INDEX idx_users_nanoid ON users(nanoid);
 ```
 
@@ -138,6 +161,7 @@ CREATE INDEX idx_users_nanoid ON users(nanoid);
 - `uuidv7()` で時系列順のUUID生成
 - `nanoid` は外部公開ID（URL/ログ/問い合わせ）
 - `provider / provider_user_id` で複数のIdP対応可能
+- **個人情報非収集**: `email`, `display_name` を削除
 - `is_active` + `deleted_at` でソフトデリート
 
 ---
@@ -180,10 +204,10 @@ CREATE INDEX idx_subjects_course_code ON subjects(course_code) WHERE is_active;
 
 ---
 
-## 3. materials
+## 3. raw_files
 
 ```sql
-CREATE TABLE materials (
+CREATE TABLE raw_files (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   nanoid TEXT NOT NULL UNIQUE,
@@ -192,29 +216,32 @@ CREATE TABLE materials (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
   
-  -- 資料メタデータ
-  title TEXT NOT NULL,
+  -- ファイル情報
   original_filename TEXT NOT NULL,
-  material_type material_type NOT NULL,
-  file_size_bytes BIGINT,
+  file_type file_type NOT NULL,
+  file_size_bytes BIGINT NOT NULL,
+  
+  -- 自動取り込み用のソースURL（将来機能）
+  source_url TEXT,
   
   -- GCS保存先（原本）
   gcs_bucket TEXT NOT NULL,
   gcs_object_path TEXT NOT NULL,
-  
-  -- 派生データの世代管理（LLM再生成対応）
-  ingestion_version INTEGER NOT NULL DEFAULT 1,
+  gcs_signed_url_expires_at TIMESTAMPTZ,
   
   -- ステータス
-  status material_status NOT NULL DEFAULT 'pending_ingestion',
+  status file_status NOT NULL DEFAULT 'uploading',
   
-  -- ページ数（PDF/PowerPoint等）
-  total_pages INTEGER,
+  -- メタデータ（ドキュメント・画像・コードのみサポート）
+  total_pages INTEGER,           -- PDF/PowerPointのページ数
+  mime_type TEXT,
+  
+  -- 処理情報
+  processed_at TIMESTAMPTZ,
   
   -- 監査
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ingested_at TIMESTAMPTZ,
   
   -- ソフトデリート
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -223,83 +250,49 @@ CREATE TABLE materials (
   UNIQUE (gcs_bucket, gcs_object_path)
 );
 
--- 物理制約を強制するための複合インデックス（検索の主経路）
-CREATE INDEX idx_materials_subject_user ON materials(subject_id, user_id) WHERE is_active;
-CREATE INDEX idx_materials_nanoid ON materials(nanoid);
-CREATE INDEX idx_materials_status ON materials(status) WHERE is_active;
-CREATE INDEX idx_materials_ingested_at ON materials(ingested_at DESC) WHERE is_active;
+-- 物理制約を強制するための複合インデックス
+CREATE INDEX idx_raw_files_subject_user ON raw_files(subject_id, user_id) WHERE is_active;
+CREATE INDEX idx_raw_files_nanoid ON raw_files(nanoid);
+CREATE INDEX idx_raw_files_status ON raw_files(status) WHERE is_active;
+CREATE INDEX idx_raw_files_processed ON raw_files(processed_at DESC) WHERE is_active;
+CREATE INDEX idx_raw_files_source_url ON raw_files(source_url) WHERE source_url IS NOT NULL;
 ```
 
 **設計メモ**:
 - **user_id + subject_id は必須**（物理制約の境界）
-- `ingestion_version` で将来のモデル更新による再生成を管理
+- `title` を削除（ファイル名から自動生成またはユーザー指定）
+- `source_url` を追加（将来の自動取り込み機能用）
+- `duration_seconds` を削除（動画は非サポート）
+- `ingestion_version` を削除（materials側で管理）
 - `gcs_bucket/gcs_object_path` で原本参照（Professor独占）
 
 ---
 
-## 4. material_pages
+## 4. materials
 
 ```sql
-CREATE TABLE material_pages (
-  -- 主キー
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  
-  -- 親資料
-  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-  
-  -- ページ番号（1始まり）
-  page_number INTEGER NOT NULL,
-  
-  -- OCR/Vision Reasoning結果（Markdown）
-  content_markdown TEXT,
-  
-  -- メタデータ（構造化情報: JSON）
-  metadata JSONB,
-  
-  -- 監査
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  UNIQUE (material_id, page_number)
-);
-
-CREATE INDEX idx_material_pages_material ON material_pages(material_id);
-CREATE INDEX idx_material_pages_metadata ON material_pages USING GIN (metadata);
-```
-
-**設計メモ**:
-- **ページ単位で管理**（PDF/PowerPoint等はページ構造を保持）
-- `content_markdown`: Vision Reasoning/OCRの結果
-- `metadata`: Structured Outputsで抽出した構造情報（章タイトル、図表番号等）をJSONBで保存
-
----
-
-## 5. chunks
-
-```sql
-CREATE TABLE chunks (
+CREATE TABLE materials (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   nanoid TEXT NOT NULL UNIQUE,
   
-  -- 親資料（物理制約継承）
-  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+  -- 親ファイル（物理制約継承）
+  raw_file_id UUID NOT NULL REFERENCES raw_files(id) ON DELETE CASCADE,
   
-  -- ページ範囲（チャンクが跨る場合）
-  page_start INTEGER NOT NULL,
-  page_end INTEGER NOT NULL,
+  -- チャンク情報
+  sequence_in_file INTEGER NOT NULL,  -- ファイル内の順序
+  page_start INTEGER,                 -- 元ページ範囲（開始）
+  page_end INTEGER,                   -- 元ページ範囲（終了）
   
   -- チャンク内容（Markdown形式）
   content_markdown TEXT NOT NULL,
-  
-  -- チャンクのシーケンス（資料内の順序）
-  sequence_in_material INTEGER NOT NULL,
-  
-  -- 世代管理（LLM更新で再生成）
-  generation INTEGER NOT NULL DEFAULT 1,
-  
-  -- 文字数（検索スニペット長の判定用）
   char_count INTEGER NOT NULL,
+  
+  -- ベクトル表現（pgvector: 768次元）
+  embedding vector(768) NOT NULL,
+  
+  -- Embeddingモデル情報（固定: text-embedding-004）
+  embedding_model TEXT NOT NULL DEFAULT 'text-embedding-004',
   
   -- 監査
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -310,66 +303,35 @@ CREATE TABLE chunks (
   deleted_at TIMESTAMPTZ
 );
 
--- 資料単位でのチャンク取得（順序保証）
-CREATE INDEX idx_chunks_material_seq ON chunks(material_id, sequence_in_material) WHERE is_active;
-CREATE INDEX idx_chunks_nanoid ON chunks(nanoid);
+-- ファイル単位でのチャンク取得（順序保証）
+CREATE INDEX idx_materials_file_seq ON materials(raw_file_id, sequence_in_file) WHERE is_active;
+CREATE INDEX idx_materials_nanoid ON materials(nanoid);
 
 -- 全文検索インデックス（PostgreSQL組み込み）
-CREATE INDEX idx_chunks_content_fts ON chunks USING GIN (to_tsvector('english', content_markdown)) WHERE is_active;
+CREATE INDEX idx_materials_content_fts ON materials USING GIN (to_tsvector('english', content_markdown)) WHERE is_active;
+
+-- HNSW ベクトル検索インデックス（高速近似検索）
+CREATE INDEX idx_materials_embedding_vector ON materials 
+  USING hnsw (embedding vector_cosine_ops) 
+  WITH (m = 16, ef_construction = 64)
+  WHERE is_active;
 ```
 
 **設計メモ**:
 - **意味単位のチャンク**（Gemini 3 Flashで分割）
-- `sequence_in_material` で資料内の順序を保持（前後文脈の取得に使用）
-- `generation` で将来のモデル更新による再生成を管理
-- **全文検索はPostgreSQL標準のGINインデックス**（Elasticsearchは将来拡張）
-
----
-
-## 6. chunk_embeddings
-
-```sql
-CREATE TABLE chunk_embeddings (
-  -- 主キー
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  
-  -- チャンク参照
-  chunk_id UUID NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
-  
-  -- ベクトル（pgvector: 例: 768次元）
-  embedding vector(768) NOT NULL,
-  
-  -- Embeddingモデル情報（世代管理）
-  model_name TEXT NOT NULL,
-  model_version TEXT NOT NULL,
-  
-  -- 監査
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  UNIQUE (chunk_id, model_name, model_version)
-);
-
--- HNSW インデックス（高速近似検索）
--- m=16, ef_construction=64 は推奨初期値（要件に応じて調整）
-CREATE INDEX idx_chunk_embeddings_vector ON chunk_embeddings 
-  USING hnsw (embedding vector_cosine_ops) 
-  WITH (m = 16, ef_construction = 64);
-
-CREATE INDEX idx_chunk_embeddings_chunk ON chunk_embeddings(chunk_id);
-```
-
-**設計メモ**:
+- `sequence_in_file` でファイル内の順序を保持（前後文脈の取得に使用）
+- `embedding_version` を削除（モデル固定のため）
+- `generation` を削除（シンプル化）
+- `embedding_model` をデフォルト値付きに変更（text-embedding-004固定）
+- **全文検索はPostgreSQL標準のGINインデックス**
 - **pgvector 0.8.1のHNSWインデックス**採用
-- `model_name/model_version` でEmbeddingモデル更新に対応
-- `vector_cosine_ops` でコサイン類似度検索
-- パラメータ `m`, `ef_construction` は初期値（ベンチマーク後に調整）
 
 ---
 
-## 7. reasoning_sessions
+## 5. chats
 
 ```sql
-CREATE TABLE reasoning_sessions (
+CREATE TABLE chats (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   nanoid TEXT NOT NULL UNIQUE,
@@ -378,21 +340,39 @@ CREATE TABLE reasoning_sessions (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
   
-  -- ユーザー質問
+  -- 質問内容
   question TEXT NOT NULL,
   
   -- Phase 2（Plan）結果（Structured Outputs JSON）
+  -- 構造: {investigation_items, termination_conditions, search_strategy}
   plan_json JSONB,
+  
+  -- 検索終了理由（実際の終了理由を記録）
+  termination_reason TEXT,
   
   -- Phase 4（Answer）結果
   final_answer_markdown TEXT,
   
-  -- セッション状態
-  status session_status NOT NULL DEFAULT 'active',
+  -- ユーザーフィードバック
+  feedback chat_feedback,
+  feedback_at TIMESTAMPTZ,
   
   -- Librarian連携情報
-  max_search_steps INTEGER NOT NULL DEFAULT 5,
   actual_search_steps INTEGER NOT NULL DEFAULT 0,
+  
+  -- 検索詳細（各ステップでヒットしたmaterial_id配列）
+  search_step_1_hit_material_ids UUID[],
+  search_step_2_hit_material_ids UUID[],
+  search_step_3_hit_material_ids UUID[],
+  search_step_4_hit_material_ids UUID[],
+  search_step_5_hit_material_ids UUID[],
+  
+  -- Pythonサーバから返された根拠（チャンク単位の詳細記録）
+  -- 構造: [{material_id, snippet, task_id, relevance_score, page_start, page_end, search_step, selected_for_answer}]
+  evidence_snippets JSONB,
+  
+  -- 最終回答に使用したファイル一覧（ファイル単位の重複排除リスト）
+  used_raw_file_ids UUID[] NOT NULL DEFAULT '{}',
   
   -- 監査
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -405,122 +385,55 @@ CREATE TABLE reasoning_sessions (
 );
 
 -- 物理制約を強制するための複合インデックス
-CREATE INDEX idx_sessions_subject_user ON reasoning_sessions(subject_id, user_id) WHERE is_active;
-CREATE INDEX idx_sessions_nanoid ON reasoning_sessions(nanoid);
-CREATE INDEX idx_sessions_status ON reasoning_sessions(status) WHERE is_active;
-CREATE INDEX idx_sessions_created ON reasoning_sessions(created_at DESC) WHERE is_active;
+CREATE INDEX idx_chats_subject_user ON chats(subject_id, user_id) WHERE is_active;
+CREATE INDEX idx_chats_nanoid ON chats(nanoid);
+CREATE INDEX idx_chats_created ON chats(created_at DESC) WHERE is_active;
+CREATE INDEX idx_chats_feedback ON chats(feedback) WHERE is_active AND feedback IS NOT NULL;
+
+-- 使用ファイルの検索（GINインデックス）
+CREATE INDEX idx_chats_used_raw_files ON chats USING GIN (used_raw_file_ids) WHERE is_active;
+
+-- 根拠スニペットの検索（GINインデックス）
+CREATE INDEX idx_chats_evidence_snippets ON chats USING GIN (evidence_snippets);
+
+-- 終了理由での分析用インデックス
+CREATE INDEX idx_chats_termination ON chats(termination_reason) WHERE is_active AND termination_reason IS NOT NULL;
 ```
 
 **設計メモ**:
-- **質問・検索セッション**（Phase 2〜4の状態管理）
-- `plan_json` にPhase 2の計画（調査項目、停止条件等）を保存
-- `max_search_steps` でLibrarianループの最大回数を制御
+- **質問・検索セッション**（Phase 2〜4の統合テーブル）
+- `plan_json` にPhase 2の計画（調査項目、終了条件、検索戦略）を保存
+- `termination_reason` で実際の検索終了理由を記録
+- `evidence_snippets` でチャンク単位の詳細根拠を保存（JSONB配列）
+- `used_raw_file_ids` でファイル単位の引用リストを保存（UUID配列）
+- `max_search_steps` を削除（plan_json内のtermination_conditionsに含まれる）
+- `feedback_comment` を削除（シンプル化）
 
 ---
 
-## 8. search_steps
+## 6. jobs
 
 ```sql
-CREATE TABLE search_steps (
-  -- 主キー
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  
-  -- 親セッション
-  session_id UUID NOT NULL REFERENCES reasoning_sessions(id) ON DELETE CASCADE,
-  
-  -- ステップ情報
-  step_number INTEGER NOT NULL,
-  step_id TEXT NOT NULL,  -- proto/librarian.proto の SearchRequest.step_id
-  
-  -- 検索パラメータ
-  search_mode search_mode NOT NULL,
-  query_text TEXT NOT NULL,
-  top_k INTEGER NOT NULL,
-  keywords TEXT[],
-  
-  -- 検索結果（メタデータ）
-  result_count INTEGER NOT NULL DEFAULT 0,
-  
-  -- 監査
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  UNIQUE (session_id, step_number)
-);
-
-CREATE INDEX idx_search_steps_session ON search_steps(session_id, step_number);
-CREATE INDEX idx_search_steps_step_id ON search_steps(step_id);
-```
-
-**設計メモ**:
-- **Librarianとの検索ループの履歴**を記録
-- `step_id` はLibrarianプロトコルとの紐付け
-- デバッグ・分析用途（どのクエリがヒットしたか追跡）
-
----
-
-## 9. session_evidence
-
-```sql
-CREATE TABLE session_evidence (
-  -- 主キー
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  
-  -- 親セッション
-  session_id UUID NOT NULL REFERENCES reasoning_sessions(id) ON DELETE CASCADE,
-  
-  -- 引用元
-  chunk_id UUID NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
-  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-  
-  -- 引用箇所（ページ範囲）
-  page_start INTEGER NOT NULL,
-  page_end INTEGER NOT NULL,
-  
-  -- スニペット（最終回答で表示する部分）
-  snippet_markdown TEXT NOT NULL,
-  
-  -- 選定理由（Librarian由来、任意）
-  selection_reason TEXT,
-  
-  -- 検索スコア（参考値）
-  search_score FLOAT,
-  
-  -- 監査
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_session_evidence_session ON session_evidence(session_id);
-CREATE INDEX idx_session_evidence_chunk ON session_evidence(chunk_id);
-CREATE INDEX idx_session_evidence_material ON session_evidence(material_id);
-```
-
-**設計メモ**:
-- **Librarianが選定した根拠セット**を保存
-- 最終回答（Phase 4）での引用箇所表示に使用
-- 透明性・追跡可能性の確保
-
----
-
-## 10. ingest_jobs
-
-```sql
-CREATE TABLE ingest_jobs (
+CREATE TABLE jobs (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   nanoid TEXT NOT NULL UNIQUE,
   
-  -- 処理対象
-  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+  -- ジョブタイプ
+  job_type job_type NOT NULL,
+  
+  -- 処理対象（任意）
+  target_raw_file_id UUID REFERENCES raw_files(id) ON DELETE CASCADE,
   
   -- 冪等性キー（Kafka再送対応）
   idempotency_key TEXT NOT NULL UNIQUE,
   
   -- ジョブ状態
-  status ingest_job_status NOT NULL DEFAULT 'pending',
+  status job_status NOT NULL DEFAULT 'pending',
   
-  -- 使用モデル（環境変数 PROFESSOR_GEMINI_MODEL_INGESTION）
-  gemini_model TEXT NOT NULL,
-  gemini_phase gemini_phase NOT NULL DEFAULT 'ingestion',
+  -- 使用モデル（環境変数から取得）
+  gemini_model TEXT,
+  gemini_phase gemini_phase,
   
   -- エラー情報
   error_message TEXT,
@@ -534,16 +447,355 @@ CREATE TABLE ingest_jobs (
   completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_ingest_jobs_material ON ingest_jobs(material_id);
-CREATE INDEX idx_ingest_jobs_status ON ingest_jobs(status);
-CREATE INDEX idx_ingest_jobs_idempotency ON ingest_jobs(idempotency_key);
-CREATE INDEX idx_ingest_jobs_created ON ingest_jobs(created_at DESC);
+CREATE INDEX idx_jobs_target_file ON jobs(target_raw_file_id);
+CREATE INDEX idx_jobs_status ON jobs(status);
+CREATE INDEX idx_jobs_idempotency ON jobs(idempotency_key);
+CREATE INDEX idx_jobs_created ON jobs(created_at DESC);
+CREATE INDEX idx_jobs_type ON jobs(job_type);
 ```
 
 **設計メモ**:
-- **Kafka経由の非同期処理ジョブ**を管理
+- **非同期処理ジョブ**を管理（ファイル取込、バッチ処理等）
 - `idempotency_key` でKafkaの再送を吸収（冪等性保証）
 - `retry_count` でリトライ制御
+- `job_type` で様々なジョブタイプに対応
+
+---
+
+## evidence_snippets のJSONB構造
+
+`chats.evidence_snippets` カラムに保存される構造：
+
+```json
+[
+  {
+    "material_id": "uuid-of-materials-table",
+    "snippet": "決定係数はR^2 = 1 - (RSS/TSS)で定義される。",
+    "task_id": "T1",
+    "relevance_score": 0.95,
+    "page_start": 15,
+    "page_end": 15,
+    "search_step": 2,
+    "selected_for_answer": true
+  }
+]
+```
+
+**フィールド説明**:
+- `material_id`: materialsテーブルのUUID
+- `snippet`: 抽出されたテキストスニペット
+- `task_id`: Phase 2で定義された調査タスクID
+- `relevance_score`: Librarianが計算した関連度スコア（0.0〜1.0）
+- `page_start`, `page_end`: 元ドキュメントのページ範囲
+- `search_step`: どの検索ステップで取得されたか（1〜5）
+- `selected_for_answer`: 最終回答生成に使用されたか
+
+---
+
+## Go型定義
+
+### Pythonサーバからの返却データ
+
+```go
+// Pythonサーバ（Librarian）からの返却データ
+type LibrarianEvidence struct {
+    ChunkID        string  `json:"chunk_id"`         // materials.id
+    TaskID         string  `json:"task_id"`          // Phase 2のタスクID
+    Snippet        string  `json:"snippet"`          // 抽出されたスニペット
+    RelevanceScore float64 `json:"relevance_score"`  // 関連度スコア
+}
+```
+
+### DBに保存するevidence_snippets
+
+```go
+// DBに保存するevidence_snippets
+type EvidenceSnippet struct {
+    MaterialID       uuid.UUID `json:"material_id"`        // materials.id
+    Snippet          string    `json:"snippet"`            // 抽出されたスニペット
+    TaskID           string    `json:"task_id"`            // Phase 2のタスクID
+    RelevanceScore   float64   `json:"relevance_score"`    // 関連度スコア
+    PageStart        *int      `json:"page_start"`         // ページ範囲（開始）
+    PageEnd          *int      `json:"page_end"`           // ページ範囲（終了）
+    SearchStep       int       `json:"search_step"`        // 検索ステップ番号
+    SelectedForAnswer bool     `json:"selected_for_answer"` // 最終回答に使用したか
+}
+```
+
+### Phase 2の計画全体
+
+```go
+// Phase 2の計画全体
+type SearchPlan struct {
+    InvestigationItems      []InvestigationItem      `json:"investigation_items"`
+    TerminationConditions   TerminationConditions    `json:"termination_conditions"`
+    SearchStrategy          SearchStrategy           `json:"search_strategy"`
+}
+
+// 終了条件
+type TerminationConditions struct {
+    MaxSearchSteps       int      `json:"max_search_steps"`
+    MinEvidenceCount     int      `json:"min_evidence_count"`
+    ConfidenceThreshold  float64  `json:"confidence_threshold"`
+    StopReasons          []string `json:"stop_reasons"`
+}
+```
+
+---
+
+## Go実装例
+
+### 1. enrichEvidenceWithPageInfo()
+
+Pythonサーバのレスポンスにページ情報を付加する処理：
+
+```go
+func enrichEvidenceWithPageInfo(
+    ctx context.Context,
+    db *sql.DB,
+    librarianEvidence []LibrarianEvidence,
+    searchStep int,
+) ([]EvidenceSnippet, error) {
+    enriched := make([]EvidenceSnippet, 0, len(librarianEvidence))
+    
+    for _, ev := range librarianEvidence {
+        materialID, err := uuid.Parse(ev.ChunkID)
+        if err != nil {
+            return nil, fmt.Errorf("invalid chunk_id: %w", err)
+        }
+        
+        // materialsテーブルからページ情報を取得
+        var pageStart, pageEnd *int
+        err = db.QueryRowContext(ctx,
+            "SELECT page_start, page_end FROM materials WHERE id = $1",
+            materialID,
+        ).Scan(&pageStart, &pageEnd)
+        if err != nil {
+            return nil, fmt.Errorf("failed to get page info: %w", err)
+        }
+        
+        enriched = append(enriched, EvidenceSnippet{
+            MaterialID:       materialID,
+            Snippet:          ev.Snippet,
+            TaskID:           ev.TaskID,
+            RelevanceScore:   ev.RelevanceScore,
+            PageStart:        pageStart,
+            PageEnd:          pageEnd,
+            SearchStep:       searchStep,
+            SelectedForAnswer: false, // 後で更新
+        })
+    }
+    
+    return enriched, nil
+}
+```
+
+### 2. extractUsedFileIDs()
+
+material_id → raw_file_id の重複排除：
+
+```go
+func extractUsedFileIDs(
+    ctx context.Context,
+    db *sql.DB,
+    evidenceSnippets []EvidenceSnippet,
+) ([]uuid.UUID, error) {
+    if len(evidenceSnippets) == 0 {
+        return []uuid.UUID{}, nil
+    }
+    
+    // material_idを抽出
+    materialIDs := make([]uuid.UUID, 0, len(evidenceSnippets))
+    seen := make(map[uuid.UUID]bool)
+    for _, ev := range evidenceSnippets {
+        if !seen[ev.MaterialID] {
+            materialIDs = append(materialIDs, ev.MaterialID)
+            seen[ev.MaterialID] = true
+        }
+    }
+    
+    // raw_file_idを取得（重複排除）
+    query := `
+        SELECT DISTINCT raw_file_id 
+        FROM materials 
+        WHERE id = ANY($1) AND is_active = TRUE
+    `
+    rows, err := db.QueryContext(ctx, query, pq.Array(materialIDs))
+    if err != nil {
+        return nil, fmt.Errorf("failed to extract file ids: %w", err)
+    }
+    defer rows.Close()
+    
+    fileIDs := make([]uuid.UUID, 0)
+    for rows.Next() {
+        var fileID uuid.UUID
+        if err := rows.Scan(&fileID); err != nil {
+            return nil, err
+        }
+        fileIDs = append(fileIDs, fileID)
+    }
+    
+    return fileIDs, rows.Err()
+}
+```
+
+### 3. markEvidenceUsedInAnswer()
+
+selected_for_answerフラグの更新：
+
+```go
+func markEvidenceUsedInAnswer(
+    evidenceSnippets []EvidenceSnippet,
+    usedMaterialIDs []uuid.UUID,
+) []EvidenceSnippet {
+    usedSet := make(map[uuid.UUID]bool)
+    for _, id := range usedMaterialIDs {
+        usedSet[id] = true
+    }
+    
+    for i := range evidenceSnippets {
+        if usedSet[evidenceSnippets[i].MaterialID] {
+            evidenceSnippets[i].SelectedForAnswer = true
+        }
+    }
+    
+    return evidenceSnippets
+}
+```
+
+### 4. saveChatResult()
+
+DB保存処理：
+
+```go
+func saveChatResult(
+    ctx context.Context,
+    db *sql.DB,
+    chatID uuid.UUID,
+    finalAnswer string,
+    evidenceSnippets []EvidenceSnippet,
+    usedFileIDs []uuid.UUID,
+    terminationReason string,
+) error {
+    evidenceJSON, err := json.Marshal(evidenceSnippets)
+    if err != nil {
+        return fmt.Errorf("failed to marshal evidence: %w", err)
+    }
+    
+    query := `
+        UPDATE chats
+        SET final_answer_markdown = $1,
+            evidence_snippets = $2,
+            used_raw_file_ids = $3,
+            termination_reason = $4,
+            completed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $5
+    `
+    
+    _, err = db.ExecContext(ctx, query,
+        finalAnswer,
+        evidenceJSON,
+        pq.Array(usedFileIDs),
+        terminationReason,
+        chatID,
+    )
+    
+    return err
+}
+```
+
+### 5. generateCitationMarkdown()
+
+ユーザー向け引用表示生成：
+
+```go
+func generateCitationMarkdown(
+    ctx context.Context,
+    db *sql.DB,
+    usedFileIDs []uuid.UUID,
+) (string, error) {
+    if len(usedFileIDs) == 0 {
+        return "", nil
+    }
+    
+    query := `
+        SELECT rf.original_filename, rf.nanoid
+        FROM raw_files rf
+        WHERE rf.id = ANY($1) AND rf.is_active = TRUE
+        ORDER BY rf.created_at
+    `
+    
+    rows, err := db.QueryContext(ctx, query, pq.Array(usedFileIDs))
+    if err != nil {
+        return "", err
+    }
+    defer rows.Close()
+    
+    var citations strings.Builder
+    citations.WriteString("\n\n---\n\n**参考資料:**\n\n")
+    
+    index := 1
+    for rows.Next() {
+        var filename, nanoid string
+        if err := rows.Scan(&filename, &nanoid); err != nil {
+            return "", err
+        }
+        citations.WriteString(fmt.Sprintf("%d. %s (ID: %s)\n", index, filename, nanoid))
+        index++
+    }
+    
+    return citations.String(), rows.Err()
+}
+```
+
+---
+
+## 設計根拠
+
+### なぜevidence_snippets（チャンク単位）とused_raw_file_ids（ファイル単位）の両方が必要か
+
+1. **evidence_snippets（チャンク単位）**:
+   - **用途**: デバッグ、分析、透明性確保
+   - Librarianがどのチャンクを検索し、どの程度関連度が高かったかを記録
+   - 各ステップでの検索品質を後から評価可能
+   - ユーザーに詳細な根拠を示す際に使用
+
+2. **used_raw_file_ids（ファイル単位）**:
+   - **用途**: ユーザー向け引用表示、ファイルアクセス制御
+   - 「この回答はどのファイルを参照したか」をファイル単位で明示
+   - 重複排除されたファイルリストで効率的な表示が可能
+   - 将来的なアクセス制御（ユーザーがファイルを削除した場合の対応等）
+
+### file_type ENUMの設計根拠
+
+Gemini API（File API）の仕様に基づく：
+
+1. **ネイティブ対応形式**:
+   - PDF, テキスト, 画像（PNG, JPEG等）, スクリプト（Python, Go等）
+   - これらはGemini APIが直接処理可能
+
+2. **変換が必要な形式**:
+   - MS Office（docx, xlsx, pptx）→ Drive API経由でPDFに変換
+   - Google Workspace → Drive API経由で変換
+
+3. **将来拡張**:
+   - ENUMに新しいタイプを追加することで、新しいファイル形式に対応可能
+   - `other` タイプで未知の形式を一時的に受け入れ
+
+### JSONB型を採用する理由
+
+1. **柔軟性**:
+   - `plan_json`, `evidence_snippets` は構造が進化する可能性が高い
+   - 新しいフィールド追加時にスキーマ変更不要
+
+2. **検索性能**:
+   - GINインデックスで効率的な検索が可能
+   - JSONBはバイナリ形式で保存され、パース不要
+
+3. **型安全性**:
+   - Goコードでは構造体にマッピング
+   - スキーマ検証はアプリケーション層で実施
 
 ---
 
@@ -557,43 +809,43 @@ CREATE INDEX idx_ingest_jobs_created ON ingest_jobs(created_at DESC);
 ### 初回セットアップ手順
 1. ENUM型を定義
 2. コアエンティティ（users, subjects）を作成
-3. 資料・チャンク関連テーブルを作成
+3. 原本ファイル・チャンクテーブル（raw_files, materials）を作成
 4. インデックス（B-tree, GIN, HNSW）を作成
-5. セッション・非同期ジョブテーブルを作成
+5. チャット・非同期ジョブテーブル（chats, jobs）を作成
 
 ### 推奨拡張（MVP後）
 - `subject_users`: 科目の共有・ロール管理
 - `user_preferences`: ユーザー設定
 - `audit_logs`: 詳細監査ログ
-- `material_summaries`: 大量ファイル高速絞り込み用の要約（必要時のみ）
+- `file_summaries`: 大量ファイル高速絞り込み用の要約（必要時のみ）
 
 ---
 
 ## パフォーマンス最適化指針
 
 ### 検索の主経路
+
 ```sql
 -- keyword検索（全文検索 + 物理制約）
-SELECT c.* FROM chunks c
-JOIN materials m ON c.material_id = m.id
-WHERE m.subject_id = :subject_id
-  AND m.user_id = :user_id
+SELECT m.* FROM materials m
+JOIN raw_files rf ON m.raw_file_id = rf.id
+WHERE rf.subject_id = :subject_id
+  AND rf.user_id = :user_id
+  AND rf.is_active = TRUE
   AND m.is_active = TRUE
-  AND c.is_active = TRUE
-  AND to_tsvector('english', c.content_markdown) @@ plainto_tsquery('english', :query)
-ORDER BY ts_rank(to_tsvector('english', c.content_markdown), plainto_tsquery('english', :query)) DESC
+  AND to_tsvector('english', m.content_markdown) @@ plainto_tsquery('english', :query)
+ORDER BY ts_rank(to_tsvector('english', m.content_markdown), plainto_tsquery('english', :query)) DESC
 LIMIT :top_k;
 
 -- vector検索（ベクトル類似度 + 物理制約）
-SELECT c.*, ce.embedding <=> :query_vector AS distance
-FROM chunks c
-JOIN chunk_embeddings ce ON c.id = ce.chunk_id
-JOIN materials m ON c.material_id = m.id
-WHERE m.subject_id = :subject_id
-  AND m.user_id = :user_id
+SELECT m.*, m.embedding <=> :query_vector AS distance
+FROM materials m
+JOIN raw_files rf ON m.raw_file_id = rf.id
+WHERE rf.subject_id = :subject_id
+  AND rf.user_id = :user_id
+  AND rf.is_active = TRUE
   AND m.is_active = TRUE
-  AND c.is_active = TRUE
-ORDER BY ce.embedding <=> :query_vector
+ORDER BY m.embedding <=> :query_vector
 LIMIT :top_k;
 ```
 
