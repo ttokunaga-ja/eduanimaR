@@ -231,7 +231,7 @@ const res = await fetch('https://example.com/api/v1/subjects', {
 
 - [ ] SSO プロバイダ（Google/Meta/Microsoft/LINE）の設定が完了しているか？
 - [ ] Cookie は HttpOnly / Secure / SameSite=Lax で設定されているか？
-- [ ] フロントエンドで扱うユーザー情報は `user_id` と `display_name` のみか？
+- [ ] フロントエンドで扱うユーザー情報は `provider` と `provider_user_id` のみか（個人情報なし）？
 - [ ] メールアドレス等の個人情報が不要に保存されていないか？
 - [ ] ログアウト時に TanStack Query のキャッシュがクリアされるか？
 - [ ] Chrome拡張が Web版の Cookie を利用して認証できるか？
