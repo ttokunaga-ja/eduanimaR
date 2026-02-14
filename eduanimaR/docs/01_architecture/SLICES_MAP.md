@@ -20,9 +20,9 @@
 ## Slices
 
 ### pages
-- (例) `home`：トップページ
-- (例) `user-profile`：ユーザープロフィール
-- (例) `settings`：設定画面
+- (例) `chat-workspace`：チャット（アプリシェル）
+- (例) `file-management-center`：資料管理センター
+- (例) `history-archive`：履歴アーカイブ
 
 ### widgets
 - (例) `app-header`：ヘッダー（複数feature/entityを合成）

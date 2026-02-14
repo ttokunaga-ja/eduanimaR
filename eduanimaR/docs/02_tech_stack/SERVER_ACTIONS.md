@@ -112,7 +112,7 @@ export async function updateUsername(prevState: ActionState, formData: FormData)
   // TODO: DAL 経由で更新 + 認可
   // await updateUserName(parsed.data)
 
-  revalidatePath('/profile')
+  revalidatePath('/app')
   // or: revalidateTag('user:current')
 
   return { ok: true }
@@ -129,7 +129,7 @@ import { updateUsername } from './actions'
 
 const initialState = { ok: true as const }
 
-export function ProfileForm() {
+export function UsernameForm() {
   const [state, formAction, pending] = useActionState(updateUsername, initialState)
 
   return (
@@ -140,6 +140,7 @@ export function ProfileForm() {
     </form>
   )
 }
+
 ```
 
 ---

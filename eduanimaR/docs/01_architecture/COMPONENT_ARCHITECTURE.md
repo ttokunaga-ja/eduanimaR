@@ -51,7 +51,7 @@
   - ページ固有の事情を持ちにくい“塊”
 
 ### pages/*/ui（Page composition）
-- 例：`UserProfilePage`
+- 例：`ChatWorkspacePage`
 - 特徴：
   - ルーティングに対応する画面（URL）
   - 画面専用の薄い整形（formatting）まで

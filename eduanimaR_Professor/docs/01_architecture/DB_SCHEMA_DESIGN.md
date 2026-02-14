@@ -50,3 +50,20 @@ PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（�
 ## LLM派生データの世代管理（推奨）
 - OCR/構造化/Embedding は将来のモデル更新で再生成される
 - 「原本（GCS）」と「派生（DB）」を分け、派生は version/generation を持てる設計にする
+
+---
+
+## 関連ドキュメント
+
+### スキーマ設計の詳細
+- **[DB_SCHEMA_TABLES.md](./DB_SCHEMA_TABLES.md)** - 具体的なテーブル定義（10テーブル + ENUM）
+- **[DB_SCHEMA_ERD.md](./DB_SCHEMA_ERD.md)** - ER図とデータフロー（Mermaid）
+- **[DB_SCHEMA_DISCUSSION.md](./DB_SCHEMA_DISCUSSION.md)** - 議論ポイントと意思決定事項
+
+### アーキテクチャ
+- [CLEAN_ARCHITECTURE.md](./CLEAN_ARCHITECTURE.md) - レイヤー構造と依存方向
+- [MICROSERVICES_MAP.md](./MICROSERVICES_MAP.md) - サービス境界とデータ所有
+
+### 実装
+- [STACK.md](../02_tech_stack/STACK.md) - 技術スタック（PostgreSQL 18.1, Atlas, sqlc, pgx, pgvector）
+- [SKILL_DB_ATLAS_SQLC_PGX.md](../skills/SKILL_DB_ATLAS_SQLC_PGX.md) - 実装ガイド
