@@ -15,14 +15,14 @@
 ## テーブル一覧
 
 ### コアエンティティ
-1. **users** - ユーザー（OAuth/OIDC由来、個人情報非収集）
-2. **subjects** - 科目/コース
-3. **raw_files** - 原本ファイル（GCS保存、自動取り込み対応）
-4. **materials** - 資料チャンク（Markdown化済み、ベクトル埋め込み済み）
-5. **chats** - 質問・検索セッション（Phase 2〜4の統合）
+1. **users** - ユーザー（OAuth/OIDC由来、個人情報非収集）【NanoID: 20文字】
+2. **subjects** - 科目/コース【NanoID: 20文字】
+3. **raw_files** - 原本ファイル（GCS保存、自動取り込み対応）【NanoID: 20文字】
+4. **materials** - 資料チャンク（Markdown化済み、ベクトル埋め込み済み）【NanoID: なし】
+5. **chats** - 質問・検索セッション（Phase 2〜4の統合）【NanoID: 20文字】
 
 ### 非同期処理
-6. **jobs** - 非同期処理ジョブ（ファイル取込、バッチ処理等）
+6. **jobs** - 非同期処理ジョブ（ファイル取込、バッチ処理等）【NanoID: なし】
 
 ---
 
@@ -131,8 +131,8 @@ CREATE TABLE users (
   -- 主キー（内部UUID）
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   
-  -- 外部公開ID（短縮ID）
-  nanoid TEXT NOT NULL UNIQUE,
+  -- 外部公開ID（短縮ID、20文字）
+  nanoid TEXT NOT NULL UNIQUE CHECK (length(nanoid) = 20),
   
   -- OAuth/OIDC識別子（例: Google sub、学内IdP uid）
   provider TEXT NOT NULL,
@@ -172,7 +172,7 @@ CREATE INDEX idx_users_nanoid ON users(nanoid);
 CREATE TABLE subjects (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  nanoid TEXT NOT NULL UNIQUE,
+  nanoid TEXT NOT NULL UNIQUE CHECK (length(nanoid) = 20),
   
   -- 所有者（インストラクター/作成者）
   owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -210,7 +210,7 @@ CREATE INDEX idx_subjects_course_code ON subjects(course_code) WHERE is_active;
 CREATE TABLE raw_files (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  nanoid TEXT NOT NULL UNIQUE,
+  nanoid TEXT NOT NULL UNIQUE CHECK (length(nanoid) = 20),
   
   -- 物理制約（MUST）
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -274,7 +274,6 @@ CREATE INDEX idx_raw_files_source_url ON raw_files(source_url) WHERE source_url 
 CREATE TABLE materials (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  nanoid TEXT NOT NULL UNIQUE,
   
   -- 親ファイル（物理制約継承）
   raw_file_id UUID NOT NULL REFERENCES raw_files(id) ON DELETE CASCADE,
@@ -305,7 +304,6 @@ CREATE TABLE materials (
 
 -- ファイル単位でのチャンク取得（順序保証）
 CREATE INDEX idx_materials_file_seq ON materials(raw_file_id, sequence_in_file) WHERE is_active;
-CREATE INDEX idx_materials_nanoid ON materials(nanoid);
 
 -- 全文検索インデックス（PostgreSQL組み込み）
 CREATE INDEX idx_materials_content_fts ON materials USING GIN (to_tsvector('english', content_markdown)) WHERE is_active;
@@ -334,7 +332,7 @@ CREATE INDEX idx_materials_embedding_vector ON materials
 CREATE TABLE chats (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  nanoid TEXT NOT NULL UNIQUE,
+  nanoid TEXT NOT NULL UNIQUE CHECK (length(nanoid) = 20),
   
   -- 物理制約（MUST）
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -417,7 +415,6 @@ CREATE INDEX idx_chats_termination ON chats(termination_reason) WHERE is_active 
 CREATE TABLE jobs (
   -- 主キー
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  nanoid TEXT NOT NULL UNIQUE,
   
   -- ジョブタイプ
   job_type job_type NOT NULL,
@@ -459,6 +456,56 @@ CREATE INDEX idx_jobs_type ON jobs(job_type);
 - `idempotency_key` でKafkaの再送を吸収（冪等性保証）
 - `retry_count` でリトライ制御
 - `job_type` で様々なジョブタイプに対応
+
+---
+
+## ID戦略の詳細
+
+### NanoID の文字数と適用基準
+- **20文字**: 外部公開・URL共有・長期保存が必要なエンティティ
+  - users, subjects, raw_files, chats
+  - 衝突確率: ~10億年に1回（1時間に1000ID生成想定）
+- **NanoID不要**: 外部露出がない内部処理エンティティ
+  - materials（UUIDで十分、Librarianとの連携はUUIDで実施）
+  - jobs（idempotency_keyで代用）
+
+### 設計根拠
+- **materials**: チャンク単位での外部参照は稀（通常はraw_fileレベルで引用表示）
+- **jobs**: 内部処理のみ、Kafka再送は `idempotency_key` で管理
+- **20文字の選定理由**: NanoIDのデフォルト21文字より1文字短縮し、衝突確率を維持しつつコンパクト化
+
+---
+
+## Go実装例: NanoID生成
+
+```go
+import (
+    "fmt"
+    gonanoid "github.com/matoous/go-nanoid/v2"
+)
+
+// 20文字のNanoIDを生成（users, subjects, raw_files, chats用）
+func generateNanoID20() (string, error) {
+    alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    return gonanoid.Generate(alphabet, 20)
+}
+
+// 使用例
+func createUser(ctx context.Context, db *sql.DB, provider, providerUserID string) error {
+    userID := uuid.Must(uuid.NewV7())
+    nanoID, err := generateNanoID20()
+    if err != nil {
+        return fmt.Errorf("failed to generate nanoid: %w", err)
+    }
+    
+    _, err = db.ExecContext(ctx, `
+        INSERT INTO users (id, nanoid, provider, provider_user_id, role)
+        VALUES ($1, $2, $3, $4, 'student')
+    `, userID, nanoID, provider, providerUserID)
+    
+    return err
+}
+```
 
 ---
 
@@ -862,7 +909,8 @@ LIMIT :top_k;
 - [ ] 全テーブルに `user_id` または `subject_id` による物理制約があるか
 - [ ] 固定値は全てENUM型で定義されているか（VARCHAR禁止）
 - [ ] 主キーは `uuidv7()` で時系列順に生成されるか
-- [ ] 外部公開IDは `nanoid` でユニーク制約が付いているか
+- [ ] 外部公開が必要なテーブルには `nanoid` (20文字) でユニーク制約が付いているか
+- [ ] materials/jobsテーブルには `nanoid` が存在しないことを確認したか
 - [ ] ソフトデリートは `is_active` + `deleted_at` で統一されているか
 - [ ] インデックスは検索要件に基づいて適切に設計されているか
 - [ ] `created_at`, `updated_at` は全テーブルに存在するか
