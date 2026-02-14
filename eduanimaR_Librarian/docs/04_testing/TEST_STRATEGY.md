@@ -8,7 +8,11 @@
 - 詳細は `TEST_PYRAMID.md` を正とする
 
 ## 重点領域
-- usecase の仕様（境界条件/権限/状態遷移）
-- repository のSQL（sqlc生成物の実動作）
-- handler のエラーマッピング（共通形式）
+- usecase / graph の仕様（境界条件/停止判断/状態遷移）
+- outbound client（Professor / Gemini）のリトライ・タイムアウト・エラーマッピング
+- handler の入出力・エラーマッピング（共通形式）
+
+## 本サービスで扱わないもの
+- DB リポジトリの実検証（Librarian は DB-less）
+- CDC/Indexer/イベント基盤を伴う E2E（Professor 側の責務）
 

@@ -9,7 +9,7 @@ Make the system debuggable and operable in production.
 
 ## Safe defaults
 - Correlate logs/traces/metrics with consistent IDs (`request_id`, `trace_id`).
-- Instrument boundaries (HTTP/gRPC handlers, outbound clients, DB, queue).
+- Instrument boundaries (HTTP handlers, outbound HTTP clients to Professor/Gemini).
 - Prefer dashboards + alerts derived from SLOs.
 
 ## Common mistakes to avoid

@@ -1,77 +1,46 @@
-# INTER_SERVICE_COMM
+# INTER_SERVICE_COMM（Librarian SSOT）
 
 ## 目的
-フロントエンド（Next.js BFF）、API Gateway、マイクロサービス間の通信規約を定義し、結合度を制御する。
+Professor（Go）↔ Librarian（Python）の通信規約を定義し、責務境界（DB-less/推論特化）を壊さずに統合できるようにする。
 
-## 2段階ゲートウェイ構成（確定）
+## 通信構成（確定）
 ```
-Browser → Next.js (BFF) → Go API Gateway → Go Microservices
+eduanima-professor (Go)  ↔  eduanima-librarian (Python)
+         HTTP/JSON (OpenAPI: SSOT)
+
+eduanima-librarian (Python)  →  Gemini API
+               HTTPS
 ```
 
-### 1) Browser ↔ Next.js (BFF)
-- プロトコル: HTTP/JSON
-- 認証: Cookie/Session (Next.js が管理)
-- 責務:
-  - Next.js が UI 向けにデータを整形・集約
-  - 複数の Go API を呼び出して結果をマージする場合あり
-  - RSC (React Server Components) で初期データをサーバー側で取得
+## Professor ↔ Librarian
+### プロトコル
+- HTTP/JSON を正とする（OpenAPI を SSOT）。
+- HTTP/JSON 以外の内部 RPC 方式は本サービスの SSOT では扱わない（Professor 内部の都合は Professor 側 SSOT で管理）。
 
-### 2) Next.js (BFF) ↔ Go API Gateway
-- プロトコル: HTTP/JSON
-- 認証: JWT Bearer Token (Next.js が Cookie から取り出して付与)
-- ルール:
-  - タイムアウト必須（Next.js 側で設定）
-  - エラーハンドリング: `ERROR_CODES.md` に従う
-  - リトライは呼び出し側（Next.js）で方針を統一（指数バックオフ等）
+### 認証/認可
+- 原則「内部サービス間通信」。認証方式（mTLS/Workload Identity 等）は運用側 SSOT に従う。
+- Librarian は最終回答文を生成しないため、認可の主戦場は Professor 側（利用者/セッション文脈の管理）。
 
-### 3) Go API Gateway ↔ Go Microservices (内部通信)
-- **プロトコル: gRPC (基本)**
-  - 型安全、高速、双方向ストリーミング対応
-  - Proto定義(.proto)がサービス間契約のSSOTとなる
-  - HTTP/JSONは例外的な用途のみ(レガシー連携等)
-- **Gateway の役割: gRPC → OpenAPI 変換**
-  - 内部マイクロサービスはgRPCで実装
-  - Gateway が gRPC サービスを呼び出し、結果をHTTP/JSON(OpenAPI形式)に変換してフロントエンドへ返す
-  - 変換ツール: grpc-gateway, connectrpc 等を活用
-- 認証: JWT 検証は Gateway で完了しているため、内部は **service-to-service 認証を必須** とする（mTLS / workload identity）
-- ルール:
-  - タイムアウト必須（無限待ち禁止）
-  - リトライは慎重に（冪等性を確認）
-  - 冪等性が必要な操作は idempotency key を導入
+### タイムアウト/リトライ
+- timeout は必須。横断ルールは `01_architecture/RESILIENCY.md` を正とする。
+- retry はネットワーク起因の一時失敗に限定し、推論ループ（MaxRetry）とは分離する。
 
-> service-to-service 認証/認可/運用の標準は `05_operations/IDENTITY_ZERO_TRUST.md` を参照。
+### 検索ツール呼び出し（責務境界）
+- Librarian は **検索クエリ**を生成し、Professor の検索ツールへ渡す。
+- **取得件数（k）/除外（既出断片）/候補集合の規模（N）/試行回数**などの「物理検索の状態」は Professor が所有する。
+- Professor は必要に応じて「広く取得 → 多様性/重複の抑制 → Librarian に渡す候補を絞る」を行う（Librarian は方針を固定しない）。
 
-## 認可（重要）
-- Gateway での認証/認可に加え、**usecase（業務層）での所有者チェック/状態遷移チェック** を必須とする（BOLA/BFLA 対策）。
-- 詳細: `05_operations/API_SECURITY.md`
+### メタデータの扱い（LLM 非露出の原則）
+- Librarian の推論（LLM）に **安定ID（document_id 等）を見せない**。
+- Professor → Librarian の検索候補は、LLM 可視の `temp_index` + テキスト断片を基本とし、安定参照への対応表は Professor が保持する。
 
-## レジリエンス（重要）
-- timeout/retry/idempotency の横断ルールは分散させず、`01_architecture/RESILIENCY.md` を正とする。
+### エラー
+- エラー形式/コードは `ERROR_HANDLING.md`, `ERROR_CODES.md` に従う。
 
-## 非同期（イベント）
-- 原則: 状態変化の伝搬はイベントで行う（Debezium CDC / Kafka）
-- ルール:
-  - スキーマ互換性（後方互換）を維持
-  - consumer は冪等に実装
-
-## 契約
-- **外部API契約 (Gateway → Frontend)**: OpenAPI(`API_CONTRACT_WORKFLOW.md`)
-  - Go API Gateway が公開するHTTP/JSON仕様
-  - Next.js (Orval) で型生成し、フロントエンドで使用
-- **内部API契約 (Gateway → Microservices)**: Protocol Buffers (.proto)
-  - gRPCサービス定義が内部通信の正
-  - `protoc` でGoコードを生成
-  - Gateway が .proto から OpenAPI へ変換する際は、grpc-gateway の annotations を活用
-- イベント契約: スキーマ定義（Avro/JSON Schema等）をSSOTにする（方式はプロジェクトで決定）
-
-> イベント契約・DLQ・再処理の標準は `03_integration/EVENT_CONTRACTS.md` を参照。
+## 契約（SSOT）
+- OpenAPI 運用: `API_CONTRACT_WORKFLOW.md`
+- 破壊的変更の扱い: `API_VERSIONING_DEPRECATION.md`
 
 ## 明確に「やらない」こと
-- **Browser から Go Microservices への直接アクセス**（内部構造の露出を招く）
-- **Go API Gateway にビジネスロジック** を書く（Gateway は認証/認可/ルーティングに徹する）
-
-## 関連
-- `01_architecture/RESILIENCY.md`
-- `03_integration/EVENT_CONTRACTS.md`
-- `05_operations/API_SECURITY.md`
-- `05_operations/IDENTITY_ZERO_TRUST.md`
+- Librarian が DB/検索基盤へ直接アクセスすること
+- Librarian がイベント同期（CDC/Outbox 等）を操作すること

@@ -24,30 +24,28 @@ SLO は「運用の意思決定」に直結するため、以下をセットで�
 
 | 対象 | SLI | 期間 | SLO | 失敗判定 | 備考 |
 |---|---|---|---|---|---|
-| 外部 API（Gateway） | 成功率 | 30日 | 99.9% | HTTP 5xx / timeout | 重要導線は分割して定義 |
-| 外部 API（Gateway） | p95 レイテンシ | 30日 | < X ms | N/A | ルート単位で分割 |
-| 内部 API（gRPC） | 成功率 | 30日 | 99.9% | gRPC status != OK | method 単位で定義 |
-| CDC / Indexer | E2E 遅延（p95） | 7日 | < X 分 | N/A | DB→検索反映 |
-| CDC / Indexer | DLQ 滞留 | 7日 | < X 件/分 | N/A | 復旧手順とセット |
+| Librarian API（HTTP） | 成功率 | 30日 | 99.9% | HTTP 5xx / timeout | ルート単位で分割 |
+| Librarian API（HTTP） | p95 レイテンシ | 30日 | < X ms | N/A | ルート単位で分割 |
+| 依存先（Professor） | 成功率 | 30日 | 99.9% | HTTP 5xx / timeout | outbound を別監視 |
+| 依存先（Gemini） | 成功率 | 30日 | 99.9% | 5xx / timeout | quota/429 は別途方針化 |
 
 ## 最小SLO（テンプレ）
 以下は例。実際の値はプロダクト要件（UX/収益/法令）で決める。
 
 ### 外部API（Gateway）
-- 成功率（HTTP 5xx を失敗）
+（本サービスでは Gateway 前提を置かない。呼び出し元は Professor を想定する。）
+
+### Librarian API（HTTP）
+- 成功率（HTTP 5xx / timeout を失敗）
 - レイテンシ（p95/p99）
 
-### 内部API（gRPC）
-- 成功率（gRPC status を失敗判定）
-- レイテンシ（p95/p99）
-
-### 同期系（CDC/Indexer）
-- DB更新→検索反映の遅延（p95）
-- DLQ の件数・滞留時間
+### 依存先（Professor / Gemini）
+- 成功率/レイテンシ
+- 依存障害が Librarian の 5xx に波及していないか
 
 ## アラート設計（推奨）
 - **症状アラート**: ユーザー影響（成功率低下、遅延増大）
-- **原因候補アラート**: 依存先（DB/ES/Kafka）の失敗率、接続枯渇、キュー滞留
+- **原因候補アラート**: 依存先（Professor / Gemini）の失敗率、接続枯渇、同時実行枯渇
 
 ### Burn-rate の考え方（概要）
 - Error Budget の消費速度が速いときに通知する
@@ -61,13 +59,12 @@ SLO は「運用の意思決定」に直結するため、以下をセットで�
 - 1) 影響範囲を確認（Gateway か特定サービスか）
 - 2) 直近デプロイ/マイグレーション有無を確認
 - 3) リクエスト相関（`request_id` / `trace_id`）でボトルネックを特定
-- 4) 依存先（DB/ES/Kafka）の失敗率・レイテンシを確認
+- 4) 依存先（Professor / Gemini）の失敗率・レイテンシを確認
 - 5) 一時緩和（レート制限強化、重い機能の切り離し、ロールバック）
 
 ## ダッシュボード最低要件
 - サービス別: RPS、エラー率、p95/p99、サチュレーション（CPU/メモリ/コネクション）
-- 依存先別: DB/ES/Kafka のレイテンシと失敗率
-- 同期: E2E遅延、DLQ
+- 依存先別: Professor / Gemini のレイテンシと失敗率
 
 ## 関連
 - 05_operations/OBSERVABILITY.md

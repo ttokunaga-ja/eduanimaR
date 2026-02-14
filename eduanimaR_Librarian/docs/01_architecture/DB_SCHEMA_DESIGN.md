@@ -1,37 +1,48 @@
-# DB_SCHEMA_DESIGN
+# DB_SCHEMA_DESIGN（Librarian 観点の SSOT）
+
+## 結論
+`eduanima-librarian` は **DB を持たない**。したがって本サービス内での DB スキーマ設計は **行わない**。
 
 ## 目的
-PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（型/制約/インデックス）を統一する。
+「DB を持たない」という境界を崩さないために、**データ所有権（Owning Data）と入出力の最小契約**を明文化する。
 
-## ID戦略（UUID + NanoID）
-- 内部主キー: UUID（推奨: UUIDv7 / `uuidv7()` を利用）
-- 外部公開ID: NanoID（URL/ログ/問い合わせで扱いやすい短ID）
-- ルール:
-  - 参照整合性は内部UUIDで維持する
-  - 外部公開IDはユニーク制約 + 露出するAPIのみで使用する
+## データ所有権
+- **Professor（Go）** が以下を所有する:
+  - DB / 検索インデックス（全文/ベクトル）
+  - 取り込み/バッチ処理/インデックス更新
+  - ドキュメントID・ページ番号・チャンクID等の正規化
+- **Librarian（Python）** が所有するのは、リクエスト内の LangGraph state のみ（メモリ内）。永続化しない。
 
-## ENUMの積極採用
-- 固定値（status/type/category）は **PostgreSQL ENUM を必須** とする
-  - **VARCHAR で固定値を管理する設計は禁止**（typo/バリデーション漏れ/性能劣化を誘発する）
-- 利点: 型安全性、制約の明確化、アプリ側の分岐漏れ検知
-- 変更方針: 追加は許容、削除/名前変更は慎重に（互換性を壊しやすい）
+## Librarian が扱う「参照（Evidence）」の最小形
+Librarian の出力は「どの資料のどこを見るべきか」を示す参照の集合であり、DB行やスキーマではない。
 
-## NULLとデフォルト
-- 原則: `NOT NULL` + `DEFAULT` を優先
-- NULLが必要な場合:
-  - sqlc/pgx が生成する nullable 型を統一して使う
-  - APIのJSON表現（省略/明示null）も合わせて決める
+推奨する最小契約は、LLMに安定IDを見せないために「二層」に分ける。
 
-## インデックス
-- B-tree を基本とし、検索要件に応じて GIN / GiST / HNSW(pgvector) を選定
-- 18.1の機能（例: B-tree Skip Scan 等）は「要件を満たす場合のみ」採用し、必ずベンチマークを残す
+### A) LLM 可視の検索候補（Professor → Librarian）
+- `temp_index`: 検索候補の一時参照（整数、リクエスト内で一意）
+- `text`: テキスト断片（LLM が評価する対象）
+- （任意）`location_hint`: 人間が読める位置情報（例: "p.12" / "Slide 12"）
 
-## ベクトル検索（pgvector 0.8.1）
-- OLTPとベクトル検索を同居させる場合は、テーブル分離/更新頻度/インデックス再構築コストを考慮
-- HNSW を使う場合:
-  - 取り込みバッチ/再構築戦略（オフピーク）を定める
-  - 近似検索の許容誤差（recall）を要件化する
+### B) 不透明な対応表（Professor が保持）
+`temp_index` を、Professor が管理する安定参照へ対応付ける（Librarian からは参照するだけで、LLM には渡さない）。
 
-## Atlas運用前提
-- スキーマ変更は `schema.hcl` が唯一の正
-- 手動 `ALTER TABLE` は禁止（差分が壊れる）
+安定参照の例（Professor 内部）:
+- `document_id`: Professor が管理する安定ID（文字列）
+- `pages`: ページ番号（整数配列、1始まり）
+- （任意）`chunk_id`: 断片ID
+- （任意）`source_uri`: 原典のURI/パス
+- （任意）`score`: 検索スコア（参照用途のみ。Librarian は閾値を固定しない）
+
+### C) Librarian の選定結果（Librarian → Professor）
+- `selected_evidence`: `temp_index` の集合（必要なら `why` を付与）
+
+この形にすることで、Librarian の推論（LLM）には安定IDを露出させず、Professor が最終的に引用（安定参照）へ変換できる。
+
+## 禁止事項（MUST）
+- Librarian での DB 接続・スキーマ管理・マイグレーション
+- Librarian での「インデックス正」を作る行為（検索結果は常に Professor の応答を正とする）
+
+## 関連
+- `01_architecture/MICROSERVICES_MAP.md`
+- `01_architecture/SYNC_STRATEGY.md`
+- `01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`

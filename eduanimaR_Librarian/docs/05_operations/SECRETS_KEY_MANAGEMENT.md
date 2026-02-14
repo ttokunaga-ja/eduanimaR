@@ -4,7 +4,7 @@
 秘密情報（secrets）と暗号鍵（keys）を安全に扱い、漏えい時の影響を最小化する。
 
 ## 適用範囲
-- アプリ設定（DB接続、外部APIキー、Kafka認証、TLS鍵など）
+- アプリ設定（DB接続、外部APIキー、イベント基盤の認証、TLS鍵など）
 - 署名鍵（JWT/セッショントークン等）
 - 暗号鍵（PIIの暗号化、KMS、Envelope encryption）
 

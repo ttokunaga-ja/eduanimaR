@@ -4,13 +4,13 @@
 Prevent hallucinations and architecture drift by making “where truth lives” explicit.
 
 ## Scope
-Applies to all proposals and changes in this template: services, gateway, CI/CD, contracts, DB, observability.
+Applies to all proposals and changes in Librarian: service behavior, contracts, CI/CD, operations.
 
 ## SSOT (Source of Truth)
 - Stack and versions: `docs/02_tech_stack/STACK.md`
 - Clean Architecture dependency rules: `docs/01_architecture/CLEAN_ARCHITECTURE.md`
 - Microservice boundaries: `docs/01_architecture/MICROSERVICES_MAP.md`
-- Contracts: `docs/03_integration/API_CONTRACT_WORKFLOW.md` and `docs/03_integration/PROTOBUF_GRPC_STANDARDS.md`
+- Contracts: `docs/03_integration/API_CONTRACT_WORKFLOW.md`
 - Operations posture: `docs/05_operations/OBSERVABILITY.md` and `docs/05_operations/CI_CD.md`
 
 ## Safe defaults
@@ -18,7 +18,7 @@ Applies to all proposals and changes in this template: services, gateway, CI/CD,
 - Prefer linking to existing SSOT docs instead of duplicating content.
 
 ## Common mistakes to avoid
-- “Let’s just add an ORM” (this template is SQL + sqlc by design).
+- “Let’s just add a DB/ORM” (Librarian is DB-less by design).
 - “Let’s switch tracing/logging library” without updating operations docs.
 - Suggesting breaking changes to contracts without a versioning/deprecation plan.
 

@@ -1,42 +1,28 @@
-# SYNC_STRATEGY
+# SYNC_STRATEGY（Librarian 観点）
+
+## 結論
+DB↔検索インデックスの同期（CDC/Outbox/再構築など）は **Librarian の責務ではない**。
+本サービスは検索の物理実行を行わず、Professor の検索ツールを呼び出すだけである。
 
 ## 目的
-PostgreSQL と Elasticsearch のデータ整合性を、運用可能なコストで維持するための同期戦略を定義する。
+Librarian が「同期の詳細」に踏み込まず、**同期遅延や検索結果の揺れを前提にした停止判断**を行えるようにする。
 
 ## 前提
-- 検索/集計は Elasticsearch 9.2.4 を第一候補とする
-- 差分同期は Debezium CDC（Kafka経由）を基本とする
+- Professor は、DB/インデックス/バッチ処理/再インデックスを管理する。
+- Librarian は、Professor から返る検索候補（`temp_index` 付きテキスト断片）だけを材料に判断する。
+- 取得件数（k）や除外ID（既出断片）など「物理検索の状態」は Professor が保持し、Librarian は指定しない。
 
-## 代表的パターンと採用指針
-### 1) Debezium CDC（推奨）
-- 概要: PostgreSQL の論理レプリケーション → Debezium → Kafka → Indexer → Elasticsearch
-- 長所: アプリの書き込み経路を汚さない、再処理がしやすい
-- 注意:
-  - スキーマ変更時の互換性（トピック/イベント）
-  - 冪等（idempotency）と順序保証
+## Librarian 側の設計指針
+- 停止条件は「検索基盤の完全性」ではなく、**タスクの充足性（target_items が引用付きで満たされたか）**で定義する。
+- 検索結果が薄い/揺れる場合は、以下の順で改善を試みる:
+  1. クエリ多様化（言い換え/キーワード抽出/制約追加）
+  2. 範囲拡大（関連概念/上位概念）
+  3. それでも不足なら、MaxRetry 到達時点の最善を返す
 
-### 2) Transactional Outbox
-- 概要: アプリがDB書き込みと同一Txで outbox にイベントを書き、別プロセスが配送
-- 長所: 整合性が取りやすい
-- 注意: outbox掃除/再配送/遅延の設計が必要
-
-### 3) Dual Write（非推奨）
-- 概要: アプリがDBとESへ同時書き込み
-- リスク: 部分失敗で不整合が発生しやすい
-
-## 整合性レベル（定義必須）
-- 検索は結果整合（eventual consistency）を許容するか
-- 許容遅延（例: P95で5秒以内等）
-- 不整合検知とリカバリ（フルリインデックス手順）
-
-> SLO/アラート（遅延・DLQ）は `05_operations/SLO_ALERTING.md` を参照。
-
-## 失敗時の原則
-- Indexerは冪等に実装し、同一イベント再処理で結果が変わらないこと
-- デッドレター（DLQ）を用意し、手動介入で復旧できること
-
-> イベント契約・DLQ・再処理は `03_integration/EVENT_CONTRACTS.md` を参照。
+## 禁止事項
+- Librarian が同期の仕組み（CDC/Outbox/Indexer 等）を直接操作すること
+- Librarian が検索結果の「正」を上書きすること
 
 ## 関連
-- `03_integration/EVENT_CONTRACTS.md`
-- `05_operations/SLO_ALERTING.md`
+- `01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`
+- `03_integration/INTER_SERVICE_COMM.md`

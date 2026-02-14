@@ -3,10 +3,9 @@
 ## 目的
 分散システムで必ず発生する「遅延・部分失敗・再試行」に対し、サービス横断で一貫した設計基準を定義する。
 
-## 適用範囲
-- Next.js(BFF) ↔ Go API Gateway（HTTP）
-- Go API Gateway ↔ Go Microservices（gRPC）
-- DB / Elasticsearch / Kafka / 外部API
+## 適用範囲（Librarian）
+- Professor（Go）↔ Librarian（Python）（HTTP/JSON）
+- Librarian ↔ Gemini API（HTTPS）
 
 ## 基本原則（MUST）
 - **Timeout は必須**（無限待ち禁止）。上流の deadline/cancellation を下流へ伝播する。
@@ -15,18 +14,18 @@
 - **Concurrency を制御**（接続プール、ワーカー数、キュー長、バックプレッシャ）。
 
 ## Timeout / Deadline
-- HTTP/gRPC のクライアントは必ず deadline を設定する
-- DB/ES/Kafka も context でキャンセル可能にする
-- 入口（BFF/Gateway）で設定した deadline を超える処理は禁止
+- すべての HTTP クライアントは timeout を必須化する（無限待ち禁止）
+- Professor→Librarian の呼び出しは request timeout を前提に設計し、Librarian は上流の締切内で「最善の結果」を返す
+- Gemini 呼び出しも timeout を設定し、上流キャンセル時は速やかに中断する
 
 ## Retry
 ### Retry してよい（SHOULD）
-- 読み取り（GET 相当）で、依存先が一時的に不安定な場合
-- **冪等キー** 付きの書き込み（後述）
+- Professor の検索ツール呼び出し（読み取り相当）で、ネットワーク起因の一時失敗のみ
+- Gemini API 呼び出しで 5xx/一時エラーのみ（指数バックオフ + ジッタ）
 
 ### Retry してはいけない（SHOULD NOT）
-- 冪等性がない書き込み（同一操作が重複実行されうる）
-- 依存先が過負荷で落ちているとき（回復を遅らせる）
+- 同一リクエストで結果が大きく変動しうる「推論ループの再実行」を、ネットワーク retry と混同して行うこと
+	- 推論ループの繰り返しは MaxRetry と停止条件で制御する（アプリケーションレベルの制御）
 
 ### ルール（SHOULD）
 - 指数バックオフ + ジッタ
@@ -38,26 +37,27 @@
 - ネットワーク再送/タイムアウト/クライアント再試行で同一リクエストが重複しても、結果を一意にする。
 
 ### 適用対象（SHOULD）
-- `POST /orders` のような「作成」
-- 決済/在庫引当/ポイント付与などの業務フロー
+- `POST /v1/librarian/search-agent` は「同じ入力なら同じ出力が望ましい」処理であり、Professor 側で `request_id` を付与し相関する
+
+> Librarian は永続化しないため、厳密な意味での idempotency-store は保持できない。
+> 代わりに、Professor 側で冪等キー/キャッシュ/重複排除を行う。
 
 ### 方式（例）
-- `Idempotency-Key`（外部HTTP）または `idempotency_key`（gRPC metadata/field）を受け取る
+- `Idempotency-Key`（HTTP header）を受け取る
 - オーナーサービスがキーを保存し、同一キーは同一結果を返す
 
 ## Circuit Breaker / Bulkhead（推奨）
-- 依存先（外部API/ES 等）ごとに隔離（bulkhead）し、連鎖障害を防ぐ
+- 依存先（Gemini / Professor tool endpoints）ごとに隔離（bulkhead）し、連鎖障害を防ぐ
 - 失敗率/遅延が閾値を超えたら短時間遮断し、回復を待つ
 
 ## Rate Limit / Backpressure（推奨）
-- Gateway で外部からの流量制限（ユーザー/トークン/ルート単位）
-- 内部はワーカー数・キュー長・接続プールで制御
+- Librarian 側は同時実行数（ワーカー/コネクション）を制御し、Gemini への過剰送信を防ぐ
+- Professor 側は Librarian 呼び出しを含めた全体流量を制御する（外部公開面がある場合）
 
 ## Graceful Shutdown（推奨）
 - 新規受付停止 → 処理中完了待ち → タイムアウトで強制終了
-- readiness/liveness と整合する（関連: PROTOBUF_GRPC_STANDARDS）
+- readiness/liveness と整合する
 
 ## 関連
-- 03_integration/INTER_SERVICE_COMM.md
-- 03_integration/PROTOBUF_GRPC_STANDARDS.md
-- 05_operations/SLO_ALERTING.md
+- `03_integration/INTER_SERVICE_COMM.md`
+- `03_integration/ERROR_HANDLING.md`

@@ -260,15 +260,15 @@ echo "Deployer SA:  $SA_DEPLOY_EMAIL"
 Create secrets (names are examples; standardize naming in your org):
 
 ```bash
-gcloud secrets create DATABASE_URL --replication-policy="automatic"
+gcloud secrets create GEMINI_API_KEY --replication-policy="automatic"
 gcloud secrets create JWT_SIGNING_KEY --replication-policy="automatic"
 ```
 
 Add initial secret versions (avoid leaking secrets into shell history in real ops; this is for bootstrap):
 
 ```bash
-printf '%s' 'postgres://USER:PASS@HOST:5432/DB?sslmode=require' | \
-  gcloud secrets versions add DATABASE_URL --data-file=-
+printf '%s' 'YOUR_GEMINI_API_KEY' | \
+  gcloud secrets versions add GEMINI_API_KEY --data-file=-
 
 openssl rand -base64 48 | \
   gcloud secrets versions add JWT_SIGNING_KEY --data-file=-
@@ -294,7 +294,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --platform="managed" \
   --service-account="$SA_RUNTIME_EMAIL" \
   --allow-unauthenticated=false \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SIGNING_KEY=JWT_SIGNING_KEY:latest"
+  --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SIGNING_KEY=JWT_SIGNING_KEY:latest"
 ```
 
 ### 8) Rollback (by revision)

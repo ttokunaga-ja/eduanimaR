@@ -5,9 +5,8 @@ API を安全に提供するための **最低限の設計・実装・運用ル�
 OWASP API Security Top 10 の観点を、日々の設計/レビュー/実装に落とし込む。
 
 ## 適用範囲
-- Browser ↔ Next.js(BFF)
-- Next.js(BFF) ↔ Go API Gateway
-- Go API Gateway ↔ Go Microservices（gRPC）
+- Professor ↔ Librarian（HTTP/JSON）
+- Librarian ↔ Gemini API（HTTPS）
 
 ## 基本原則（MUST）
 - **認可は二段構え**
@@ -32,14 +31,14 @@ OWASP API Security Top 10 の観点を、日々の設計/レビュー/実装に�
 - 内部通信は service-to-service 認証（mTLS / workload identity）を必須化（関連: IDENTITY_ZERO_TRUST / INTER_SERVICE_COMM）
 
 ### C. リソース消費（Unrestricted Resource Consumption）
-- すべての外部 I/O に timeout がある（HTTP/gRPC/DB/ES/Kafka）
+- すべての外部 I/O に timeout がある（HTTP/HTTPS）
 - ページングはデフォルト値と上限を持つ（例: `limit <= 100`）
 - ソート/フィルタは許容リスト方式（任意フィールド指定を許さない）
 - アップロードや大きいリクエストは **最大サイズ** を決める
 
 ### D. セキュリティ設定ミス（Misconfiguration）
 - CORS/CSRF/セキュリティヘッダの責務（BFF or Gateway）を決めている
-- 本番で debug エンドポイント、reflection（gRPC）、詳細エラーを無効化
+- 本番で debug エンドポイント、詳細エラー、過剰な診断情報を無効化
 - 依存先接続文字列/秘密情報がログに出ない
 
 ### E. SSRF / Unsafe Consumption

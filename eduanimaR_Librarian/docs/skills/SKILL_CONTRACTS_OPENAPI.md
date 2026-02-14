@@ -1,4 +1,4 @@
-# Skill: Contracts (OpenAPI + Orval)
+# Skill: Contracts (OpenAPI)
 
 ## Purpose
 Keep external HTTP/JSON APIs contract-first and safely evolvable.
@@ -14,11 +14,11 @@ Keep external HTTP/JSON APIs contract-first and safely evolvable.
 - Keep response/error shapes stable and explicitly documented.
 
 ## Common mistakes to avoid
-- “Just change the response shape” without versioning/deprecation.
-- Divergence between gateway implementation and `openapi.yaml`.
+- Changing response shapes without a versioning/deprecation plan.
+- Divergence between implementation and OpenAPI.
 - Silent behavior changes without updating API lifecycle docs.
 
 ## Checklist
-- Update OpenAPI first, then regenerate clients (e.g., Orval).
+- Update OpenAPI first, then regenerate clients/DTOs if you use codegen.
 - Confirm error codes and status mapping remain consistent.
 - Provide deprecation notes and migration path for consumers.

@@ -1,7 +1,7 @@
 # Skill: API Security (OWASP API Security)
 
 ## Purpose
-Build secure-by-default HTTP and gRPC APIs and reduce common API exploit classes.
+Build secure-by-default HTTP APIs and reduce common API exploit classes.
 
 ## SSOT
 - API security checklist: `docs/05_operations/API_SECURITY.md`

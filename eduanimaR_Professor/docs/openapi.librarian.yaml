@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: eduanimaR Librarian API
+  version: 0.1.0
+  description: |
+    Professor ↔ Librarian（Python）の内部API契約。
+    このファイルが SSOT（契約の正）であり、HTTP/JSON のみを対象とする。
+servers:
+  - url: /
+tags:
+  - name: Librarian
+    description: Reasoning/search-agent endpoints
+paths:
+  /healthz:
+    get:
+      tags: [Librarian]
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+  /readyz:
+    get:
+      tags: [Librarian]
+      summary: Readiness check
+      responses:
+        "200":
+          description: OK
+  /v1/librarian/search-agent:
+    post:
+      tags: [Librarian]
+      summary: Run Librarian search-agent loop
+      description: |
+        Professor が Librarian に推論（検索戦略・停止判断・エビデンス選定）を委譲する。
+
+        重要:
+        - 物理検索の取得件数（k）や既出ID管理などは Professor が所有し、Librarian は指定しない。
+        - Librarian の出力は `temp_index` を用いた選定結果であり、安定IDへの対応は Professor が保持する。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchAgentRequest"
+      responses:
+        "200":
+          description: Completed or best-effort result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchAgentResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    SearchAgentRequest:
+      type: object
+      required: [user_query, analyzed_info, task]
+      properties:
+        user_query:
+          type: string
+        analyzed_info:
+          description: Professor 側で生成した解析・制約（Librarian が推論に使う）。
+          type: object
+          additionalProperties: true
+        task:
+          $ref: "#/components/schemas/SearchTask"
+        stop_conditions:
+          type: string
+          description: Human-readable stop conditions (SSOT is task.target_items).
+        request_id:
+          type: string
+          description: Correlation id (propagated across services).
+    SearchTask:
+      type: object
+      required: [target_items, max_retries]
+      properties:
+        target_items:
+          type: array
+          items:
+            type: string
+        max_retries:
+          type: integer
+          minimum: 0
+    SearchAgentResponse:
+      type: object
+      required: [status, selected_evidence, reasoning_summary]
+      properties:
+        status:
+          type: string
+          enum: [COMPLETED, PARTIAL]
+        selected_evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelectedEvidence"
+        reasoning_summary:
+          type: string
+    SelectedEvidence:
+      type: object
+      required: [temp_index]
+      properties:
+        temp_index:
+          type: integer
+          minimum: 0
+        why:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            request_id:
+              type: string

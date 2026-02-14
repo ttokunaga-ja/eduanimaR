@@ -1,52 +1,34 @@
 # API_CONTRACT_WORKFLOW
 
 ## 目的
-OpenAPI を正（SSOT）とし、そこからサーバー実装（Echo）とクライアント実装（Next.js/TypeScript）の両方に必要な型/インターフェースを生成することで、契約逸脱を防ぐ。
+Professor（Go）↔ Librarian（Python）の API を **OpenAPI を正（SSOT）**として管理し、契約逸脱を防ぐ。
 
-## 前提:2段階ゲートウェイ構成 + gRPC内部通信
-本プロジェクトは以下の構成を採用する:
+## 前提（Librarian）
+本サービスは以下の構成を前提とする:
 
 ```
-Browser → Next.js (BFF) → Go API Gateway → Go Microservices (User/Product/Order...)
-         [HTTP/JSON]        [HTTP/JSON]     [gRPC]
-         [OpenAPI]                          [Protocol Buffers]
+eduanima-professor (Go)  ↔  eduanima-librarian (Python)
+         [HTTP/JSON]            [Litestar]
+         [OpenAPI: SSOT]
 ```
-
-- **Next.js(BFF)**: UI向けゲートウェイ。データ整形・集約・Cookie/Session管理。
-- **Go API Gateway**: システム全体のゲートウェイ。認証/認可/レート制限/ルーティング。
-  - **gRPC → OpenAPI 変換**を担当(grpc-gateway等を使用)
-  - 外向きはHTTP/JSON(OpenAPI)、内向きはgRPC(Protocol Buffers)
-- **Go Microservices**: ビジネスロジック実装。DB/ES等への永続化。
-  - **gRPCサービス**として実装(.protoが契約)
 
 ## 原則（MUST）
-- **ハンドラーのシグネチャを手動で変更しない**
 - 変更は必ず OpenAPI 定義から始める（Contract First）
 - 生成物は手編集しない（再生成で消える）
-- **フロントエンドは Orval で生成された型・Hooks のみを使用する**（手書き型定義禁止）
+- Librarian のハンドラーは OpenAPI と整合するように実装する
 
 ## フロー（推奨）
-### バックエンド側
-#### A) 内部サービス (gRPC) の開発
-1. `.proto` ファイルを定義・更新する
-   - service / rpc / message を定義
-   - 必要に応じて grpc-gateway の annotations を付与(HTTP mapping用)
-2. `protoc` でGoコードを生成する
-3. `internal/service` で生成されたgRPCサーバーインターフェースを実装する
+### 1) 契約定義（SSOT）
+1. OpenAPI を更新する（破壊的変更かどうかを明記）
+2. `ERROR_HANDLING.md` の共通形式に沿ってエラーも定義する
 
-#### B) Gateway (gRPC → OpenAPI) の構成
-1. Gateway が内部gRPCサービスを呼び出せるように設定
-2. grpc-gateway または connectrpc を使って、gRPCをHTTP/JSONに変換
-3. 変換結果として `docs/openapi.yaml` を生成・公開する
-4. `ERROR_HANDLING.md` の共通形式に沿ってHTTPエラーをマッピングする
-5. 破壊的変更の場合は、バージョニング（`/v1` 等）か互換運用の方針を決める
+### 2) Librarian（Python）側
+1. OpenAPI の request/response と一致する DTO（msgspec）を用意する
+2. Litestar のルーティング/ハンドラーを実装する
 
-### フロントエンド側（Orval による自動生成）
-1. バックエンドが出力した `openapi.yaml` (または JSON) を取得
-2. `npm run api:generate` (Orval) を実行
-3. `src/shared/api/` 配下に TypeScript の型・React Hooks が生成される
-4. FSD の `entities` / `features` 層で生成された Hooks（`useGetUser` 等）を使用
-5. **手書きで `fetch` や `axios` を書かない**（生成に統一）
+### 3) Professor（Go）側
+1. OpenAPI からクライアントを生成する（例: OpenAPI Generator / oapi-codegen 等）
+2. Professor から Librarian を呼び出す呼び出し点をユースケースとして統一する
 
 ## レビュー観点
 - 互換性: 既存クライアントに影響する変更か（必須/任意、型変更、enum削除等）

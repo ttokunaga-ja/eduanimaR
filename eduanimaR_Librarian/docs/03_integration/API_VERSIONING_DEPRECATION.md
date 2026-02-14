@@ -4,8 +4,7 @@
 外部API（OpenAPI）を長期運用するため、互換性・バージョニング・非推奨/廃止（deprecation）を標準化する。
 
 ## 適用範囲
-- Browser ↔ Next.js(BFF)
-- Next.js(BFF) ↔ Go API Gateway（外向き API / OpenAPI SSOT）
+- Professor（Go）↔ Librarian（Python）（HTTP/JSON, OpenAPI SSOT）
 
 ## 原則（MUST）
 - **互換性を壊さない**のが基本。破壊的変更は最後の手段。

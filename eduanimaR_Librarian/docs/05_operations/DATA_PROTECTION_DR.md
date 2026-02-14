@@ -8,12 +8,14 @@
 - **RTO**: どれくらいで復旧させる必要があるか
 
 ## バックアップ（MUST）
-- 定期バックアップを取得する（フル + 増分/PITR は要件に応じて）
-- バックアップは暗号化し、アクセス権を最小化する
-- **復元テスト（リストア演習）** を定期実施し、手順を Runbook 化する
+Librarian は DB-less / stateless であり、バックアップ対象となる永続データを持たない。
+
+ただし、以下はデータ保護の対象として扱う:
+- 設定/シークレット（APIキー等）
+- 監査ログや運用ログの保管（ログ基盤側の保持/削除）
 
 ## PITR（Point-in-Time Recovery）（推奨）
-- 誤操作/不正更新に備え、可能なら PITR を用意する
+（Not Applicable）
 
 ## データ保持・削除（MUST）
 - PII を含むデータの保持期間を決める
@@ -25,12 +27,13 @@
 - ただし PII/秘密情報は出さない（関連: OBSERVABILITY）
 
 ## DR（推奨）
-- 依存コンポーネント（DB/ES/Kafka）ごとに復旧手順を用意
-- フェイルオーバ/リージョン切替の手順と責任者を決める
+Librarian の DR は「再デプロイで復旧できる」前提で設計する。
+
+- 依存先（Professor / Gemini）が部分失敗しても、Librarian が安全に劣化できること
+- リージョン障害時の再デプロイ手順（IaC/手順/責任者）
 
 ## 関連
 - 05_operations/OBSERVABILITY.md
 - 05_operations/RELEASE_DEPLOY.md
-- 05_operations/MIGRATION_FLOW.md
 - 05_operations/SECRETS_KEY_MANAGEMENT.md
 - 05_operations/INCIDENT_POSTMORTEM.md

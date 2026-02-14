@@ -1,19 +1,11 @@
 # MIGRATION_FLOW
 
 ## 目的
-Atlas v1.0.0 による宣言的マイグレーションの運用手順を定義し、環境差分と人為ミスを防ぐ。
+（Not Applicable）
 
-## 原則
-- スキーマの正は `schema.hcl` のみ
-- 手動で `ALTER TABLE` を発行しない
+Librarian は DB-less / stateless であり、DB マイグレーション運用（マイグレーションツール等）を行わない。
+DB スキーマ/マイグレーションは Professor 側の SSOT を正とする。
 
-## 変更フロー（例）
-1. `schema.hcl` を変更
-2. 差分を確認（CIで plan 相当を実行）
-3. レビュー（破壊的変更/ロック/実行時間を確認）
-4. ステージングへ適用
-5. 本番適用（メンテ窓/ロールバック方針を事前合意）
-
-## 監視
-- 失敗時は適用ログと差分を保存
-- 変更履歴はチケット/PRに紐付ける
+## 関連
+- `01_architecture/DB_SCHEMA_DESIGN.md`
+- `01_architecture/MICROSERVICES_MAP.md`

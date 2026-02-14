@@ -1,33 +1,38 @@
 # CLEAN_ARCHITECTURE
 
 ## 目的
-各サービスのディレクトリ構成と依存方向を固定し、機能追加・保守・テスト容易性を最大化する。
+`eduanima-librarian`（Python 推論マイクロサービス）のディレクトリ構成と依存方向を固定し、推論ロジック（検索戦略・停止判断・選定）の保守性とテスト容易性を最大化する。
 
-## 推奨レイアウト（Standard Go Layout + Clean Architecture）
-- `cmd/<service>/`:
-  - エントリポイント（main）。DI（依存注入）の組み立てのみ。
-- `internal/handler/`:
-  - HTTP層（Echo）。入出力変換、認可、バリデーション、エラーマッピング。
-- `internal/usecase/`:
-  - ビジネスロジック（ユースケース）。最重要。
-  - ルール: handler/DB/Search の詳細に依存しない。
-- `internal/domain/`:
-  - エンティティ/値オブジェクト/ドメインエラー。
-- `internal/repository/`:
-  - 永続化・外部I/F（PostgreSQL, Elasticsearch等）の実装。
-- `pkg/`:
-  - サービス横断で共有してよい（かつ安定）なライブラリのみ。
+## 前提（重要）
+- Librarian は **DB-less**（永続化なし）。DB/インデックス/バッチは Go 側（Professor）の責務。
+- Librarian の外部依存は原則として以下のみ:
+  - **Gemini API（Gemini 3 Flash）**
+  - **Professor が公開する検索ツール（HTTP/JSON）**
+
+## 推奨レイアウト（Python + Clean Architecture）
+```
+src/
+  eduanima_librarian/
+    app/            # Litestar app / routing / DI wiring
+    controllers/    # HTTP 入出力（request/response, auth, error mapping）
+    usecases/       # ユースケース（検索戦略/ループ/停止判断/選定）
+    domain/         # ドメインモデル（Evidence, StopCondition, Task, errors）
+    ports/          # 外部I/Fの抽象（ProfessorSearchPort, LlmPort 等）
+    adapters/       # ports の実装（GeminiClient, ProfessorClient）
+    observability/  # logging/tracing/metrics（サービス内で完結）
+tests/
+```
 
 ## 依存方向（必須）
-- `handler` → `usecase` → `domain`
-- `repository` → `domain`
-- `usecase` は `repository` の「インターフェース」に依存し、実装には依存しない。
+- `controllers` → `usecases` → `domain`
+- `adapters` → `ports` / `domain`
+- `usecases` は `adapters` に依存しない（必ず `ports` 経由）
 
-## 境界の作り方
-- `usecase` 側で ports を定義する（例: `UserRepository` interface）
-- `repository` で adapters を実装する
+## LangGraph の置き場所
+- LangGraph（検索ループの状態機械/グラフ）は `usecases` に置く。
+- `domain` は LangGraph/Litestar/Gemini SDK などの実装詳細に依存しない。
 
-## 禁止事項
-- handler から直接DBクエリを実行しない
-- domain が pgx/sqlc/Echo に依存しない
-- 生成コード（sqlc / OpenAPI）を手で編集しない
+## 禁止事項（Librarian のガードレール）
+- DB 接続・マイグレーション・キャッシュサーバ導入（状態を外に持たない）
+- 最終回答文の生成（出力はエビデンスの構造化データのみ）
+- 無制限の検索ループ（MaxRetry と停止条件を必ず適用）

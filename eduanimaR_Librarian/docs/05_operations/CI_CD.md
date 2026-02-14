@@ -5,9 +5,8 @@
 
 ## CI（必須）
 - Unitテスト
-- Integrationテスト（必要なモジュールのみ。Testcontainers活用）
-- 契約（.proto / OpenAPI）と生成物の整合性チェック（再生成差分の検出）
-- Atlas差分の検証（plan相当）
+- Integrationテスト（必要なモジュールのみ。外部I/O境界を中心に）
+- 契約（OpenAPI）と生成物の整合性チェック（再生成差分の検出）
 
 ---
 
@@ -18,7 +17,7 @@
 - 契約/生成（Must）
 	- Job 名（推奨）: `contract-codegen-check`
 	- 配置（推奨）: `.github/workflows/contract-codegen-check.yml`
-	- 対象: `.proto` / `docs/openapi.yaml` / 生成物
+	- 対象: OpenAPI（Professor↔Librarian）/ 生成物
 	- 仕様（SSOT）: `03_integration/CONTRACT_TESTING.md`
 
 - SLO/アラート（運用SSOT）
@@ -39,7 +38,7 @@
 
 ## CIの推奨ステージ（例）
 ### 1) Lint / Static
-- Go lint（方式はプロジェクトで統一）
+- Python lint/typecheck（方式はプロジェクトで統一）
 - 依存・生成ツールの整合（tooling を固定している場合は差分が出ないこと）
 
 ### 1.5) Security（推奨）
@@ -48,13 +47,9 @@
 - 依存スキャン（SCA）/コンテナスキャン
 
 ### 2) Contract / Codegen
-- `.proto` を更新した場合:
-	- `buf lint`（推奨）
-	- `buf breaking`（推奨。比較対象は `main` またはリリースタグ）
-	- `protoc` / `buf generate` の再実行で差分が出ないこと（生成物手編集の検出）
 - OpenAPI を更新/生成した場合:
-	- `docs/openapi.yaml` の再生成で差分が出ないこと
-	- Orval 等のフロント向け生成を前提に、破壊的変更がないこと（レビューで確認）
+	- SSOT（OpenAPI）と実装/DTO の整合が保たれること
+	- クライアント/DTO 生成を採用している場合は、再生成で差分が出ないこと（生成物手編集の検出）
 
 推奨（運用ルール）：
 - `.github/workflows/contract-codegen-check.yml` は **PRで必ず実行**し、差分が出た場合は PR をブロックする
@@ -63,8 +58,7 @@
 > 外向き契約（OpenAPI）は「生成物差分検出」を CI に含める。
 
 ### 3) Tests
-- `go test ./...`
-- Integration（DB/ES 等）: Testcontainers で必要最小の範囲を実行
+- Unit / Integration（外部I/O境界）を必要最小の範囲で実行
 
 ### 4) Provenance / Attestation（推奨）
 - SBOM と provenance（出自）を生成し、成果物に紐づける

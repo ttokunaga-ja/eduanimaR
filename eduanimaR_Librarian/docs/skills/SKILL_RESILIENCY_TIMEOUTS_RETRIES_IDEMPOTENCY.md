@@ -6,7 +6,7 @@ Avoid cascading failures and make partial outages survivable.
 ## SSOT
 - Resiliency rules: `docs/01_architecture/RESILIENCY.md`
 - Inter-service comm: `docs/03_integration/INTER_SERVICE_COMM.md`
-- Sync strategy (DB ↔ Search / CDC): `docs/01_architecture/SYNC_STRATEGY.md`
+- Sync strategy (boundary rules): `docs/01_architecture/SYNC_STRATEGY.md`
 
 ## Safe defaults
 - Timeouts first: set deadlines at the boundary and propagate via context.

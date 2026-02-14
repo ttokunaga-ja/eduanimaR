@@ -5,14 +5,13 @@
 SLO を守りながら安全にリリースするための段階的デリバリー標準を定義する。
 
 ## 適用範囲
-- API Gateway / Microservices
-- 非同期（Indexer / Consumer）
-- DB マイグレーション（関連: `05_operations/MIGRATION_FLOW.md`）
+- Librarian（HTTP API）
+- 依存先（Professor / Gemini）を含むエラー率/レイテンシ
 
 ## 原則（MUST）
 - **小さく出す**: 変更は小さく分割して出す
 - **観測できない変更は出さない**: 事前に SLIs を用意する
-- **ロールバック可能性**を設計に含める（アプリだけでなくDBも）
+- **ロールバック可能性**を設計に含める（アプリ/設定/契約）
 - **Error Budget を使う**: 失敗許容量が枯渇しているならリリースを止める
 
 ## デプロイ戦略
@@ -36,9 +35,9 @@ SLO を守りながら安全にリリースするための段階的デリバリ�
 
 ## リリース前の必須条件（MUST）
 - 監視:
-  - エラー率（HTTP 5xx / gRPC status）
+  - エラー率（HTTP 5xx / timeout）
   - p95/p99 レイテンシ
-  - 依存先（DB/ES/Kafka）の失敗率/レイテンシ
+  - 依存先（Professor / Gemini）の失敗率/レイテンシ
 - 相関:
   - `request_id` / `trace_id` が追える
 - ロールバック:
@@ -51,24 +50,8 @@ SLO を守りながら安全にリリースするための段階的デリバリ�
   - 例: p99 が基準より悪化 → 停止
 - “原因候補（DB遅延など）”ではなく、まずは“症状（ユーザー影響）”で止める
 
-## DB 互換（MUST）: Expand/Contract
-破壊的変更を安全に出すため、スキーマ変更は段階的に行う。
-
-### パターン（例）
-1. Expand: 新カラム追加（NULL可）
-2. アプリ: 新旧両方を読み書き（互換期間）
-3. Backfill: 旧データを埋める
-4. Contract: 旧カラム削除、制約強化
-
-> Atlas の運用は `05_operations/MIGRATION_FLOW.md`。
-
-## 非同期（CDC/Indexer）のリリース
-- 互換性:
-  - イベントスキーマは後方互換（フィールド追加は任意）
-- カナリア:
-  - consumer グループを分ける、もしくは一部パーティションのみ処理するなど段階導入
-- 監視:
-  - DLQ 増加、遅延（DB→検索反映）をゲートにする
+## データ/同期の扱い
+Librarian は DB-less のため、DB スキーマ変更・CDC・Indexer 等の段階リリースは Professor 側の責務として扱う。
 
 ## リリースチェックリスト（テンプレ）
 - 変更種別: API/DB/イベント/インフラ
@@ -81,7 +64,6 @@ SLO を守りながら安全にリリースするための段階的デリバリ�
 - `05_operations/RELEASE_DEPLOY.md`
 - `05_operations/SLO_ALERTING.md`
 - `05_operations/OBSERVABILITY.md`
-- `05_operations/MIGRATION_FLOW.md`
-- `03_integration/EVENT_CONTRACTS.md`
 - `04_testing/PERFORMANCE_LOAD_TESTING.md`
 - `05_operations/INCIDENT_POSTMORTEM.md`
+

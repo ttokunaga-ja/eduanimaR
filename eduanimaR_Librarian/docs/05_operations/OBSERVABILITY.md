@@ -8,7 +8,7 @@
 - 参照: `05_operations/SLO_ALERTING.md`
 
 ## ログ（必須）
-- Go 標準の `log/slog` を使用する
+- 言語標準のロガー（および採用済みのログ方針）に統一する
 - すべてのリクエストに `request_id` を付与し、ログに含める
 - 可能なら `trace_id` も付与（導入方式はプロジェクトで統一）
 - ルール:
@@ -16,12 +16,11 @@
 	- SQLやクレデンシャルを生ログしない
 
 ## トレース（推奨）
-- OpenTelemetry を標準とし、サービス間（HTTP/gRPC）で trace context を伝播する
+- OpenTelemetry を標準とし、サービス間（HTTP）で trace context を伝播する
 - Span の最小要件:
-	- Gateway（HTTPハンドラ）: 入口 span
-	- Gateway→Microservices（gRPC client）: client span
-	- Microservices（gRPC server）: server span
-	- DB（pgx）/外部API（ES等）: child span
+	- Librarian（HTTP handler）: 入口 span
+	- Librarian→Professor（HTTP client）: client span
+	- Librarian→Gemini（HTTPS client）: client span
 - 属性は OpenTelemetry の semantic conventions（特に RPC/HTTP/DB）に寄せる
 
 ## Semantic Conventions（推奨）
@@ -30,9 +29,7 @@ OpenTelemetry Semantic Conventions を実装のSSOTとして扱う。
 
 ### 最小要件（SHOULD）
 - HTTP: ルート/メソッド/ステータス/URL属性
-- RPC(gRPC): service/method/status
-- DB: system/name/operation
-- Messaging(Kafka等): system/destination/operation
+- （必要なら）外部依存（Professor / Gemini）の種別・結果
 - Feature flag: 評価結果（フラグ名/バリアント）
 
 > 具体の属性名は OTel の semantic conventions を正とする。
@@ -41,12 +38,8 @@ OpenTelemetry Semantic Conventions を実装のSSOTとして扱う。
 - SLI として最低限、以下を収集する（粒度は `service` / `method` / `status` を基本）:
 	- リクエスト数（RPS）
 	- レイテンシ（p50/p95/p99）
-	- エラー率（gRPC status / HTTP status）
-	- 依存先（DB/ES/Kafka）の失敗率・レイテンシ
-- CDC / Indexer:
-	- エンドツーエンド遅延（DB更新→検索反映）
-	- DLQ 件数・滞留時間
-	- リトライ回数
+	- エラー率（HTTP status / timeout）
+	- 依存先（Professor / Gemini）の失敗率・レイテンシ
 
 ## エラー監視
 - 5xx は原則アラート対象
@@ -54,14 +47,10 @@ OpenTelemetry Semantic Conventions を実装のSSOTとして扱う。
 
 ## 相関（ログ↔トレース）
 - `request_id` と `trace_id` をログに必ず出し、障害時に相互に辿れるようにする
-- Gateway で生成/受領した `request_id` は下流へ伝播する（HTTP header / gRPC metadata）
-
-## 同期遅延監視（CDC/Indexer）
-- Debezium/Kafka/Indexer のレイテンシを計測し、許容範囲を定義する
-- DLQ 件数・滞留時間を監視し、運用で復旧できる導線を用意する
+- 上流（Professor）で生成/受領した `request_id` は下流へ伝播する（HTTP header）
 
 ## 参考（一次情報）
-- OpenTelemetry Go: https://opentelemetry.io/docs/languages/go/
+- OpenTelemetry Python: https://opentelemetry.io/docs/languages/python/
 - OpenTelemetry semantic conventions: https://opentelemetry.io/docs/specs/semconv/
 
 ## 関連
