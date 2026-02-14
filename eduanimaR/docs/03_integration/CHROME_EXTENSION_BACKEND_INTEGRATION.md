@@ -145,7 +145,222 @@ Professor 契約：
 
 ---
 
-## 9) パーミッション（最小化）
+## 9) LMS DOM監視の実装パターン（Phase 2）
+
+### 9.1 MutationObserver による資料検知
+
+Content Script で MutationObserver を使用し、LMS 上の資料リンクをリアルタイムで検知する。
+
+#### 実装例
+
+```typescript
+// extension/src/content/materialDetector.ts
+export function startMaterialDetection(callback: (material: DetectedMaterial) => void) {
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList') {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement) {
+            detectMaterialsInElement(node, callback);
+          }
+        }
+      }
+    }
+  });
+
+  // LMS の資料コンテナを監視
+  const container = document.querySelector('#course-materials');
+  if (container) {
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  // 初回スキャン
+  detectMaterialsInElement(document.body, callback);
+
+  return () => observer.disconnect();
+}
+
+function detectMaterialsInElement(
+  element: HTMLElement,
+  callback: (material: DetectedMaterial) => void
+) {
+  // PDF/PPTX/DOCX リンクを検知
+  const links = element.querySelectorAll<HTMLAnchorElement>('a[href*=".pdf"], a[href*=".pptx"], a[href*=".docx"]');
+  
+  for (const link of links) {
+    const url = link.href;
+    const filename = link.textContent?.trim() || extractFilenameFromUrl(url);
+    
+    callback({
+      url,
+      filename,
+      detected_at: new Date().toISOString(),
+    });
+  }
+}
+```
+
+### 9.2 Background → Professor API への転送
+
+検知した資料を Background Service Worker 経由で Professor API に送信する。
+
+#### メッセージパッシング
+
+```typescript
+// extension/src/content/materialDetector.ts
+startMaterialDetection((material) => {
+  // Content Script → Background へメッセージ送信
+  chrome.runtime.sendMessage({
+    type: 'MATERIAL_DETECTED',
+    payload: material,
+  });
+});
+```
+
+```typescript
+// extension/src/background/index.ts
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'MATERIAL_DETECTED') {
+    const material = message.payload;
+    
+    // Professor API へ転送
+    uploadMaterial(material)
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    
+    return true; // 非同期レスポンス
+  }
+});
+
+async function uploadMaterial(material: DetectedMaterial) {
+  // 1. ファイルをダウンロード
+  const blob = await fetch(material.url).then((r) => r.blob());
+  
+  // 2. Professor API へアップロード
+  const formData = new FormData();
+  formData.append('file', blob, material.filename);
+  formData.append('subject_id', getCurrentSubjectId()); // ユーザー選択または推定
+  
+  const response = await fetch('https://api.example.com/v1/materials', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${await getAccessToken()}`,
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to upload material');
+  }
+}
+```
+
+### 9.3 LMS サイトへの影響最小化
+
+#### パフォーマンス対策
+
+- MutationObserver のコールバックは debounce する（100ms）
+- 大量の資料検知時は throttle する（1秒に最大10件）
+- バックグラウンドでダウンロード/アップロードを実行し、UI をブロックしない
+
+#### プライバシー対策
+
+- ユーザーの明示的な許可なしにアップロードしない
+- 検知した資料を一覧表示し、ユーザーが選択した資料のみアップロード
+
+---
+
+## 10) Web ↔ 拡張のデータ同期
+
+### 10.1 Cookie認証によるAPI呼び出し
+
+Web版でログイン後、Chrome拡張は同じ Cookie を利用してProfessor API にアクセスする。
+
+#### 実装方針
+
+1. **Web版でログイン**
+   - OAuth 2.0 / OpenID Connect で認証
+   - HttpOnly Cookie にセッション ID を保存
+
+2. **拡張から API 呼び出し**
+   - `credentials: 'include'` を指定してCookieを送信
+   - 同一オリジンであることを確保（CORS設定）
+
+```typescript
+// extension/src/background/api.ts
+export async function fetchSubjects() {
+  const response = await fetch('https://api.example.com/v1/subjects', {
+    credentials: 'include', // Cookie を送信
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (response.status === 401) {
+    // 未認証 → Web版でログインを促す
+    chrome.tabs.create({ url: 'https://app.example.com/login' });
+    throw new Error('Not authenticated');
+  }
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch subjects');
+  }
+  
+  return response.json();
+}
+```
+
+### 10.2 パーミッション設計
+
+#### 必要なパーミッション
+
+```json
+// extension/manifest.json
+{
+  "permissions": [
+    "storage",           // ユーザー設定の保存
+    "scripting"          // Content Script のインジェクション
+  ],
+  "host_permissions": [
+    "https://lms.example.com/*",  // LMS ドメイン（資料検知）
+    "https://api.example.com/*"   // Professor API（Cookie認証）
+  ]
+}
+```
+
+#### 最小化の原則
+
+- ワイルドカード（`https://*/*`）を使用しない
+- LMS ドメインは具体的に指定（例: `https://moodle.example.com/*`）
+- 不要な権限を要求しない
+
+### 10.3 セッション切れの検知
+
+拡張側で 401 エラーを受け取った場合：
+
+```typescript
+// extension/src/background/api.ts
+async function handleAuthError() {
+  // ユーザーに通知
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'icon.png',
+    title: 'ログインが必要です',
+    message: 'Web版でログインしてください。',
+    buttons: [{ title: 'ログインページを開く' }],
+  });
+  
+  // Web版のタブを開く
+  chrome.tabs.create({ url: 'https://app.example.com/login' });
+}
+```
+
+---
+
+## 11) パーミッション（最小化）
 
 - Host permissions は LMS ドメインに限定（ワイルドカード乱用禁止）
 - `storage` は必要最小限
