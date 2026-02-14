@@ -7,13 +7,17 @@
 - Public API exposure: Yes（`index.ts` で公開）
 - Status: approved
 - Last updated: 2026-02-15
+- **Updated**: 2026-02-14 - Backend DB Schema（raw_files）と整合
 
 ---
 
 ## 1) Purpose
-- 科目ごとに保存済み資料をツリー形式で表示する
-- ファイルをクリックして開く、アップロード、検索/フィルタ機能を提供
-- 解析状態（pending / processing / completed / failed）を視覚的に表示
+- 科目ごとに保存済み資料をリスト形式で表示する（Phase 1 ではツリー形式不要）
+- ファイルをクリックして開く、アップロード機能を提供
+- 検索/フィルタ機能（ファイル名、ステータス）
+- 解析状態（uploading / uploaded / processing / completed / failed / archived）を視覚的に表示
+
+**重要**: Backend DBでは `raw_files` テーブルを使用（原本ファイル）
 
 想定利用箇所：
 - Chat Workspace の Sidebar（資料タブ）
@@ -131,8 +135,8 @@
 ```typescript
 {
   subjectId: string;          // 科目ID
-  files: File[];              // ファイル一覧
-  onFileClick: (file: File) => void; // ファイルクリック時のコールバック
+  rawFiles: RawFile[];        // ファイル一覧
+  onFileClick: (file: RawFile) => void; // ファイルクリック時のコールバック
   onUpload: () => void;       // アップロードボタンクリック時のコールバック
 }
 ```
@@ -159,27 +163,64 @@
 ### API/Query に依存するか：Yes
 
 **依存する層**：
-- `features/fileManagement/lib/useFiles` Hook から `files` を注入
+- `features/fileManagement/lib/useRawFiles` Hook から `rawFiles` を注入
 - `features/fileManagement/lib/useUploadFile` Hook から `onUpload` を注入
 
 データフロー：
-1. `useFiles(subjectId)` でファイル一覧を取得
+1. `useRawFiles(subjectId)` でファイル一覧を取得
 2. Props として渡す
 3. ポーリング（5秒間隔）で解析状態を更新（TanStack Query の `refetchInterval`）
 
-関連：`../../01_architecture/DATA_ACCESS_LAYER.md`
+データモデル（Backend DB Schemaと一致）：
+```typescript
+// RawFile（原本ファイル）
+interface RawFile {
+  id: string;                // UUID (内部ID)
+  nanoid: string;            // 20文字の外部公開ID
+  user_id: string;           // 所有者UUID（物理制約）
+  subject_id: string;        // 所属科目UUID（物理制約）
+  original_filename: string; // 元のファイル名
+  file_type: FileType;       // ファイルタイプ（ENUM）
+  file_size_bytes: number;   // ファイルサイズ（バイト）
+  status: FileStatus;        // ファイルステータス
+  total_pages?: number;      // PDF/PowerPointのページ数
+  processed_at?: string;     // 処理完了日時（ISO 8601）
+  created_at: string;        // ISO 8601
+  is_active: boolean;        // ソフトデリート用
+}
+
+// FileStatus（Backend ENUM型と一致）
+type FileStatus =
+  | 'uploading'      // アップロード中
+  | 'uploaded'       // アップロード完了
+  | 'processing'     // 処理中（Vision Reasoning実行中）
+  | 'completed'      // 処理完了
+  | 'failed'         // 処理失敗
+  | 'archived';      // アーカイブ済み
+
+// FileType（Backend ENUM型と一致、抜粋）
+type FileType =
+  | 'pdf' | 'text'
+  | 'python' | 'go' | 'javascript'
+  | 'png' | 'jpeg' | 'webp'
+  | 'docx' | 'xlsx' | 'pptx'
+  | 'google_docs' | 'google_sheets' | 'google_slides'
+  | 'other';
+```
+
+関連：`../../01_architecture/DATA_MODELS.md`
 
 ---
 
 ## 9) Error Handling
 
 ### どのエラーを受け取るか：
-- `useFiles` の fetch エラー → `error` Prop
+- `useRawFiles` の fetch エラー → `error` Prop
 - アップロード失敗 → `useUploadFile` 内で処理（このコンポーネントには影響しない）
 
 ### 表示方針：
 - ファイル一覧取得失敗: 全体にエラー表示 + リトライボタン
-- 個別ファイルの解析失敗: `upload_status="failed"` で視覚的に表示
+- 個別ファイルの解析失敗: `status="failed"` で視覚的に表示
 
 関連：
 - `../../03_integration/ERROR_HANDLING.md`
@@ -196,7 +237,7 @@
 - ステータスフィルタリング
 
 ### Integration（Vitest + MSW）で保証すること：
-- `useFiles` との結合
+- `useRawFiles` との結合
 - ファイルクリック時のコールバック実行
 
 ### E2E（Playwright）で触るべき導線：
@@ -206,24 +247,26 @@
 
 ## 11) Acceptance Criteria（Must）
 
-- [ ] 科目内のファイル一覧がツリー形式で表示される
-- [ ] 各ファイルにファイル名、タイプアイコン、解析状態が表示される
+- [ ] 科目内のファイル一覧がリスト形式で表示される（Phase 1 ではツリー不要）
+- [ ] 各ファイルにファイル名、タイプアイコン、解析状態（uploading/uploaded/processing/completed/failed/archived）が表示される
 - [ ] ファイルをクリックすると `onFileClick` コールバックが発火する
 - [ ] アップロードボタンをクリックすると `onUpload` コールバックが発火する
 - [ ] 検索ボックスでファイル名をリアルタイム検索できる
-- [ ] ステータスフィルタ（すべて/完了/解析中/失敗）が機能する
+- [ ] ステータスフィルタ（すべて/完了/処理中/失敗/アーカイブ済み）が機能する
 - [ ] Empty 状態で適切なメッセージとアップロードボタンが表示される
 - [ ] Loading 状態で Skeleton UI が表示される
 - [ ] エラー時に適切なメッセージとリトライボタンが表示される
 - [ ] 解析状態がポーリングで更新される
 - [ ] キーボードでファイルをナビゲーションできる
-- [ ] スクリーンリーダーで各ファイルの情報が読み上げられる
+- [ ] Backend DB Schema（raw_files テーブル）と整合している
 
 ---
 
 ## 12) Open Questions
 
 - ツリー表示は Phase 1 で実装するか？
-  - 回答: Phase 1 ではフラットなリスト。Phase 2 でフォルダ構造を検討
+  - 回答: **Phase 1 ではフラットなリスト**。Phase 2 でフォルダ構造を検討
 - ポーリング間隔は？
   - 回答: 5秒間隔（TanStack Query の `refetchInterval: 5000`）
+- FileStatus ENUM の全種類に対応するか？
+  - 回答: Yes。Backend ENUM型（uploading/uploaded/processing/completed/failed/archived）すべてに対応

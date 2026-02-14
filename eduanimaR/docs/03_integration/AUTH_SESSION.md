@@ -16,8 +16,9 @@ OAuth 2.0 / OpenID Connect による SSO 認証、セッション管理、Cookie
 
 - 認証は **OAuth 2.0 / OpenID Connect** による SSO（対応プロバイダ: Google / Meta / Microsoft / LINE）
 - セッションは **HttpOnly Cookie** を基本（アクセストークンを LocalStorage に置かない）
-- **個人情報の最小化**：フロントエンドは `user_id` と `display_name` のみ保持
-  - **重要**: メールアドレス、電話番号等の個人情報はProfessor側でも管理しない
+- **個人情報の最小化**：フロントエンドは `user_id` (UUID + nanoid) のみ保持
+  - **重要**: メールアドレス、電話番号、表示名等の個人情報はProfessor側でも管理しない
+  - Backend DBには `provider` と `provider_user_id` のみが保存される
 - CSRF 方針（SameSite / Origin check / token）をプロジェクトとして固定する
 - ユーザー依存データは "意図せず共有キャッシュ" されないようにする（動的化 or no-store か設計で担保）
 - 認証状態の変更（login/logout）は UI に即反映されるよう、再検証と境界を明示する
@@ -49,7 +50,8 @@ Phase 1 では以下のプロバイダをサポート：
 3. **コールバック処理**
    - `/api/auth/callback/[provider]` で Authorization Code を受け取る
    - Professor API にコードを転送し、ユーザー情報を取得
-   - **個人情報の最小化**: `user_id` と `display_name` のみを受け取る
+   - **個人情報の最小化**: `provider` と `provider_user_id` のみをDBに保存
+   - `user_id` (UUID) と `nanoid` (20文字) を生成
 
 4. **セッション確立**
    - HttpOnly Cookie にセッション ID を保存
@@ -58,19 +60,27 @@ Phase 1 では以下のプロバイダをサポート：
 ### 1.3 個人情報の取り扱い
 
 **重要な設計方針**：
-- フロントエンド（Next.js BFF）は `user_id` と `display_name` のみを扱う
-- メールアドレス、電話番号、住所等の個人情報は **Professor側でも保持しない**
+- **Backend DBには個人情報を一切保存しない**（メール、電話番号、表示名等）
+- Backend DBに保存されるのは `provider` と `provider_user_id` のみ
+- ユーザー識別は `user_id` (UUID) で行う
+- 外部公開には `nanoid` (20文字) を使用
 - 認証プロバイダから取得した個人情報は、認証処理の完了後に破棄する
-- ユーザー識別は `user_id`（プロバイダの一意識別子から生成）のみで行う
 
 型定義（契約）：
 ```typescript
-// shared/types/auth.ts
+// shared/types/auth.ts (Backend DB Schemaと一致)
 export interface CurrentUser {
-  user_id: string;       // 一意識別子（例: "google_123456789"）
-  display_name: string;  // 表示名（例: "田中 太郎"）
+  id: string;                // UUID (内部ID)
+  nanoid: string;            // 20文字の外部公開ID
+  provider: string;          // OAuth/OIDCプロバイダ（例: "google", "microsoft"）
+  provider_user_id: string;  // プロバイダ側のユーザーID
+  role: 'student' | 'instructor' | 'admin';
 }
 ```
+
+**UI表示について**：
+- ユーザー名表示が必要な場合は、フロントエンド側で別途管理するか、省略する
+- 例: "ユーザー（Google）" や "アカウント設定" のような表示
 
 ### 1.4 ログアウトフロー
 
