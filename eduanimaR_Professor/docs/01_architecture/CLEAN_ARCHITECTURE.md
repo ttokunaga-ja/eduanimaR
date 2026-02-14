@@ -1,7 +1,14 @@
 # CLEAN_ARCHITECTURE（eduanima-professor）
 
 ## 目的
-Professor（Go）を「司令塔 + データの守護者」として成長させても破綻しないように、ディレクトリ構成と依存方向（境界）を固定する。
+Professor（Go）を「インフラ・実行部隊・最終回答者（実務） + データの守護者」として成長させても破綻しないように、ディレクトリ構成と依存方向（境界）を固定する。
+
+> 補足: 思考（検索戦略の立案・充足判定・LangGraphのループ）は Python（Librarian）が担い、Professor はその要求を **安全に実行**（検索/取得/権限強制）し、最後に回答を合成する。
+
+> 修正（責務の2段階）: 検索戦略は **大戦略（Phase 2: WHAT/停止条件/タスク分割）** と **小戦略（Phase 3: HOW/クエリ生成/再試行/終了判定）** に分かれる。
+> - Phase 2（大戦略/プランニング）は Professor（Go）が担う（Gemini 3 Flash で「調査項目」と「停止条件」を作る）
+> - Phase 3（小戦略/タクティクス）は Librarian（Python）が担う（Gemini 3 Flash でクエリ生成・ツール選択・反省/再試行・停止条件の満足判定を行う）
+> - Professor（Go）は **検索ツールの実行（DB検索の物理実行 + 制約/権限強制）** と **最終回答生成（Gemini 3 Pro）** を担う
 
 ## 前提
 - 外向き: HTTP/JSON（OpenAPI） + SSE

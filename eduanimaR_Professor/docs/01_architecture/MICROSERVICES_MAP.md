@@ -5,8 +5,8 @@
 
 ## 結論：サービス境界（MUST）
 - 本システムは **2サービス構成** とする。
-	- **eduanima-professor（Go）**: 司令塔 / データの守護者。外向きAPI、認証・認可、GCS/Kafka/DBの管理、検索の物理制約強制、最終回答合成。
-	- **eduanima-librarian（Python）**: 探索（Agentic Search）と評価ループ。DB/GCSへ直接アクセスしない。
+	- **eduanima-professor（Go）**: **大戦略（Phase 2: WHAT/停止条件）+ インフラ・実行部隊 + 最終執筆者（実務）**。外向きAPI、認証・認可、GCS/Kafka/DBの管理、資料の構造化/永続化、検索の物理制約強制、最終回答合成を担当。
+	- **eduanima-librarian（Python）**: **小戦略（Phase 3: HOW/終了判定）**。探索（Agentic Search / LangGraph）・クエリ生成・ツール選択・反省/再試行・停止条件の満足判定を担当。DB/GCSへ直接アクセスしない。
 - **DB/GCSへの直接アクセス権限は Professor のみに付与**する（最重要不変条件）。
 
 ## 契約（SSOT）
@@ -19,7 +19,40 @@
 | Service | Responsibility | Owning Data | Exposed APIs | Depends On | Runtime |
 | --- | --- | --- | --- | --- | --- |
 | **eduanima-professor (Go)** | Gateway/Orchestration、認証・認可、資料インジェスト統治、検索の物理制約強制、最終回答合成 | **Cloud SQL(PostgreSQL+pgvector)**、**GCS(原本)**、Kafka(ジョブ) | **HTTP/JSON(OpenAPI)** + **SSE**（外向き） / **gRPC client**（Librarian向け） | OIDC Provider、GCS、Kafka、Gemini API、Librarian(gRPC) | Cloud Run |
-| **eduanima-librarian (Python)** | **Phase 3（検索）**: 再検索ループ（LangGraph）、情報十分性判断、Professorへのツール要求（検索実行） | なし（ステートレス） | **gRPC server**（Professorから呼び出し） | Gemini API、Professor（検索結果） | Cloud Run |
+| **eduanima-librarian (Python)** | **Phase 3（小戦略）**: 再検索ループ（LangGraph）、クエリ生成、ツール選択、反省/再試行、停止条件の満足判定、Professorへのツール要求（検索実行） | なし（ステートレス） | **gRPC server**（Professorから呼び出し） | Gemini API、Professor（検索結果） | Cloud Run |
+
+## Goサーバー（Professor）の主要な責務（4つの柱）
+検索戦略は **Phase 2（Go: WHAT/停止条件）** と **Phase 3（Python: HOW/終了判定）** に分担しつつ、Go（Professor）が **インフラ・実行部隊・最終回答者**として実務の全工程（DB/GCS/Kafka/GeminiのI/O、検索の物理実行、権限強制、最終回答生成）を担う。
+
+### 1) 資料のインデックス化と構造化（Batch Processing）
+- Gemini Batch API（Flash）で PDF/画像→Markdown化、意味単位チャンク分割をスケジューリング・管理する
+- 返ってきた構造化データ（Markdown/チャンク/メタデータ）を Postgres（pgvector）へ永続化する
+- Embedding を生成し、検索用ベクトルとしてDBに格納する
+
+### 2) 初期分析とLibrarianへの依頼（Pre-processing & Orchestration）
+- ユーザー質問のインテントを解析し、「資料検索が必要か」を判定する
+- 会話履歴/科目情報などのコンテキストを整理し、Librarian が実行しやすい形で渡す
+- **Phase 2（大戦略）**として、タスク分割（調査項目のリスト）と停止条件（Stop Conditions）を定義して依頼する
+
+### 3) 検索ツールの実効（Search Tool Execution）
+- Librarian が生成したクエリ（テキスト/ベクトル）で、Postgres に対する全文検索/類似性検索を **物理的に実行**する
+- 取得データを軽量な Markdown 断片（チャンク＋前後など）に整形して返す
+- 権限/所有者制約（`user_id`/`subject_id`/`is_active` 等）を DB/Repository 層で強制する
+
+### 4) 最終回答の生成（Answer Synthesis / Professor Role）
+- Librarian が選定した資料ID/ページ等に基づき、DBから全文Markdownを取得する
+- Gemini 3 Pro を呼び出し、教育的配慮を含む最終回答を生成する
+- 回答と引用元情報を SSE/HTTP でユーザーへ返す
+
+## 責務の分離まとめ（Go vs Python）
+
+| 機能 | Go サーバー (Professor/System) | Python サーバー (Librarian) |
+| :--- | :--- | :--- |
+| **データ保持** | PostgreSQL/GCS/Kafka 等を直接操作（データの守護者） | DB接続を持たない（ステートレス） |
+| **資料の前処理** | **Gemini Batch**で構造化・永続化・Embedding生成 | 関与しない |
+| **推論の目的** | **Phase 2（大戦略）**の作成 + 最終回答の生成（Gemini 3 Flash / 3 Pro） | **Phase 3（小戦略）**の実行（クエリ生成・反省/再試行・停止条件の満足判定）（Gemini 3 Flash） |
+| **検索実行** | **SQLの発行・検索の物理実行**（制約強制） | クエリの「言葉」を作り、再検索を指揮する |
+| **セッション管理** | 会話履歴の保存・ユーザー認証/認可 | Goから渡された履歴を一時利用するだけ |
 
 ## 依存関係（通信方向）
 - Frontend → Professor（HTTP/OpenAPI）
@@ -35,35 +68,35 @@
 2. **Upload**: Professor が原本を GCS に保存
 3. **Produce**: Professor が Kafka に `IngestJob` を publish（冪等キーを含む）
 4. **Consume**: Professor ワーカーがジョブを consume
-5. **Ingestion（Vision→Chunks）**: **Gemini 3 Flash** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
+5. **Ingestion（Vision→Chunks）**: **Gemini 3 Flash（Batch Mode）** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
 6. **Store**: Professor が Postgres（pgvector）へ永続化（UUIDv7、subject_id/user_id による物理制約を前提）
 
 > 注: 要約（Summary）は **原則生成しない**。大量ファイルからの高速な候補絞り込みが必要になった場合のみ「ファイル単位の短いSummary」を追加で生成する。
 
 ### Reasoning Loop（検索・回答）
 1. **Start**: Frontend が質問を Professor に送信
-2. **Phase 2（Plan）**: Professor が **Gemini 3 Flash** で「意図解釈・検索戦略・停止条件（終了条件）・MaxRetry」を JSON で生成
-3. **Phase 3（Search: Python/LangGraph）**: Professor が gRPC で Librarian を起動（質問 + Plan + user_id + subject_id + 制約）
+2. **Phase 2（Plan / 大戦略）**: Professor が **Gemini 3 Flash** で「タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト」を生成し、Librarian に渡す
+3. **Phase 3（Search / 小戦略: Python/LangGraph）**: Professor が gRPC で Librarian を起動（質問 + Plan + user_id + subject_id + 制約）
 4. **Execute Search（Professor）**: Professor が DB を検索し、**subject_id/user_id/is_active 等の WHERE を強制**して結果（Chunk＋前後）を返却
-5. **Loop**: Librarian が **Gemini 3 Flash** で結果を評価し、停止条件に満たなければ再検索（MaxRetry/時間は Professor が制御。推奨: 最大5回 = 3回 + 2回リカバリ）
+5. **Loop（Librarian）**: Librarian が **Gemini 3 Flash** で結果を評価し、停止条件を満たすまで再検索要求（MaxRetry/時間は Professor が制御。推奨: 最大5回 = 3回 + 2回リカバリ）
 6. **Finalize**: Librarian が「収集完了」または「不足を宣言して終了」として資料ID/根拠候補を返す
-7. **Phase 4（Answer/RAG）**: Professor が **選定された資料のみ全文Markdown** をDBから取得し、**Gemini 3 Pro** で最終回答を生成
+7. **Phase 4（Answer / Professor）**: Professor が **選定された資料のみ全文Markdown** をDBから取得し、**Gemini 3 Pro** で最終回答を生成
 8. **Stream**: Professor が SSE で回答・引用・進捗をFrontendへストリーミング
 
-## Phase 3（検索ループ）の設定指針（SSOT）
+## Phase 3（検索ループ: Librarian / LangGraph）の設定指針（SSOT）
 LangGraph を用いた循環型エージェントで重要なのは **「何回回すか」と「どう止めるか」**。
 
 ### MaxRetry（推奨: 最大 5 回）
-- 1回目: 直球検索（Phase 2の計画で最も確度が高いクエリ）
+- 1回目: 直球検索（Phase 2 で与えられた調査項目で最も確度が高いクエリ）
 - 2回目: 補完・修正（不足要素の狙い撃ち）
 - 3回目: 類義語・広域（専門→一般、正規表現を緩める等）
 - 4〜5回目: フォールバック（目次/前後関係/周辺章からの材料集め）
 
 > 5回で足りない場合は、それ以上回してもハルシネーション（嘘の検索）やコスト増のリスクが上がる。
-> **「現時点で見つかった根拠だけでPhase 4へ進む」または「不足を報告して終了」**を脱出口として必ず用意する。
+> **「現時点で見つかった根拠だけで Phase 4 へ進む」または「不足を報告して終了」**を脱出口として必ず用意する。
 
-## Phase 2（Plan JSON）の役割（合格基準/ルーブリック）
-Phase 2は Phase 3 のための **合格基準（Definition of Done）** を作る工程。
+## Phase 2（Plan / 大戦略）の役割（合格基準/ルーブリック）
+Phase 2 は Phase 3（Librarian）のための **合格基準（Definition of Done）** と初期パラメータ（調査項目/停止条件/コンテキスト）を作る工程。
 
 ### 分割（Decomposition）
 質問を「意味の最小単位」に分解し、探索のチェックリストにする。
