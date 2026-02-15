@@ -1,3 +1,12 @@
+---
+Title: Slices Map
+Description: eduanimaRのFSD機能一覧と配置マップ
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, fsd, architecture, slices
+---
+
 # Slices Map (機能一覧と配置)
 
 Last-updated: 2026-02-15
@@ -84,6 +93,63 @@ Last-updated: 2026-02-15
 - `shared/ui`：原子UI（Button, TextField 等）、MUI v6 + Pigment CSS のラッパー
 - `shared/api`：Orval 生成物と API 設定（Professor の OpenAPI から生成）
 - `shared/lib`：汎用ユーティリティ（ビジネスロジック禁止）
+
+---
+
+## eduanimaR 固有のSlices定義
+
+### `qa` (Q&A機能)
+- **責務**: 質問と回答、チャット形式UI
+- **Professor API**:
+  - `POST /v1/qa/ask` - 質問送信
+  - `GET /v1/qa/stream` - SSE回答ストリーミング
+  - `GET /v1/qa/history` - 質問履歴取得
+- **依存**: `entities/question`, `entities/answer`, `shared/api`
+- **UI**: チャットメッセージリスト、入力フォーム、参照資料リンク
+
+### `materials` (資料管理)
+- **責務**: 科目・資料の一覧、検索、ツリー表示
+- **Professor API**:
+  - `GET /v1/materials` - 資料一覧取得
+  - `GET /v1/materials/:id` - 資料詳細取得
+  - `POST /v1/materials/ingest` - 資料取り込み（Chrome拡張）
+- **依存**: `entities/material`, `entities/subject`, `shared/api`
+- **UI**: 科目別ツリー表示、検索フィルタ、お気に入り登録
+
+### `study-plan` (学習計画・履歴)
+- **責務**: 学習計画作成、進捗管理、履歴表示
+- **Professor API**:
+  - `GET /v1/study-plan` - 学習計画取得
+  - `POST /v1/study-plan` - 学習計画作成
+  - `PATCH /v1/study-plan/:id` - 進捗更新
+- **依存**: `entities/study-plan`, `shared/api`
+- **UI**: カレンダー、タスクリスト、進捗グラフ
+
+### `auth` (認証フロー)
+- **責務**: SSO認証、ログイン/ログアウト（Phase 2以降）
+- **Professor API**:
+  - `POST /v1/auth/verify` - トークン検証
+  - `POST /v1/auth/refresh` - トークン更新
+  - `POST /v1/auth/logout` - ログアウト
+- **依存**: `shared/api`, NextAuth.js
+- **UI**: ログインボタン、プロバイダー選択画面
+
+## Slices間の依存方向（FSD原則）
+
+```
+app (pages/layouts)
+  ↓
+features (qa, materials, study-plan, auth)
+  ↓
+entities (question, answer, material, subject, study-plan)
+  ↓
+shared (api, ui, lib)
+```
+
+- **禁止**: 下位層から上位層への依存
+- **推奨**: Slices間は直接依存せず、shared/apiを経由
+
+---
 
 ## slice 追記テンプレ
 追記するときは、最低限これだけ埋めます。
