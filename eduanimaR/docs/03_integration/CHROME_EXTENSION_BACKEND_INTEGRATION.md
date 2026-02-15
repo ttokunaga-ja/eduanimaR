@@ -65,6 +65,78 @@ Professor API は `Authorization: Bearer <JWT>` を要求します（OpenAPI 参
 
 ---
 
+## 2.4) 拡張機能専用エンドポイント（Phase 2以降）
+
+拡張機能専用の機能を提供するエンドポイント群。これらはWeb版からはアクセス不可。
+
+### POST /v1/auth/extension/register
+- 用途: ユーザー登録（拡張機能のみ）
+- 認証: X-Extension-Auth ヘッダー必須
+- リクエスト:
+  ```json
+  {
+    "sso_token": "string",
+    "lms_user_id": "string",
+    "email": "string"
+  }
+  ```
+- レスポンス:
+  ```json
+  {
+    "user_id": "uuid",
+    "access_token": "jwt",
+    "refresh_token": "jwt"
+  }
+  ```
+
+### POST /v1/courses/sync
+- 用途: 科目同期（拡張機能のみ）
+- 認証: Bearer JWT + X-Extension-Auth ヘッダー必須
+- リクエスト:
+  ```json
+  {
+    "courses": [
+      {
+        "lms_course_id": "string",
+        "course_name": "string",
+        "course_code": "string"
+      }
+    ]
+  }
+  ```
+- レスポンス:
+  ```json
+  {
+    "synced_courses": [
+      {
+        "course_id": "uuid",
+        "lms_course_id": "string",
+        "status": "created|updated"
+      }
+    ]
+  }
+  ```
+
+### POST /v1/resources/upload
+- 用途: Moodle資料のアップロード（拡張機能のみ）
+- 認証: Bearer JWT + X-Extension-Auth ヘッダー必須
+- リクエスト: multipart/form-data
+  - file: binary
+  - subject_id: uuid
+  - resource_name: string
+  - file_type: string
+  - source_url: string
+  - detected_at: iso-timestamp
+- レスポンス:
+  ```json
+  {
+    "resource_id": "uuid",
+    "status": "processing"
+  }
+  ```
+
+---
+
 ## 3) Phase 2：自動保存（Auto-Ingestion）
 
 ### 3.1 資料検知（content script）
