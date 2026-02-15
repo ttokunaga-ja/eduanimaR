@@ -17,31 +17,75 @@
 2. 依存ルール（layers / isolation / public API）に違反しない構造を先に決める
 3. 実装（外部公開は `index.ts` のみ）
 
-## Slices
-
-### pages
-- (例) `home`：トップページ
-- (例) `user-profile`：ユーザープロフィール
-- (例) `settings`：設定画面
-
-### widgets
-- (例) `app-header`：ヘッダー（複数feature/entityを合成）
-- (例) `app-sidebar`：ナビゲーション
-- (例) `post-card`：投稿カード（entity + feature の合成点）
-
-### features
-- (例) `auth-by-email`：ログイン
-- (例) `auth-by-token`：トークンでの再認証/更新
-- (例) `article-rating`：評価操作
+## Slices（eduanimaR 固有）
 
 ### entities
-- (例) `user`：ユーザー表示/モデル
-- (例) `session`：セッション（ログイン状態の表現）
-- (例) `article`：記事表示/モデル
+- **`subject`**: 科目（Professor の `subject_id` に対応）
+  - **責務**: 科目名・期間・担当教員の表示
+  - **依存**: `shared/api`（Professor の `/subjects` エンドポイント）
+  - **バックエンド境界**: Professor の `subject` テーブル
+
+- **`file`**: 資料ファイル（Professor の GCS URL / metadata に対応）
+  - **責務**: ファイル一覧・サムネイル・メタデータ表示
+  - **依存**: `shared/api`（Professor の `/files` エンドポイント）
+  - **バックエンド境界**: Professor の `file` テーブル + GCS
+
+- **`user`**: ユーザー（SSO/OAuth で取得したプロフィール）
+  - **責務**: ユーザー名・アイコン表示
+  - **依存**: `shared/api`（Professor の `/me` エンドポイント）
+  - **バックエンド境界**: Professor の `user` テーブル
+
+- **`session`**: セッション（ログイン状態の表現）
+  - **責務**: 認証状態の管理、トークンリフレッシュ
+  - **依存**: `shared/api`（Professor の `/auth/refresh` エンドポイント）
+  - **バックエンド境界**: Cookie ベースのセッション（Phase 2以降）
+
+### features
+- **`qa-chat`**: Q&A（Professor の SSE + Librarian Agent の推論結果）
+  - **責務**: 質問入力、リアルタイム回答表示、ソース（参照箇所）のクリッカブルリンク
+  - **依存**: `shared/api`（Professor の `/qa/stream` SSE）、`entities/file`
+  - **バックエンド境界**: Professor（SSE配信）↔ Librarian（gRPC、検索戦略立案）
+
+- **`file-upload`**: 資料アップロード（Professor の IngestJob → Kafka経由）
+  - **責務**: ドラッグ&ドロップ、アップロード進捗、エラーハンドリング
+  - **依存**: `shared/api`（Professor の `/ingest` エンドポイント）
+  - **バックエンド境界**: Professor の IngestJob（Kafka → OCR/Embedding）
+
+- **`auth-by-email`**: ログイン（Phase 2以降、SSO/OAuth）
+  - **責務**: SSO/OAuth のフロー開始、セッション確立
+  - **依存**: `shared/api`（Professor の `/auth/login` エンドポイント）
+  - **バックエンド境界**: Professor の認証フロー（Google/Meta/Microsoft/LINE）
+
+- **`auth-by-token`**: トークンでの再認証/更新
+  - **責務**: リフレッシュトークンによるセッション延長
+  - **依存**: `entities/session`
+  - **バックエンド境界**: Professor の `/auth/refresh` エンドポイント
+
+### widgets
+- **`file-tree`**: 科目別ファイルツリー表示
+  - **責務**: `entities/subject` + `entities/file` の合成、折りたたみ UI
+  - **依存**: `entities/subject`, `entities/file`
+
+- **`qa-panel`**: Q&A パネル（履歴 + 入力 + 回答表示）
+  - **責務**: `features/qa-chat` + 質問履歴の合成
+  - **依存**: `features/qa-chat`, `entities/user`
+
+- **`app-header`**: ヘッダー（ナビゲーション + ユーザーメニュー）
+  - **責務**: `entities/user` + `features/auth` の合成
+  - **依存**: `entities/user`, `features/auth-by-token`
+
+### pages
+- **`dashboard`**: ダッシュボード（科目一覧、最近の質問、アップロード状況）
+  - **責務**: `widgets/file-tree` + `widgets/qa-panel` の配置
+  - **依存**: `widgets/*`, `features/*`
+
+- **`settings`**: 設定画面（通知設定、アカウント情報）
+  - **責務**: ユーザー設定の CRUD
+  - **依存**: `entities/user`, `shared/api`
 
 ### shared
-- `shared/ui`：原子UI（Button, TextField 等）
-- `shared/api`：Orval 生成物と API 設定
+- `shared/ui`：原子UI（Button, TextField 等）、MUI v6 + Pigment CSS のラッパー
+- `shared/api`：Orval 生成物と API 設定（Professor の OpenAPI から生成）
 - `shared/lib`：汎用ユーティリティ（ビジネスロジック禁止）
 
 ## slice 追記テンプレ

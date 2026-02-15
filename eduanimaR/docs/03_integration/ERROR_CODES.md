@@ -1,54 +1,143 @@
-# Error Codes（Frontend Mapping）
+# Error Codes（エラーコード一覧）
 
-このドキュメントは、バックエンドが返す失敗を **フロントの挙動へ一意にマッピング**するための契約です。
+本ドキュメントは Professor（Go）の `ERROR_CODES.md` と同期します。
 
-目的：
-- 画面ごとの例外処理の乱立を防ぐ
-- エラーを分類し、UXと運用（観測）を一致させる
+## 目的
+- バックエンド（Professor / Librarian）とフロントエンドで統一のエラーコード体系を維持
+- エラー発生時の UI 表示・ユーザー誘導を標準化
+- 監視・デバッグ時のエラー分類を容易にする
 
-関連：
-- エラー処理：`ERROR_HANDLING.md`
-- 観測性：`../05_operations/OBSERVABILITY.md`
-
----
-
-## 結論（Must）
-
-- エラーは **code** を中心に扱う（message 文字列で分岐しない）
-- 未知の code は **Unknown** として安全側に倒す（error boundary / 汎用メッセージ）
-- UI挙動はこの表をSSOTとし、実装の分岐は一箇所に寄せる（例：`shared/api/errors.ts`）
+## エラーコード体系
+- **1xxx**: 認証・認可エラー
+- **2xxx**: リクエストエラー（バリデーション、必須パラメータ不足）
+- **3xxx**: リソース不在エラー（404相当）
+- **4xxx**: 外部サービスエラー（Gemini API、GCS、Kafka）
+- **5xxx**: 内部エラー（予期しないエラー）
 
 ---
 
-## 推奨コード体系（テンプレ）
+## 主要エラーコード
 
-プロジェクトのバックエンド体系に合わせて調整してください。
-最低限、以下のカテゴリが区別できること。
-
-| Category | code（例） | HTTP（目安） | UI挙動 | 再試行 | 運用通知 |
-| --- | --- | --- | --- | --- | --- |
-| AuthN | `UNAUTHORIZED` | 401 | ログイン導線/再認証 | × | △（急増で） |
-| AuthZ | `FORBIDDEN` | 403 | 権限なし表示 | × | △ |
-| NotFound | `NOT_FOUND` | 404 | Not Found / 空状態 | × | △ |
-| Validation | `VALIDATION_FAILED` | 400/422 | フォームに反映 | × | × |
-| Conflict | `CONFLICT` | 409 | 再読み込み/再試行案内 | △ | △ |
-| RateLimit | `RATE_LIMITED` | 429 | 待って再試行（間隔表示） | ○ | ○ |
-| Upstream | `UPSTREAM_TIMEOUT` | 504 | 再試行/フォールバック | ○ | ○ |
-| Upstream | `UPSTREAM_UNAVAILABLE` | 502/503 | 再試行/フォールバック | ○ | ○ |
-| Internal | `INTERNAL` | 500 | error boundary | × | ○ |
-| Unknown | `UNKNOWN` | - | 汎用失敗 | △ | ○ |
-
----
-
-## 実装方針（推奨）
-
-- 例外はアプリ内の共通エラー型（例：`AppError`）へ正規化する
-- 正規化は API 層（`shared/api`）に閉じ込め、features/pages に持ち込まない
-- `requestId/traceId` をUIに表示するかは運用ポリシーで決める（サポート導線があるなら表示が有効）
+| コード | 名称 | 説明 | UI表示 | リトライ |
+|:---|:---|:---|:---|:---|
+| `1001` | `AUTH_REQUIRED` | 認証が必要 | 「ログインしてください」ダイアログ表示、ログイン画面へ遷移 | 不可 |
+| `1002` | `AUTH_INVALID_TOKEN` | トークン無効 | セッションをクリアし、再ログイン促進 | 不可 |
+| `1003` | `AUTH_FORBIDDEN` | 権限不足 | 「この操作は許可されていません」トースト表示 | 不可 |
+| `2001` | `VALIDATION_FAILED` | バリデーションエラー | フォームのフィールドごとにエラーメッセージ表示 | 不可 |
+| `2002` | `FILE_TOO_LARGE` | ファイルサイズ超過 | 「ファイルサイズは最大50MBです」トースト表示 | 不可 |
+| `2003` | `INVALID_FILE_TYPE` | 非対応ファイル形式 | 「対応形式: PDF, DOCX, PPTX, 画像」トースト表示 | 不可 |
+| `3001` | `SUBJECT_NOT_FOUND` | 科目が存在しない | 「科目が見つかりません」空状態表示 | 不可 |
+| `3002` | `FILE_NOT_FOUND` | ファイルが存在しない | 「ファイルが削除されたか、アクセス権限がありません」 | 不可 |
+| `4001` | `GEMINI_API_ERROR` | Gemini API エラー | 「AI処理が一時的に利用できません。しばらく待ってから再試行してください」 | 可 |
+| `4002` | `GCS_ERROR` | GCS エラー | 「ファイルの取得に失敗しました」 | 可 |
+| `4003` | `KAFKA_ERROR` | Kafka エラー | 「処理の開始に失敗しました。再試行してください」 | 可 |
+| `5001` | `INTERNAL_ERROR` | 内部エラー | 「予期しないエラーが発生しました。サポートに連絡してください」 | 可（最大3回） |
 
 ---
 
-## 禁止（AI/人間共通）
+## フロントエンド実装方針
 
-- `message.includes('...')` で分岐
-- code の追加/変更をドキュメント無しで実装だけ入れる
+### 1. エラーコードの受け取り
+Professor / Librarian からのエラーレスポンスは以下の形式：
+
+```json
+{
+  "code": "AUTH_REQUIRED",
+  "message": "Authentication required",
+  "details": {}
+}
+```
+
+### 2. UI メッセージへの変換
+`src/shared/api/errors.ts` にエラーコードマップを定義：
+
+```typescript
+export const ERROR_MESSAGES: Record<string, string> = {
+  AUTH_REQUIRED: 'ログインしてください',
+  AUTH_INVALID_TOKEN: 'セッションが無効です。再ログインしてください',
+  AUTH_FORBIDDEN: 'この操作は許可されていません',
+  VALIDATION_FAILED: '入力内容を確認してください',
+  FILE_TOO_LARGE: 'ファイルサイズは最大50MBです',
+  INVALID_FILE_TYPE: '対応形式: PDF, DOCX, PPTX, 画像',
+  SUBJECT_NOT_FOUND: '科目が見つかりません',
+  FILE_NOT_FOUND: 'ファイルが削除されたか、アクセス権限がありません',
+  GEMINI_API_ERROR: 'AI処理が一時的に利用できません。しばらく待ってから再試行してください',
+  GCS_ERROR: 'ファイルの取得に失敗しました',
+  KAFKA_ERROR: '処理の開始に失敗しました。再試行してください',
+  INTERNAL_ERROR: '予期しないエラーが発生しました。サポートに連絡してください',
+};
+```
+
+### 3. リトライ戦略
+リトライ可能なエラー（`4xxx`, `5001`）は以下の戦略を採用：
+
+- **初回リトライ**: 1秒後
+- **2回目リトライ**: 2秒後
+- **3回目リトライ**: 4秒後（最大3回）
+- **指数バックオフ**: `Math.min(1000 * Math.pow(2, retryCount), 10000)`
+
+### 4. エラーバウンダリ
+予期しないエラー（`5001` 等）は React Error Boundary でキャッチし、フォールバック UI を表示：
+
+```typescript
+<ErrorBoundary
+  fallback={<ErrorFallback />}
+  onError={(error, errorInfo) => {
+    // エラーログを送信
+    logError(error, errorInfo);
+  }}
+>
+  <App />
+</ErrorBoundary>
+```
+
+### 5. SSE エラーの扱い
+SSE（`/qa/stream`）で受信する `error` イベントは以下の形式：
+
+```json
+{
+  "type": "error",
+  "code": "GEMINI_API_ERROR",
+  "message": "Gemini API error occurred"
+}
+```
+
+クライアント側の実装：
+
+```typescript
+eventSource.addEventListener('error', (event) => {
+  const error = JSON.parse(event.data);
+  const userMessage = ERROR_MESSAGES[error.code] || 'エラーが発生しました';
+  showToast(userMessage, 'error');
+  
+  // リトライ可能なエラーの場合は再接続を試みる
+  if (isRetryable(error.code)) {
+    scheduleRetry();
+  }
+});
+```
+
+---
+
+## エラーコードの追加・更新手順
+
+1. **Professor（Go）で追加**:
+   - Professor の `ERROR_CODES.md` に新しいエラーコードを追加
+   - Go コード内で該当エラーを返す実装を追加
+
+2. **フロントエンドに同期**:
+   - 本ドキュメントにエラーコードを追記
+   - `src/shared/api/errors.ts` に UI メッセージを追加
+   - 必要に応じて UI コンポーネントを更新
+
+3. **CI で差分検出**:
+   - Professor の `ERROR_CODES.md` とフロントエンドの本ドキュメントを比較
+   - 差分がある場合は CI を失敗させる（同期忘れ防止）
+
+---
+
+## 禁止事項
+
+- `message` 文字列で分岐しない（必ず `code` を使用）
+- エラーコードをハードコーディングしない（`ERROR_MESSAGES` マップを使用）
+- Professor のエラーコード体系と異なる独自のコードを定義しない

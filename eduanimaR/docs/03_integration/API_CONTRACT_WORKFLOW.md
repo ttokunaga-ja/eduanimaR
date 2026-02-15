@@ -109,3 +109,47 @@ SSOT の優先順位：
 - 画面内での手書き `fetch/axios`（生成物がある前提）
 - “OpenAPIに無い” エンドポイント/フィールドの利用
 - `generated/` の手編集
+
+---
+
+## eduanimaR 固有の契約運用
+
+### OpenAPI の正（SSOT）
+- **定義元**: Professor（Go）の `docs/openapi.yaml`
+- **配置**: 本リポジトリの `openapi/openapi.yaml` にコピー（CI で差分検出）
+- **生成**: Orval で `src/shared/api/generated/` に TypeScript コード生成
+
+### SSE（Server-Sent Events）契約
+Professor の `/qa/stream` エンドポイントは以下のイベント型を配信：
+
+| イベント型 | 内容 | 発信元 |
+|:---|:---|:---|
+| `plan` | 調査項目・停止条件 | Professor（Phase 2: Plan生成） |
+| `search` | 検索結果（クエリ、ヒット件数） | Librarian Agent（検索戦略実行） |
+| `answer` | 最終回答（本文 + ソース） | Professor（Phase 2: Gemini 3 Flash） |
+| `error` | エラー通知（`ERROR_CODES.md` の code を含む） | Professor / Librarian |
+| `done` | 完了通知 | Professor |
+
+**クライアント側の実装要件**:
+- 接続断・再接続を前提にする（`EventSource` の `error` イベントをハンドリング）
+- イベントの重複を許容する設計（idempotency）
+- `error` イベント受信時は `ERROR_CODES.md` に基づいて UI を更新
+
+### エラーコードの同期
+- Professor の `ERROR_CODES.md` を SSOT とし、フロントエンドの `03_integration/ERROR_CODES.md` に同期
+- エラー UI は `03_integration/ERROR_HANDLING.md` の方針に従う
+- **同期頻度**: Professor のエラーコード追加・変更時、即座にフロントエンド側を更新（CI で差分検出）
+
+### Breaking Changes の扱い
+- Professor が以下の変更を行う場合、事前に Slack/Issue で通知：
+  - 必須フィールド追加
+  - 型変更（string → number 等）
+  - エンドポイント削除
+  - SSE イベント型の変更
+- フロントエンドはマイグレーション期間（1週間）を設ける
+- 期間中は旧・新両方のスキーマをサポート（後方互換）
+
+### バージョニング
+- OpenAPI の `version` フィールドを SSOT とする
+- メジャーバージョンアップ（v1 → v2）時は、フロントエンドの API クライアント生成を再実行
+- マイナー・パッチバージョンは後方互換を保証

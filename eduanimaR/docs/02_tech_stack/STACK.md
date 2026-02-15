@@ -1,5 +1,34 @@
 # 確定版：推奨技術スタック（2026年2月10日）
 
+## eduanimaR 固有の前提（2026-02-15更新）
+
+本プロジェクトは、**大学LMS資料の自動収集・検索・学習支援**を提供する以下の構成です：
+
+| コンポーネント | 役割 | 技術スタック |
+|:---|:---|:---|
+| **Frontend** | Chrome拡張機能 + Webアプリ | Next.js 15 (App Router) + FSD + MUI v6 + Pigment CSS |
+| **Professor（Go）** | 外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成 | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
+| **Librarian（Python）** | LangGraph Agent による検索戦略立案 | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+
+### データフロー
+1. **Frontend → Professor**: OpenAPI（HTTP/JSON）でリクエスト送信
+2. **Professor ↔ Librarian**: gRPC で検索戦略の協調
+3. **Professor → Frontend**: SSE でリアルタイム回答配信
+4. **Professor**: Kafka経由でOCR/Embeddingのバッチ処理
+
+### 認証（Phase 2以降）
+- SSO（OAuth 2.0 / OpenID Connect）
+- 対応プロバイダ: Google / Meta / Microsoft / LINE
+- Phase 1（ローカル開発）: 認証スキップ（固定dev-user）
+
+### サービスコンセプト（eduanimaRHandbook より）
+- **Mission**: 学習者が「探す」より「理解する」時間を増やす
+- **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+- **主要ペルソナ**: 忙しい学部生（複数科目、資料が散在、探す時間が負担）
+- **提供価値**: 資料の「着眼点」を示し、原典への回帰を促す
+
+---
+
 ## Executive Summary (BLUF)
 これまでの一連の分析に基づき、**Go製マイクロサービスバックエンド** と **FSD (Feature-Sliced Design)** を採用したフロントエンド開発における、**2026年時点での最適解となる技術スタック**を確定させました。
 
