@@ -28,8 +28,8 @@
 
 ### 参照先（バックエンドドキュメント）
 
-- Professor の API 生成運用：`../../eduanimaR_Professor/docs/03_integration/API_GEN.md`
-- Professor の API 契約ワークフロー：`../../eduanimaR_Professor/docs/03_integration/API_CONTRACT_WORKFLOW.md`
+- Professor の API 生成運用：`../../../eduanimaR_Professor/docs/03_integration/API_GEN.md`
+- Professor の API 契約ワークフロー：`../../../eduanimaR_Professor/docs/03_integration/API_CONTRACT_WORKFLOW.md`
 
 ---
 
