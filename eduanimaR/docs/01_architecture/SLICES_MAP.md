@@ -1,5 +1,7 @@
 # Slices Map (機能一覧と配置)
 
+Last-updated: 2026-02-15
+
 このドキュメントは「どの機能がどの slice に存在するか」を定義し、AI が勝手に新規 slice を乱立させないためのマップです。
 
 ## ルール
@@ -46,13 +48,16 @@
   - **依存**: `shared/api`（Professor の `/qa/stream` SSE）、`entities/file`
   - **バックエンド境界**: Professor（SSE配信）↔ Librarian（gRPC、検索戦略立案）
 
-- **`file-upload`**: 資料アップロード（Professor の IngestJob → Kafka経由）
-  - **責務**: ドラッグ&ドロップ、アップロード進捗、エラーハンドリング
-  - **依存**: `shared/api`（Professor の `/ingest` エンドポイント）
-  - **バックエンド境界**: Professor の IngestJob（Kafka → OCR/Embedding）
+- **`file-upload`**: 資料アップロード（開発用のみ）
+  - **責務**: 開発環境でのファイル手動アップロード確認用UI
+  - **本番制限**: Web版では無効化。Chrome拡張機能による自動アップロードのみ有効。
+  - **依存**: `shared/api`（Professor の `/api/materials/upload`）
+  - **バックエンド境界**: Professor（GCS保存 → Kafka IngestJob → ワーカー処理）
 
-- **`auth-by-email`**: ログイン（Phase 2以降、SSO/OAuth）
-  - **責務**: SSO/OAuth のフロー開始、セッション確立
+- **`auth-by-email`**: メールログイン（開発用）
+  - **責務**: 開発環境での認証確認用
+  - **本番制限**: Web版からの新規ユーザー登録は禁止。拡張機能でSSO認証したユーザーのみログイン可能。
+  - **Phase 2以降**: Google / Meta / Microsoft / LINE によるSSO認証実装
   - **依存**: `shared/api`（Professor の `/auth/login` エンドポイント）
   - **バックエンド境界**: Professor の認証フロー（Google/Meta/Microsoft/LINE）
 
@@ -60,6 +65,11 @@
   - **責務**: リフレッシュトークンによるセッション延長
   - **依存**: `entities/session`
   - **バックエンド境界**: Professor の `/auth/refresh` エンドポイント
+
+- **`chrome-extension-bridge`**: 拡張機能連携（Phase 3以降）
+  - **責務**: Chrome拡張機能からのSSO認証結果受け取り、自動アップロード状態の表示
+  - **依存**: `shared/api`（Professor の認証エンドポイント）
+  - **バックエンド境界**: Professor（SSO検証、ユーザー登録、科目同期）
 
 ### widgets
 - **`file-tree`**: 科目別ファイルツリー表示
