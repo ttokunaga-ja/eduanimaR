@@ -7,7 +7,7 @@
 
 ## 2. SOLUTION (解決策)
 *   **Librarian & Professor:** 自律的な資料検索と、根拠に基づいた教育的解説。
-*   **Auto-Ingestion:** 拡張機能による資料の自動収集・解析。
+*   **Auto-Ingestion（最重要）:** Chrome拡張機能によるMoodle資料の完全自動収集・解析。学生は何もする必要がない。
 *   **Learning Context:** 科目IDによる厳格な検索範囲の制限と、ソースURLの提示。
 
 ## 3. UNIQUE VALUE PROPOSITION (独自の価値)

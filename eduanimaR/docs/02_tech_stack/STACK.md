@@ -15,6 +15,33 @@
 - リアルタイム表示：**SSE（Server-Sent Events）**（契約：`../03_integration/SSE_STREAMING.md`）
 - API 契約：Professor の **OpenAPI を SSOT**（`../../eduanimaR_Professor/docs/openapi.yaml`）
 
+## 開発フェーズと技術スタック
+
+### Phase 1: ローカル開発（認証なし）
+- Next.js（App Router）
+- TanStack Query
+- Tailwind CSS
+- 認証: スキップ（固定のdev-user使用）
+- 目的: API開発・検証、ベンチマーク実施
+
+### Phase 2: 認証・セキュリティ
+- 上記 + OAuth 2.0 / OpenID Connect
+- SSO連携（Google / Meta / Microsoft / LINE）
+- 拡張機能専用エンドポイントの追加
+- Web版の機能制限（新規登録・科目登録・ファイルアップロード無効化）
+
+### Phase 3: Chrome拡張機能
+- Plasmo（React）
+- Moodle DOM解析（MutationObserver）
+- LMS SSO連携
+- 既存APIとの統合
+- **最重要機能**: Moodle資料の自動検知・アップロード
+
+### Phase 4: 本番リリース
+- 拡張機能: Chrome Web Store（非公開配布）
+- Web版: 一般公開（拡張機能で登録したユーザーのみログイン可能）
+- 拡張機能 + Web版の同時提供
+
 ---
 
 ## 1) Web（Phase 1〜）
