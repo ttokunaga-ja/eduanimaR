@@ -1,3 +1,12 @@
+---
+Title: API Integration & Code Generation
+Description: eduanimaRのAPI生成とOrval設定
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, api, orval, code-generation
+---
+
 # API Integration & Code Generation
 
 Last-updated: 2026-02-15
@@ -182,4 +191,64 @@ jobs:
 
       - name: Fail if generated output changed
         run: git diff --exit-code
+```
+
+---
+
+## Orval設定
+
+### 設定ファイル
+```typescript
+// orval.config.ts
+export default {
+  professor: {
+    input: './openapi.yaml',
+    output: {
+      mode: 'single',
+      target: './src/shared/api/generated/professor.ts',
+      client: 'react-query',
+      mock: true,
+    },
+    hooks: {
+      afterAllFilesWrite: 'prettier --write',
+    },
+  },
+};
+```
+
+### 生成コマンド
+```bash
+npm run api:generate  # Orval実行 + Prettier
+```
+
+### 生成物の配置
+- **ディレクトリ**: `src/shared/api/generated/`
+- **ファイル**: `professor.ts` (型定義 + TanStack Queryフック)
+- **コミット方針**: 生成物をコミットする（差分レビューのため）
+
+### エラー型定義の自動生成
+
+```yaml
+# openapi.yaml
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum: [MATERIAL_NOT_FOUND, SUBJECT_ACCESS_DENIED, ...]
+        message:
+          type: string
+```
+
+生成結果:
+```typescript
+export type ErrorResponse = {
+  code: 'MATERIAL_NOT_FOUND' | 'SUBJECT_ACCESS_DENIED' | ...;
+  message: string;
+};
 ```

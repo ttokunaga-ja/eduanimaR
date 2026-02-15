@@ -1,4 +1,15 @@
+---
+Title: Error Handling
+Description: eduanimaRのエラーハンドリング統一方針
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, error-handling, professor, api
+---
+
 # Error Handling（RSC / Route Handler / Client）
+
+Last-updated: 2026-02-15
 
 このドキュメントは、フロントエンドにおける「失敗の扱い」を統一し、
 - エラーの握りつぶし
@@ -74,3 +85,111 @@
 - catchして `console.error` だけで終わる（運用に乗らない）
 - エラーコードの “文字列比較の散乱”（一箇所で分類する）
 - 画面ごとに勝手な文言/扱いを定義する
+
+---
+
+## Professor APIエラーレスポンス形式
+
+```json
+{
+  "code": "MATERIAL_NOT_FOUND",
+  "message": "Material with ID 'abc123' not found",
+  "details": {
+    "materialId": "abc123"
+  }
+}
+```
+
+## フロントエンド統一エラーハンドリング
+
+### TanStack Query onError
+
+```typescript
+const { data, error } = useQuery({
+  queryKey: ['materials', id],
+  queryFn: () => getMaterial(id),
+  onError: (error: AxiosError<ErrorResponse>) => {
+    const code = error.response?.data?.code;
+    const message = getErrorMessage(code);
+    showErrorToast(message);
+  },
+});
+```
+
+### Axios Interceptor
+
+```typescript
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError<ErrorResponse>) => {
+    const code = error.response?.data?.code;
+    
+    // 認証エラー
+    if (code === 'TOKEN_EXPIRED') {
+      // リフレッシュトークンで再試行
+      return refreshAndRetry(error.config);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+```
+
+## SSE接続エラー処理
+
+### 指数バックオフ再接続
+
+```typescript
+function connectSSE(url: string, maxRetries = 5) {
+  let retries = 0;
+  
+  function connect() {
+    const eventSource = new EventSource(url);
+    
+    eventSource.onerror = () => {
+      eventSource.close();
+      
+      if (retries < maxRetries) {
+        const delay = Math.pow(2, retries) * 1000; // 1s, 2s, 4s, 8s, 16s
+        setTimeout(() => {
+          retries++;
+          connect();
+        }, delay);
+      } else {
+        showErrorToast('接続に失敗しました');
+      }
+    };
+    
+    return eventSource;
+  }
+  
+  return connect();
+}
+```
+
+## エラー表示UI
+
+### トースト通知
+```typescript
+import { toast } from 'react-hot-toast';
+
+showErrorToast('資料が見つかりませんでした');
+```
+
+### エラーページ
+```typescript
+// app/error.tsx
+export default function Error({ error }: { error: Error }) {
+  return (
+    <div>
+      <h1>エラーが発生しました</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+### インラインエラー
+```typescript
+{error && <p className="text-red-500">{error.message}</p>}
+```

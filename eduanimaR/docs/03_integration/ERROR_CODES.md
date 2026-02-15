@@ -1,4 +1,15 @@
+---
+Title: Error Codes
+Description: eduanimaR共通エラーコード一覧とUI表示マッピング
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, error-codes, professor, api
+---
+
 # Error Codes（エラーコード一覧）
+
+Last-updated: 2026-02-15
 
 本ドキュメントは Professor（Go）の `ERROR_CODES.md` と同期します。
 
@@ -141,3 +152,44 @@ eventSource.addEventListener('error', (event) => {
 - `message` 文字列で分岐しない（必ず `code` を使用）
 - エラーコードをハードコーディングしない（`ERROR_MESSAGES` マップを使用）
 - Professor のエラーコード体系と異なる独自のコードを定義しない
+
+---
+
+## eduanimaR共通エラーコード
+
+### Professor API エラーコード
+
+| コード | HTTPステータス | ユーザー向けメッセージ |
+|--------|---------------|----------------------|
+| `MATERIAL_NOT_FOUND` | 404 | 資料が見つかりませんでした |
+| `SUBJECT_ACCESS_DENIED` | 403 | この科目へのアクセス権限がありません |
+| `SEARCH_TIMEOUT` | 504 | 検索がタイムアウトしました。もう一度お試しください |
+| `REASONING_FAILED` | 500 | 回答生成に失敗しました |
+| `INVALID_QUESTION` | 400 | 質問の形式が正しくありません |
+| `RATE_LIMIT_EXCEEDED` | 429 | リクエストが多すぎます。しばらく待ってから再試行してください |
+| `AUTHENTICATION_REQUIRED` | 401 | ログインが必要です |
+| `TOKEN_EXPIRED` | 401 | セッションの有効期限が切れました。再度ログインしてください |
+
+### フロントエンド実装
+
+```typescript
+// src/shared/api/error-codes.ts
+export const ERROR_CODES: Record<string, string> = {
+  MATERIAL_NOT_FOUND: '資料が見つかりませんでした',
+  SUBJECT_ACCESS_DENIED: 'この科目へのアクセス権限がありません',
+  SEARCH_TIMEOUT: '検索がタイムアウトしました。もう一度お試しください',
+  REASONING_FAILED: '回答生成に失敗しました',
+  INVALID_QUESTION: '質問の形式が正しくありません',
+  RATE_LIMIT_EXCEEDED: 'リクエストが多すぎます。しばらく待ってから再試行してください',
+  AUTHENTICATION_REQUIRED: 'ログインが必要です',
+  TOKEN_EXPIRED: 'セッションの有効期限が切れました。再度ログインしてください',
+};
+
+export function getErrorMessage(code: string): string {
+  return ERROR_CODES[code] || 'エラーが発生しました';
+}
+```
+
+### バックエンドとの同期
+- Professor側の`ERROR_CODES.md`と定期的に同期
+- 新規エラーコード追加時はフロントエンド側も更新
