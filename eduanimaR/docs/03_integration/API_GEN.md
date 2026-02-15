@@ -8,6 +8,31 @@
 
 ---
 
+## 0) バックエンド（Professor）側の責務
+
+### MUST（バックエンドが保証すること）
+
+バックエンド（Professor）は以下を **OpenAPI 定義に明記**する責任があります：
+
+1. **Breaking Changes / Compatible Changes の明記**
+   - OpenAPI の `description` や `x-breaking-change` などのフィールドで明示
+   - 互換性がない変更は事前に廃止手順（deprecation）を経る
+
+2. **enum の意味とマッピング**
+   - 可能な箇所で DB ENUM（PostgreSQL ENUM 等）を採用
+   - API / DB / アプリケーション間で enum の意味が一致していること
+
+3. **エラー形式とエラーコードの標準化**
+   - エラーレスポンスの形式を統一（`ERROR_HANDLING.md` 参照）
+   - エラーコードとUI挙動のマッピング（`ERROR_CODES.md` 参照）
+
+### 参照先（バックエンドドキュメント）
+
+- Professor の API 生成運用：`../../../eduanimaR_Professor/docs/03_integration/API_GEN.md`
+- Professor の API 契約ワークフロー：`../../../eduanimaR_Professor/docs/03_integration/API_CONTRACT_WORKFLOW.md`
+
+---
+
 ## 1) ワークフロー（固定）
 
 1. **OpenAPI の取得**：バックエンドリポジトリ/環境から最新の `openapi.yaml`（または `openapi.json`）を取得
