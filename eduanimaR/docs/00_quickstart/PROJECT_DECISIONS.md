@@ -1,5 +1,7 @@
 # Project Decisions（SSOT）
 
+Last-updated: 2026-02-15
+
 このファイルは「プロジェクトごとに選択が必要」な決定事項の SSOT。
 AI/人間が推測で埋めないために、まずここを埋めてから実装する。
 
@@ -27,7 +29,7 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 ## Next.js（Must）
 - **SSR/Hydration**: 原則 Must（学習支援UIの即応性を重視）
 - **Route Handler/Server Action の採用方針**: 
-  - Server Actions: フォーム送信（ファイルアップロード、設定更新）
+  - Server Actions: フォーム送信（設定更新）
   - Route Handler: SSE（リアルタイム回答配信）、Webhook受信
 - **キャッシュ戦略（tag/path/revalidate の主軸）**: 
   - 科目・ファイル一覧: `revalidateTag`（資料追加時に無効化）
@@ -40,7 +42,6 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
   - `entities/subject`: 科目（Professor の subject_id に対応）
   - `entities/file`: 資料ファイル（Professor の GCS URL / metadata に対応）
   - `features/qa-chat`: Q&A（Professor の SSE + Librarian Agent の推論結果）
-  - `features/file-upload`: 資料アップロード（Professor の IngestJob → Kafka経由）
   - `widgets/file-tree`: 科目別ファイルツリー表示
 
 ## i18n（Phase 2以降）
@@ -60,3 +61,32 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **共有範囲**: Phase 1〜4は個人利用のみ（科目内グループ共有は将来検討）
 - **質問履歴・学習ログ**: 共有しない（プライバシー保護）
 - **CSP**: `SECURITY_CSP.md` に基づく厳格な設定
+
+---
+
+## eduanimaR 固有の前提（2026-02-15確定）
+
+### サービス境界
+- **Professor（Go）**: データ所有者。DB/GCS/Kafka直接アクセス。外向きAPI（HTTP/JSON + SSE）。
+- **Librarian（Python）**: 推論特化。Professor経由でのみ検索実行。
+- **Frontend（Next.js + FSD）**: Professorの外部APIのみを呼ぶ。Librarianへの直接通信は禁止。
+
+### 認証方式
+- Phase 1: ローカル開発のみ（dev-user固定）
+- Phase 2以降: SSO（Google / Meta / Microsoft / LINE）
+- **重要**: Web版からの新規登録は禁止。拡張機能でSSO登録したユーザーのみがログイン可能。
+
+### ファイルアップロード
+- **フロントエンドの責務範囲**: フロントエンドはファイルアップロードUIを持たない
+- **本番環境**: Chrome拡張機能による自動アップロードのみ（Professor APIへ直接送信）
+- **開発環境**: 外部ツール（curl, Postman等）でProfessor APIへ直接アップロード
+- **禁止事項**: フロントエンドにファイルアップロード機能を実装してはならない
+
+### データ境界
+- user_id / subject_id による厳格な分離（Professor側で強制）
+- フロントエンドは物理制約を「信頼」して表示
+
+### 外部API契約（SSOT）
+- Professor: `docs/openapi.yaml`（`eduanimaR_Professor/docs/openapi.yaml` が正）
+- 生成: Orval（`npm run api:generate`）
+- 生成物: `src/shared/api/generated/`（コミット対象）

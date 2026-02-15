@@ -1,5 +1,7 @@
 # Auth & Session Policy（Cookie / CSRF / Cache）
 
+Last-updated: 2026-02-15
+
 このドキュメントは、Next.js（App Router）を BFF として運用する際の
 認証・セッション・Cookie とキャッシュの相互作用を “契約” として固定します。
 
@@ -64,3 +66,31 @@
 - トークンを LocalStorage に保存
 - ユーザー依存レスポンスを “共通キャッシュ” に載せる
 - 例外を握りつぶして「ログインし直して」で済ませる（分類して扱う）
+
+---
+
+## eduanimaR固有の認証フロー
+
+### Phase 1（ローカル開発）
+- 固定の `dev-user` を使用
+- フロントエンドに認証UIは存在しない
+- Professor APIが開発モードでdev-userを自動設定
+
+### Phase 2以降（本番）
+- **SSO認証**: Google / Meta / Microsoft / LINE
+- **ユーザー登録フロー**:
+  1. ユーザーがChrome拡張機能をインストール
+  2. LMS上でSSO認証
+  3. Professorがユーザー登録・科目同期
+  4. Moodle資料の自動検知・アップロード開始
+
+### Web版の認証制限
+- **新規登録禁止**: Web版からの新規ユーザー登録は無効化
+- **ログインのみ許可**: 拡張機能でSSO登録したユーザーのみWeb版にログイン可能
+- **目的**: 大画面での閲覧・履歴確認専用
+- **実装方針**: フロントエンドに開発専用の認証UIを実装してはならない
+
+### セッション管理
+- Cookie-based session（Next.js middleware）
+- セッション期限: 7日間（更新可能）
+- セッションストア: Redis（Phase 2以降）

@@ -1,5 +1,7 @@
 # Quickstart（Frontend / FSD Template）
 
+Last-updated: 2026-02-15
+
 目的：eduanimaR フロントエンドを30分で起動・開発開始できる状態にする。
 
 ## 0) 前提
@@ -53,14 +55,30 @@ npm run build         # Next.js build
 
 SSOT：`05_operations/CI_CD.md`
 
-## 5) Chrome拡張機能（開発時）
+## 5) 開発環境でのファイルアップロード
+フロントエンドはファイルアップロードUIを持ちません。
+開発時のファイルアップロードは、外部ツール（curl, Postman等）でProfessor APIへ直接実行します。
+
+```bash
+# 例: curlでファイルアップロード
+curl -X POST http://localhost:8080/api/materials/upload \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@/path/to/document.pdf" \
+  -F "subject_id=xxx-xxx-xxx"
+```
+
+## 6) Chrome拡張機能（Phase 3以降）
 ```bash
 npm run build:extension
 ```
 
 → `dist/extension/` を Chrome の「拡張機能を読み込む」で追加
 
-## 6) 次に埋める（プロジェクト固有）
+**重要**: 本番環境では、ファイルアップロード・ユーザー登録はChrome拡張機能からのみ実行可能。
+Web版は拡張機能で登録したユーザーの閲覧専用チャネルとして機能。
+
+## 7) 次に埋める（プロジェクト固有）
 - `00_quickstart/PROJECT_DECISIONS.md`（本プロジェクトの決定事項）
 - `01_architecture/SLICES_MAP.md`（新規機能追加時に slice を追記）
+- `03_integration/AUTH_SESSION.md`（SSO認証・セッション管理の詳細）
 - `03_integration/ERROR_CODES.md`（Professor と同期）
