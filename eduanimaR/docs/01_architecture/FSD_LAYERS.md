@@ -59,7 +59,7 @@ Public API に公開するもの（目安）：
 - **置かないもの**：再利用前提の部品（再利用したいなら `widgets`/`features`/`entities`）
 
 ### widgets（独立したUIブロック）
-- **責務**：複数feature/entityを合成する“塊”（例：ヘッダー、検索結果パネル）
+- **責務**：複数feature/entityを合成する"塊"（例：ヘッダー、検索結果パネル）
 - **置くもの**：レイアウトを含む UI ブロック、複合コンポーネント
 
 ### features（ユーザー価値の単位）
@@ -84,26 +84,51 @@ Public API に公開するもの（目安）：
 
 ## 4) Next.js での実装パターン（薄い adapter）
 
-`src/app/**/page.tsx` はルーティングの“入口”で、原則 `src/pages/**/ui/Page` を import して描画するだけにします。
+`src/app/**/page.tsx` はルーティングの"入口"で、原則 `src/pages/**/ui/Page` を import して描画するだけにします。
 
 - 目的：FSDのページ実装を `pages` レイヤーへ集約し、ルーティング都合で構造が崩れるのを防ぐ
 
 ---
 
-## 5) レビュー観点（チェックリスト）
+## 5) バックエンド（Professor）との責務対応
+
+| Frontend (FSD) | Backend (Professor/Clean Arch) | 通信方法 |
+| --- | --- | --- |
+| `app` (routing) | `cmd/` (entry point) | - |
+| `pages` (page composition) | `transport/http` (OpenAPI) | HTTP/JSON (Next.js BFF経由) |
+| `features` (use cases) | `usecase` (business logic) | API契約（OpenAPI） |
+| `entities` (business entities) | `domain` (entities) | 型生成（Orval） |
+| `shared/api` (generated) | `repository` interface | - |
+| `shared/ui` (MUI components) | （該当なし） | - |
+
+### Frontend固有の注意（MUST）
+- Frontend が直接呼ぶバックエンドは **Professor のみ**（OpenAPI）
+- **Professorが検索の物理実行と最終回答生成を担当**
+- **Librarianとの通信はProfessor側で完結**（Frontend は関与しない）
+- 生成回答には必ず **Source を表示する**（クリック可能な path/url + ページ番号等）
+
+### バックエンド詳細の参照先
+- Professor（Go）の責務全体：`../../eduanimaR_Professor/docs/README.md`
+- Professor の Clean Architecture：`../../eduanimaR_Professor/docs/01_architecture/CLEAN_ARCHITECTURE.md`
+- バックエンド側の FSD 対応表：`../../eduanimaR_Professor/docs/01_architecture/FSD_LAYERS.md`
+
+---
+
+## 6) レビュー観点（チェックリスト）
 
 - import が単方向（`app→...→shared`）になっている
 - 同一レイヤー別sliceへの依存がない（特に `features→features`）
 - deep import していない（Public API 経由）
 - 置き場所が妥当（再利用するものを pages に閉じ込めていない）
+- **バックエンドとの責務境界が明確**（Professor → Frontend の役割分担）
 
 ---
 
-## 6) ルールの強制（ツール）
+## 7) ルールの強制（ツール）
 
 人手レビューだけでは破綻しやすいため、境界ルールはツールで強制します。
 
 - ESLint：`eslint-plugin-boundaries` で layers / slices の境界違反を検知
 - import パス：`@/*` を `src/*` に割り当て、import を正規化（相対パス地獄を避ける）
 
-注意：ここはプロジェクトの ESLint/tsconfig に依存するため、導入時に “実際のディレクトリ構造” に合わせて設定を確定させる。
+注意：ここはプロジェクトの ESLint/tsconfig に依存するため、導入時に "実際のディレクトリ構造" に合わせて設定を確定させる。
