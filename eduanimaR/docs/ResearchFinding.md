@@ -229,3 +229,119 @@ Python 側が「何個取得するか」という物理的な数値まで管理�
 
 **Confidence Score: 10/10**
 (理由: 各ノードの責務が単一責任原則(SRP)に従っており、LLMの推論特性と分散システムのデータ整合性が完全に調和しているため。)
+
+2026年2月現在、検索システム（特にRAG）におけるハイブリッド検索のベストプラクティスは、**「Agentには『検索手法』を選択させず、『クエリの種類』を入力させる」**ことであり、ランキング手法には**「RRF（Reciprocal Rank Fusion）」**を採用するのが定石です。
+
+Python（脳）とGo（手足）の責務分担を前提とした、具体的な設計論を解説します。
+
+---
+
+### 1. Agentに「検索手法」を選択させるべきか？
+
+**結論：Agentに「ハイブリッド / 全文 / ベクトル」というアルゴリズムを選択させるべきではありません。**
+
+Agent（LLM）は「検索アルゴリズムの特性」を完全には理解しておらず、誤った選択（例：造語をベクトル検索してヒットしない等）をするリスクがあります。
+代わりに、**Agentには常に「キーワード」と「自然言語クエリ」の両方を出力させ、Go側で常にハイブリッド検索（または入力に応じた自動切替）を行う設計**が最も堅牢です。
+
+#### 推奨設計：Agent（Python）の出力
+Agentは以下のJSONを出力し、Goに渡します。
+
+```json
+{
+  "search_intent": "決定係数の定義を知りたい",
+  "vector_query": "決定係数の定義と計算式について",  // 意味検索用
+  "keyword_query": ["決定係数", "定義", "式"],       // キーワード検索用（BM25）
+  "filter_conditions": { "lecture_id": "L03" }       // メタデータフィルタ（SQL WHERE句用）
+}
+```
+
+*   **Go側の挙動**:
+    *   `keyword_query` があれば **BM25（全文検索）** を実行。
+    *   `vector_query` があれば **Vector Search** を実行。
+    *   両方ある場合は **ハイブリッド（RRF統合）** を実行。
+    *   片方が空なら、単一検索に自動で切り替わる。
+
+これにより、Agentは「アルゴリズム」を意識せず、「検索したい言葉」を入れるだけで最適な検索結果が得られます。
+
+---
+
+### 2. ハイブリッド検索のランキング・スコアリング設計
+
+Goサーバー（検索エンジン）で実装すべき、2026年のベストプラクティスを比較・推奨します。
+
+#### 案A：ベクトルのスコアに全文のスコアを加算（Score Linear Combination）
+*   **手法**: `Score = (alpha * Vector_Score) + (beta * BM25_Score)`
+*   **課題**: ベクトルスコア（0.0〜1.0）と BM25スコア（0〜無限大）は**スケールが全く異なる**ため、正規化（Normalization）が非常に難しく、`alpha` パラメータの調整が泥沼化します。
+*   **評価**: **非推奨**（調整コストが高すぎるため）。
+
+#### 案B：キーワードで絞り込み、その後ベクトル検索（Post-Filtering）
+*   **手法**: SQLの `WHERE content LIKE '%キーワード%'` で絞り込んでからベクトル検索。
+*   **課題**: 「表記ゆれ（例：売上/売り上げ）」で重要な資料が**足切り（False Negative）**されてしまい、ベクトル検索の良さ（意味理解）が死にます。
+*   **評価**: **メタデータ（日付・ID）以外では非推奨**。
+
+#### 案C：RRF（Reciprocal Rank Fusion） ★推奨
+*   **手法**: 全文検索とベクトル検索を別々に実行し、それぞれの**「順位（Rank）」**に基づいてスコアを算出・統合します。
+    *   $$Score = \frac{1}{k + Rank_{vector}} + \frac{1}{k + Rank_{keyword}}$$
+*   **メリット**: スコアの単位（コサイン類似度 vs BM25）を気にする必要がなく、**「どちらかの検索で上位なら総合上位」**という直感的な挙動になります。
+*   **評価**: **現在の業界標準（De Facto Standard）です。Goで実装すべきはこれです。**
+
+---
+
+### 3. eduanima+R における実装戦略（Go & Python）
+
+「RRF」をベースに、さらに精度を高める「Rerank」を組み合わせた構成を提案します。
+
+#### ① Python (Librarian) の責務
+*   **クエリ生成**: 常に `keyword_list`（専門用語、固有名詞）と `semantic_query`（文章）の両方を生成します。
+    *   例：「決定係数」はキーワード、「それが0に近い時の意味」はセマンティック。
+
+#### ② Go (Searcher) の責務：ハイブリッド実行フロー
+
+1.  **並列検索（Parallel Execution）**:
+    *   **Thread A**: `keyword_list` を用いて PostgreSQL で全文検索 (tsvector / BM25) → Top 50 を取得。
+    *   **Thread B**: `semantic_query` を用いて pgvector でベクトル検索 (Cosine Distance) → Top 50 を取得。
+2.  **RRF マージ（Fusion）**:
+    *   両方の結果を ID ベースで統合し、RRF スコアで再ソート。
+    *   これで「キーワードが一致し、かつ文脈も合っている」ものが最上位に来ます。
+3.  **（オプション）Reranking（重要）**:
+    *   RRF で統合した上位 20 件程度に対し、軽量な **Cross-Encoder モデル（Reranker）** を適用して最終順位を決定すると精度が劇的に向上します。
+    *   *コスト重視なら RRF 止まりでも十分高性能です。*
+
+---
+
+### 4. 具体的なコードイメージ（概念）
+
+#### Go 側での RRF 実装ロジック
+```go
+// 簡易的なRRF実装例
+func RRFMerge(vectorResults []Result, keywordResults []Result, k int) []Result {
+    scores := make(map[string]float64)
+    chunks := make(map[string]ChunkData)
+
+    // ベクトル検索の順位スコア加算
+    for rank, res := range vectorResults {
+        scores[res.ID] += 1.0 / float64(k + rank + 1)
+        chunks[res.ID] = res.Data
+    }
+
+    // キーワード検索の順位スコア加算
+    for rank, res := range keywordResults {
+        scores[res.ID] += 1.0 / float64(k + rank + 1)
+        if _, exists := chunks[res.ID]; !exists {
+             chunks[res.ID] = res.Data
+        }
+    }
+
+    // スコア順にソートして返す
+    return SortByScore(scores, chunks)
+}
+```
+
+### 結論：採用すべきアーキテクチャ
+
+1.  **選択**: Agentには**「キーワード」と「文章」の両方を入力**させる（手法は選ばせない）。
+2.  **実行**: Goサーバーで **全文検索とベクトル検索を並列実行** する。
+3.  **統合**: **RRF (Reciprocal Rank Fusion)** アルゴリズムで順位を統合する。
+4.  **絞り込み**: 「講義回（第3回など）」や「科目ID」などの**メタデータのみ**、SQLの `WHERE` 句（ハードフィルタ）として適用する。
+
+この構成により、Agentが「専門用語（キーワード）」と「概念（ベクトル）」のどちらに重きを置いて検索しようとしても、RRFが自動的に良いとこ取りをして最適な結果を返してくれます。
