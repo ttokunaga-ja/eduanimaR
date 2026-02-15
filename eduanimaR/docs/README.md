@@ -5,7 +5,7 @@
 目的：
 - 判断のぶれ（人間/AI）を減らす
 - 依存境界・契約駆動・運用の事故を先に潰す
-- “本番だけ壊れる” を再現可能な手順に落とす
+- "本番だけ壊れる" を再現可能な手順に落とす
 
 ---
 
@@ -15,20 +15,22 @@
 
 ## まず読む（最短ルート）
 1. 技術スタック（SSOT）：`02_tech_stack/STACK.md`
-2. FSDの概要：`01_architecture/FSD_OVERVIEW.md`
-3. レイヤー境界：`01_architecture/FSD_LAYERS.md`
-4. データ取得の契約（DAL）：`01_architecture/DATA_ACCESS_LAYER.md`
-5. キャッシュ/再検証：`01_architecture/CACHING_STRATEGY.md`
-6. API 生成：`03_integration/API_GEN.md`
-7. API 契約運用：`03_integration/API_CONTRACT_WORKFLOW.md`
-8. 失敗の標準：
+2. FSD 全体像：`01_architecture/FSD_OVERVIEW.md`
+3. レイヤー境界とバックエンド対応：`01_architecture/FSD_LAYERS.md`
+4. Slices とバックエンド境界の対応：`01_architecture/SLICES_MAP.md`
+5. データ取得の契約（DAL）：`01_architecture/DATA_ACCESS_LAYER.md`
+6. API 契約運用（バックエンドとの通信）：`03_integration/API_CONTRACT_WORKFLOW.md`
+7. API 生成（Orval）：`03_integration/API_GEN.md`
+8. バージョニング/廃止：`03_integration/API_VERSIONING_DEPRECATION.md`
+9. エラー処理の標準：
    - `03_integration/ERROR_HANDLING.md`
    - `03_integration/ERROR_CODES.md`
-9. セキュリティ（CSP/ヘッダー）：`03_integration/SECURITY_CSP.md`
-10. 運用（最小）：
-   - `05_operations/OBSERVABILITY.md`
-   - `05_operations/RELEASE.md`
-   - `05_operations/PERFORMANCE.md`
+10. キャッシュ/再検証：`01_architecture/CACHING_STRATEGY.md`
+11. セキュリティ（CSP/ヘッダー）：`03_integration/SECURITY_CSP.md`
+12. 運用（最小）：
+    - `05_operations/OBSERVABILITY.md`
+    - `05_operations/RELEASE.md`
+    - `05_operations/PERFORMANCE.md`
 
 ---
 
@@ -91,9 +93,26 @@
 
 ---
 
+## Requirements（要件管理）
+- ポータル：`06_requirements/README.md`
+- ページ要件：`06_requirements/pages/`
+- コンポーネント要件：`06_requirements/components/`
+
+---
+
 ## Skills（Agent向け：短い実務ルール）
 - `skills/README.md`
 
 運用の基本：
-- “迷ったらコードではなくドキュメントを更新して契約を変える”
-- “例外は増やさず、境界の切り方を見直す”
+- "迷ったらコードではなくドキュメントを更新して契約を変える"
+- "例外は増やさず、境界の切り方を見直す"
+
+---
+
+## バックエンドドキュメントとの関係
+
+���ロントエンドは **Professor（Go）** を通じてバックエンドと通信します。
+
+- バックエンド全体の責務と契約：`../eduanimaR_Professor/docs/README.md`
+- バックエンドとフロントエンドの対応関係：`01_architecture/FSD_LAYERS.md` 内の対応表を参照
+- API契約の詳細：`03_integration/API_CONTRACT_WORKFLOW.md` および `../eduanimaR_Professor/docs/03_integration/API_GEN.md`
