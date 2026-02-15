@@ -1,26 +1,34 @@
-# Docs Portal（Frontend / Chrome Extension）
+# Docs Portal（Frontend / FSD Template）
 
-この `docs/` 配下は、eduanima+R の **フロントエンド（Web）** と **Chrome 拡張** を実装/運用するための「契約（SSOT）」です。
+この `docs/` 配下は、Next.js（App Router）+ FSD（Feature-Sliced Design）での開発を「契約（運用ルール）」として固定するためのドキュメント集です。
 
 目的：
-- 要件・契約のぶれ（人間/AI）を減らす
-- 境界（Frontend ↔ Professor）と失敗の扱いを固定する
-- ストリーミング（SSE）/拡張（DOM監視）を安全に運用する
+- 判断のぶれ（人間/AI）を減らす
+- 依存境界・契約駆動・運用の事故を先に潰す
+- “本番だけ壊れる” を再現可能な手順に落とす
 
 ---
 
 ## Quickstart（最短で開発開始）
-0. `00_quickstart/QUICKSTART.md`
-1. `00_quickstart/PROJECT_DECISIONS.md`
+0. `00_quickstart/QUICKSTART.md`（30分で着手できる状態にする）
+1. `00_quickstart/PROJECT_DECISIONS.md`（プロジェクト固有の決定事項SSOT）
 
-## まず読む（上流 → 下流）
-1. 総合要件（SSOT）：`06_requirements/EDUANIMA_R_PRD.md`
-2. リリースロードマップ（SSOT）：`06_requirements/RELEASE_ROADMAP.md`
-3. 技術スタック（SSOT）：`02_tech_stack/STACK.md`
-4. API 契約運用：`03_integration/API_CONTRACT_WORKFLOW.md`
-5. SSE（必須）：`03_integration/SSE_STREAMING.md`
-6. Chrome 拡張連携：`03_integration/CHROME_EXTENSION_BACKEND_INTEGRATION.md`
-7. 失敗の標準：`03_integration/ERROR_HANDLING.md` / `03_integration/ERROR_CODES.md`
+## まず読む（最短ルート）
+1. 技術スタック（SSOT）：`02_tech_stack/STACK.md`
+2. FSDの概要：`01_architecture/FSD_OVERVIEW.md`
+3. レイヤー境界：`01_architecture/FSD_LAYERS.md`
+4. データ取得の契約（DAL）：`01_architecture/DATA_ACCESS_LAYER.md`
+5. キャッシュ/再検証：`01_architecture/CACHING_STRATEGY.md`
+6. API 生成：`03_integration/API_GEN.md`
+7. API 契約運用：`03_integration/API_CONTRACT_WORKFLOW.md`
+8. 失敗の標準：
+   - `03_integration/ERROR_HANDLING.md`
+   - `03_integration/ERROR_CODES.md`
+9. セキュリティ（CSP/ヘッダー）：`03_integration/SECURITY_CSP.md`
+10. 運用（最小）：
+   - `05_operations/OBSERVABILITY.md`
+   - `05_operations/RELEASE.md`
+   - `05_operations/PERFORMANCE.md`
 
 ---
 
@@ -41,6 +49,7 @@
 
 ## Tech Stack
 - `02_tech_stack/STACK.md`
+- `02_tech_stack/MUI_PIGMENT.md`
 - `02_tech_stack/SSR_HYDRATION.md`
 - `02_tech_stack/STATE_QUERY.md`
 - `02_tech_stack/SERVER_ACTIONS.md`
@@ -52,21 +61,12 @@
 - API 生成：`03_integration/API_GEN.md`
 - API 契約ワークフロー：`03_integration/API_CONTRACT_WORKFLOW.md`
 - バージョニング/廃止：`03_integration/API_VERSIONING_DEPRECATION.md`
-- SSE：`03_integration/SSE_STREAMING.md`
-- Chrome 拡張 ↔ Backend：`03_integration/CHROME_EXTENSION_BACKEND_INTEGRATION.md`
 - エラー形式/扱い：`03_integration/ERROR_HANDLING.md`
 - エラーコード：`03_integration/ERROR_CODES.md`
 - CSP/ヘッダー：`03_integration/SECURITY_CSP.md`
 - Auth/Session：`03_integration/AUTH_SESSION.md`
 - i18n/Locale（必要な場合）：`03_integration/I18N_LOCALE.md`
 - Docker 環境：`03_integration/DOCKER_ENV.md`
-
----
-
-## Requirements（SSOT）
-- `06_requirements/EDUANIMA_R_PRD.md`
-- `06_requirements/RELEASE_ROADMAP.md`
-- `06_requirements/README.md`
 
 ---
 

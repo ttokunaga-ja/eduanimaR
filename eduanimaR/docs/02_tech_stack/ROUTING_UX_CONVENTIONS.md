@@ -38,7 +38,7 @@
 - logging は `useEffect` で行い、運用へ送る（console だけで終えない）
 
 粒度：
-- 重要なセグメント（例：`(routes)/app/history`）には局所 `error.tsx` を置き、全体巻き込みを防ぐ
+- 重要なセグメント（例：`(routes)/settings`）には局所 `error.tsx` を置き、全体巻き込みを防ぐ
 
 ---
 
