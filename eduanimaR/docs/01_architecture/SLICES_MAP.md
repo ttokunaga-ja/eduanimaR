@@ -6,7 +6,7 @@ Last-updated: 2026-02-15
 
 ## ルール
 - 新しい slice を作る前に、このファイルに追記してから実装する
-- slice 名は英小文字のケバブケース（例: `auth-by-email`）
+- slice 名は英小文字のケバブケース（例: `qa-chat`）
 - `features` 内の slice 同士は直接 import しない（合成は `widgets` / `pages`）
 
 ## 命名・粒度のガイド
@@ -47,19 +47,6 @@ Last-updated: 2026-02-15
   - **責務**: 質問入力、リアルタイム回答表示、ソース（参照箇所）のクリッカブルリンク
   - **依存**: `shared/api`（Professor の `/qa/stream` SSE）、`entities/file`
   - **バックエンド境界**: Professor（SSE配信）↔ Librarian（gRPC、検索戦略立案）
-
-- **`file-upload`**: 資料アップロード（開発用のみ）
-  - **責務**: 開発環境でのファイル手動アップロード確認用UI
-  - **本番制限**: Web版では無効化。Chrome拡張機能による自動アップロードのみ有効。
-  - **依存**: `shared/api`（Professor の `/api/materials/upload`）
-  - **バックエンド境界**: Professor（GCS保存 → Kafka IngestJob → ワーカー処理）
-
-- **`auth-by-email`**: メールログイン（開発用）
-  - **責務**: 開発環境での認証確認用
-  - **本番制限**: Web版からの新規ユーザー登録は禁止。拡張機能でSSO認証したユーザーのみログイン可能。
-  - **Phase 2以降**: Google / Meta / Microsoft / LINE によるSSO認証実装
-  - **依存**: `shared/api`（Professor の `/auth/login` エンドポイント）
-  - **バックエンド境界**: Professor の認証フロー（Google/Meta/Microsoft/LINE）
 
 - **`auth-by-token`**: トークンでの再認証/更新
   - **責務**: リフレッシュトークンによるセッション延長

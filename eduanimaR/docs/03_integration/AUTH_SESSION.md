@@ -73,7 +73,8 @@ Last-updated: 2026-02-15
 
 ### Phase 1（ローカル開発）
 - 固定の `dev-user` を使用
-- 認証スキップ（開発確認用）
+- フロントエンドに認証UIは存在しない
+- Professor APIが開発モードでdev-userを自動設定
 
 ### Phase 2以降（本番）
 - **SSO認証**: Google / Meta / Microsoft / LINE
@@ -87,6 +88,7 @@ Last-updated: 2026-02-15
 - **新規登録禁止**: Web版からの新規ユーザー登録は無効化
 - **ログインのみ許可**: 拡張機能でSSO登録したユーザーのみWeb版にログイン可能
 - **目的**: 大画面での閲覧・履歴確認専用
+- **実装方針**: フロントエンドに開発専用の認証UIを実装してはならない
 
 ### セッション管理
 - Cookie-based session（Next.js middleware）
