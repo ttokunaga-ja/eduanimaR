@@ -25,7 +25,7 @@ npm run dev
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 API_BASE_URL=http://localhost:8080
 
-# Phase 2以降（SSO）
+# Phase 2（SSO）
 # NEXT_PUBLIC_OAUTH_CLIENT_ID=your-client-id
 # OAUTH_CLIENT_SECRET=your-secret
 ```
@@ -67,14 +67,24 @@ curl -X POST http://localhost:8080/api/materials/upload \
   -F "subject_id=xxx-xxx-xxx"
 ```
 
-## 6) Chrome拡張機能（Phase 3以降）
+## 6) Chrome拡張機能（Phase 1から実装）
 ```bash
 npm run build:extension
 ```
 
 → `dist/extension/` を Chrome の「拡張機能を読み込む」で追加
 
-**重要**: 本番環境では、ファイルアップロード・ユーザー登録はChrome拡張機能からのみ実行可能。
+### Phase 1での拡張機能開発
+- **自動アップロード機能**: LMSページから資料を自動検知・アップロードする機能を実装
+- **ローカルテスト**: Chrome拡張機能をローカルで読み込み、Moodleテストサイトで動作確認
+- **認証なし**: dev-user固定で動作（Professor APIが開発モードで自動設定）
+
+### Phase 2での拡張機能公開
+- **SSO認証**: LMS上でのGoogle/Meta/Microsoft/LINE認証
+- **ユーザー登録**: 拡張機能からのみユーザー登録可能
+- **Chrome Web Store公開**: 非公開配布として公開
+
+**重要**: 本番環境（Phase 2）では、ファイルアップロード・ユーザー登録はChrome拡張機能からのみ実行可能。
 Web版は拡張機能で登録したユーザーの閲覧専用チャネルとして機能。
 
 ## 7) 次に埋める（プロジェクト固有）

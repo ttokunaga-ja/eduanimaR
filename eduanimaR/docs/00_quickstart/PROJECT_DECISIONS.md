@@ -13,7 +13,7 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 
 ## 認証（Must）
 - **方式**: Cookie（SSO/OAuth 2.0による）
-- **SSO対応プロバイダー（Phase 2以降）**: Google / Meta / Microsoft / LINE
+- **SSO対応プロバイダー（Phase 2）**: Google / Meta / Microsoft / LINE
 - **Phase 1**: ローカル開発のみ、認証スキップ（固定dev-user使用）
 - **セッション保存場所**: Cookie（httpOnly, Secure, SameSite=Lax）
 - **401/403 の UI 振る舞い**: ログイン画面へリダイレクト、元ページURLを保持
@@ -72,15 +72,26 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **Frontend（Next.js + FSD）**: Professorの外部APIのみを呼ぶ。Librarianへの直接通信は禁止。
 
 ### 認証方式
-- Phase 1: ローカル開発のみ（dev-user固定）
-- Phase 2以降: SSO（Google / Meta / Microsoft / LINE）
+- **Phase 1**: ローカル開発のみ（dev-user固定、認証UI実装不要）
+- **Phase 2**: SSO（Google / Meta / Microsoft / LINE）による本番認証、Web版・拡張機能を同時リリース
 - **重要**: Web版からの新規登録は禁止。拡張機能でSSO登録したユーザーのみがログイン可能。
 
 ### ファイルアップロード
 - **フロントエンドの責務範囲**: フロントエンドはファイルアップロードUIを持たない
-- **本番環境**: Chrome拡張機能による自動アップロードのみ（Professor APIへ直接送信）
-- **開発環境**: 外部ツール（curl, Postman等）でProfessor APIへ直接アップロード
-- **禁止事項**: フロントエンドにファイルアップロード機能を実装してはならない
+- **Phase 1（開発環境）**: 
+  - Web版: 外部ツール（curl, Postman等）でProfessor APIへ直接アップロード
+  - 拡張機能: 自動アップロード機能の実装と検証（ローカルでのChromeへの読み込み）
+- **Phase 2（本番環境）**: Chrome拡張機能による自動アップロードのみ（Phase 1で実装済みの機能を本番適用）
+- **禁止事項**: Web版にファイルアップロード機能を実装してはならない
+
+### 自動アップロード機能
+- **Phase 1で実装**: Chrome拡張機能のLMS資料自動検知・アップロード機能を完全実装
+- **実装内容**:
+  - Content Scriptによる資料リンク検知
+  - Background Serviceによる定期チェック
+  - Professor APIへの自動送信
+- **Phase 1での検証方法**: Chromeにローカルで拡張機能を読み込み、Moodleテストサイトで動作確認
+- **Phase 2で公開**: Chrome Web Storeへ公開し、本番環境で提供
 
 ### データ境界
 - user_id / subject_id による厳格な分離（Professor側で強制）

@@ -71,26 +71,32 @@ Last-updated: 2026-02-15
 
 ## eduanimaR固有の認証フロー
 
-### Phase 1（ローカル開発）
+### Phase 1（開発環境のみ）
 - 固定の `dev-user` を使用
 - フロントエンドに認証UIは存在しない
 - Professor APIが開発モードでdev-userを自動設定
+- **拡張機能**: ローカルでの動作確認のみ、認証なし
 
-### Phase 2以降（本番）
+### Phase 2（本番環境・同時リリース）
 - **SSO認証**: Google / Meta / Microsoft / LINE
+- **Web版・拡張機能の同時リリース**: 
+  - Chrome Web Storeへ公開（非公開配布）
+  - Webアプリの本番デプロイ
 - **ユーザー登録フロー**:
-  1. ユーザーがChrome拡張機能をインストール
+  1. ユーザーがChrome拡張機能をインストール（Chrome Web Storeから）
   2. LMS上でSSO認証
   3. Professorがユーザー登録・科目同期
-  4. Moodle資料の自動検知・アップロード開始
+  4. Moodle資料の自動検知・アップロード開始（Phase 1で実装済みの機能）
 
-### Web版の認証制限
+### Web版の認証制限（Phase 2）
 - **新規登録禁止**: Web版からの新規ユーザー登録は無効化
 - **ログインのみ許可**: 拡張機能でSSO登録したユーザーのみWeb版にログイン可能
 - **目的**: 大画面での閲覧・履歴確認専用
-- **実装方針**: フロントエンドに開発専用の認証UIを実装してはならない
+- **実装方針**: 
+  - Phase 1: 認証UIを実装してはならない（dev-user固定）
+  - Phase 2: SSO認証のみ実装、Web版からの新規登録エンドポイントは無効化
 
-### セッション管理
+### セッション管理（Phase 2）
 - Cookie-based session（Next.js middleware）
 - セッション期限: 7日間（更新可能）
-- セッションストア: Redis（Phase 2以降）
+- セッションストア: Redis

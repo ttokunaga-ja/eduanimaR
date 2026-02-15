@@ -15,6 +15,25 @@ Last-updated: 2026-02-15
 0. `00_quickstart/QUICKSTART.md`（30分で着手できる状態にする）
 1. `00_quickstart/PROJECT_DECISIONS.md`（プロジェクト固有の決定事項SSOT）
 
+**重要な前提（Phase構成）**:
+- **Phase 1（開発環境）**: 
+  - ローカルでの動作確認のみ
+  - 認証なし（dev-user固定）
+  - 自動アップロード機能の実装と検証
+  - Web版: curlやPostmanでAPIテスト
+  - 拡張機能: Chromeにローカル読み込みで動作確認
+  
+- **Phase 2（本番環境・同時リリース）**:
+  - SSO認証実装（Google/Meta/Microsoft/LINE）
+  - Chrome Web Storeへ公開（非公開配布）
+  - Webアプリの本番デプロイ
+  - Web版からの新規登録は禁止、拡張機能でのみユーザー登録可能
+  
+- **ファイルアップロード**: 
+  - フロントエンドにUIを実装してはならない
+  - Phase 1: API直接呼び出し + 拡張機能実装
+  - Phase 2: 拡張機能の自動アップロードのみ
+
 ## まず読む（最短ルート）
 1. **プロジェクト固有の前提**: `00_quickstart/PROJECT_DECISIONS.md` ← **最優先**
 2. 技術スタック（SSOT）：`02_tech_stack/STACK.md`
