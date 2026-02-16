@@ -3,13 +3,13 @@ Title: API Integration & Code Generation
 Description: eduanimaRのAPI生成とOrval設定
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, api, orval, code-generation
 ---
 
 # API Integration & Code Generation
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 バックエンド（Goマイクロサービス）との通信コードは、OpenAPI 定義から自動生成します。
 
@@ -192,6 +192,37 @@ jobs:
       - name: Fail if generated output changed
         run: git diff --exit-code
 ```
+
+---
+
+## Breaking Changesの検出（Must）
+
+### CI/CDでのOpenAPI契約変更検出
+
+契約駆動開発を徹底するため、OpenAPI契約の変更を自動検出する仕組みを明記:
+
+- **契約コードの配置**: 生成コードは `src/shared/api/generated/` に配置し、FSDの上位層から参照
+- **Breaking Changes検出**: CI/CDで以下を検出
+  - 既存エンドポイントの削除
+  - 必須パラメータの追加
+  - レスポンス型の変更
+  - HTTPメソッドの変更
+
+### Breaking Changesが検出された場合の対応
+
+1. **Professor側の対応**: 
+   - APIバージョニング (`/v1/`, `/v2/`)
+   - 廃止予定の明示 (deprecated flag)
+   - 移行期間の設定
+
+2. **フロントエンド側の対応**:
+   - 生成コードの更新 (`npm run api:generate`)
+   - 影響範囲の特定 (TypeScriptエラーから判断)
+   - 段階的な移行 (Feature Flagなど)
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/03_integration/API_GEN.md`
+- `../../eduanimaR_Professor/docs/03_integration/API_CONTRACT_WORKFLOW.md`
 
 ---
 

@@ -119,6 +119,33 @@ export const ExtensionInstallPrompt = () => {
 - **実装**: 拡張とWebアプリが同一のセッションIDを参照
 - **ログアウト**: どちらかでログアウトすると両方無効化
 
+## 認証境界の保証（Must）
+
+### Chrome拡張機能とWebアプリの認証統一
+
+- **同一セッション**: Chrome拡張機能とWebアプリは同一のセッションを共有
+- **同一user_id**: どちらの導線でも同一のuser_idで認可判定
+- **認証状態の管理**: Professorが認証状態を管理(フロントエンドは認証トークンのみ保持)
+
+### Phase 1の特殊対応
+
+**ローカル開発時の認証スキップ**:
+- 固定のdev-userを使用
+- 認証UIは実装しない
+- Professor側で自動的にdev-userセッションを生成
+
+```typescript
+// Phase 1での開発用設定例
+if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
+  // Professor側が自動的にdev-userを設定
+  // フロントエンドは何もしない
+}
+```
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md` (SSO/OAuth)
+- `../../eduanimaRHandbook/04_product/ROADMAP.md` (Phase 1-2の認証方針)
+
 ## セキュリティ要件
 - **トークン暗号化**: HTTPS通信必須
 - **CSRF対策**: SameSite Cookie属性

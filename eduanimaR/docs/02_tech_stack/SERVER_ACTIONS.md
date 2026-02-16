@@ -144,6 +144,64 @@ export function ProfileForm() {
 
 ---
 
+## Professor API呼び出しパターン（eduanimaR固有）
+
+### Server ActionsからProfessor APIを呼び出す標準パターン
+
+```typescript
+'use server'
+
+import { api } from '@/shared/api'
+import { revalidateTag } from 'next/cache'
+
+export async function askQuestion(formData: FormData) {
+  const question = formData.get('question') as string
+  const subjectId = formData.get('subjectId') as string
+  
+  try {
+    // Professor API呼び出し (OpenAPI生成クライアント使用)
+    const response = await api.qa.ask({ question, subjectId })
+    
+    // キャッシュ再検証
+    revalidateTag(`qa:${subjectId}`)
+    
+    return { ok: true, data: response }
+  } catch (error) {
+    // エラーコードに基づいた標準的なエラー処理
+    return { ok: false, error: getErrorMessage(error) }
+  }
+}
+```
+
+### SSE(Server-Sent Events)の扱い
+
+リアルタイムフィードバック(質問応答の進捗等)はSSEで受信:
+
+```typescript
+// Client Component
+export function QAChat() {
+  const handleAsk = async (question: string) => {
+    const eventSource = new EventSource(
+      `/api/qa/stream?question=${encodeURIComponent(question)}`
+    )
+    
+    eventSource.addEventListener('answer_chunk', (event) => {
+      const chunk = JSON.parse(event.data)
+      appendToAnswer(chunk.text)
+    })
+    
+    eventSource.addEventListener('done', () => {
+      eventSource.close()
+    })
+  }
+}
+```
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/03_integration/API_GEN.md`
+
+---
+
 ## 禁止（AI/人間共通）
 
 - UI からの mutation を “とりあえず” Route Handler にする（グルーコード化）

@@ -49,6 +49,18 @@ Last-updated: 2026-02-16
 
 参照：`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`
 
+## Professor API通信（契約駆動開発）
+
+### フロントエンドの通信ルール
+- **Professor API**: フロントエンドはProfessorのOpenAPI(HTTP/JSON + SSE)経由でバックエンドと通信
+- **Librarian呼び出し禁止**: LibrarianはProfessor経由でのみ呼び出され、フロントエンドから直接呼び出さない
+- **契約駆動開発**: OpenAPIからの型/クライアント生成を必須化(手書きの型定義・fetch関数を禁止)
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/02_tech_stack/STACK.md`
+- `../../eduanimaR_Professor/docs/02_tech_stack/TS_GUIDE.md`
+- `../../eduanimaR_Professor/proto/librarian/v1/librarian.proto` (コメント)
+
 ## Phase別の技術スタック差異
 
 ### Phase 1（ローカル開発）
