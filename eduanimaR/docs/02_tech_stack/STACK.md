@@ -267,9 +267,10 @@ Node（公式 index.json、2026-02-11 に取得）：
 | **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
 
 ### Professor ↔ Librarian 通信
-- **プロトコル**: **HTTP/JSON**（NOT gRPC）
-- **エンドポイント**: `POST /v1/librarian/search-agent`
+- **プロトコル**: **gRPC（双方向ストリーミング）**
+- **契約**: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
 - **Librarianの特性**: ステートレス推論サービス（会話履歴・キャッシュなし）
+- **技術的理由**: Phase 3検索ループにおける複数ターン双方向通信に最適
 
 ### 責務分担の明確化（Professor/Librarian境界）
 
@@ -290,7 +291,7 @@ Node（公式 index.json、2026-02-11 に取得）：
 - **終了判定**: 十分な情報が集まったかの評価と停止判断
 - **ステートレス**: 会話履歴・キャッシュなし
 - **制約**: DB/GCS/Kafka への直接アクセス禁止（Professor 経由のみ）
-- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信、契約: `proto/librarian/v1/librarian.proto`
 
 #### Frontend（Next.js + FSD）の責務
 - **Professor の外部 API のみを呼ぶ**: OpenAPI 契約に基づく通信
@@ -312,7 +313,7 @@ Node（公式 index.json、2026-02-11 に取得）：
 - **ステートレス推論サービス**: 会話履歴・キャッシュ等の永続化なし
 - **1リクエストで推論完結**: Librarian推論ループは1リクエスト内で完結（最大5回推奨）
 - **中断・再開不可**: フロントエンドからの中断・再開は不可
-- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信
 
 #### フロントエンドへの影響
 

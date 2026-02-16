@@ -47,7 +47,7 @@
 - **Phase 3（小戦略）**: LangGraphによるLibrarian推論ループ（最大5回推奨）
 - **ステートレス**: 会話履歴・キャッシュなし
 - **DB直接アクセス禁止**: Professor経由でのみ検索実行
-- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信
 
 ### Frontend責務
 - **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
@@ -136,5 +136,5 @@ Node（公式 index.json、2026-02-11に取得）：
 - deep import をしない（Public API）
 - “例外追加” で逃げず、構造（境界/責務）を直す
 - **Professor/Librarian責務境界を厳守**: Librarian直接通信禁止
-- **用語統一**: "Librarian推論ループ", "選定エビデンス", "ハイブリッド検索(RRF統合)", "HTTP/JSON"（NOT gRPC）
+- **用語統一**: "Librarian推論ループ", "選定エビデンス", "ハイブリッド検索(RRF統合)", "gRPC双方向ストリーミング"（Professor ↔ Librarian）
 - **上流ドキュメント参照**: Handbook/Professor/Librarianのドキュメントと整合性を保つ

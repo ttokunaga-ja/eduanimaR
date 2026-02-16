@@ -115,7 +115,7 @@ Last-updated: 2026-02-15
 - **Phase 3（小戦略）**: LangGraphによるLibrarian推論ループ（最大5回推奨）
 - **ステートレス**: 会話履歴・キャッシュなし
 - **DB直接アクセス禁止**: Professor経由でのみ検索実行
-- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信
 - **エラー伝播**: LibrarianエラーはProfessor経由でフロントエンドへ
 
 #### Frontend責務
@@ -203,7 +203,7 @@ apiClient.interceptors.response.use(
 
 #### Professor/Librarian責務とSSEエラー
 - **Professor**: HTTP/JSON + SSEでフロントエンドと通信、Librarian推論ループのエラーもSSEで伝播
-- **Librarian**: HTTP/JSON（NOT gRPC）でProfessorと通信、ステートレス推論ループ（最大5回推奨）
+- **Librarian**: **gRPC（双方向ストリーミング）** でProfessorと通信、ステートレス推論ループ（最大5回推奨）
 - **Frontend**: ProfessorのSSEのみ受信、Librarian直接通信禁止
 
 #### SSE 切断時の再接続戦略（透明性確保）
@@ -331,7 +331,7 @@ Professor の HTTP/JSON + SSE エラーレスポンス形式とフロントエ�
 
 #### Librarian（Python）のエラー処理責務
 - Librarian推論ループのエラー検出（最大5回試行）
-- Professor経由でのエラー通知（HTTP/JSON、NOT gRPC）
+- Professor経由でのエラー通知（**gRPC**）
 - DB直接アクセス禁止エラーの検出
 
 #### Frontend エラー処理責務
