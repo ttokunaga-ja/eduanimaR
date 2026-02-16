@@ -9,6 +9,21 @@ Last-updated: 2026-02-15
 - 依存境界・契約駆動・運用の事故を先に潰す
 - "本番だけ壊れる" を再現可能な手順に落とす
 
+## サービス全体のコンセプト
+
+### Mission & North Star
+- **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
+- **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+
+### Professor / Librarian の役割
+- **Professor（Go）**: データ所有者、最終回答生成、DB/GCS/Kafka の物理実行を担当
+- **Librarian（Python）**: 検索戦略立案、LangGraph Agent による推論（Professor経由でのみ検索実行）
+
+### 上流ドキュメントへの参照
+- サービスコンセプト全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
+- バックエンド Professor: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
+- バックエンド Librarian: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
+
 ---
 
 ## Quickstart（最短で開発開始）

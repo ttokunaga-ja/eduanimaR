@@ -79,6 +79,28 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
 - **Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態
 - **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+  - 具体的には「質問から関連箇所（資料名 + ページ番号）へ到達する時間」を計測
+  - ユーザーが「理解する時間」を最大化するための指標
+
+### ペルソナ要約
+- **主要ペルソナ**: 忙しい学部生
+  - 複数科目を並行履修し、資料が散在
+  - 「どこに何が書いてあったか」を探す時間が負担
+  - 資料の「着眼点」を示し、原典への回帰を促す支援が必要
+
+### Professor / Librarian の責務境界
+- **Professor（Go）**: データ所有者、DB/GCS/Kafka 直接アクセス、検索の物理実行、最終回答生成
+  - DB/GCS/検索インデックスへの直接アクセス権限を持つ
+  - 外向き API（HTTP/JSON + SSE）を提供
+  - バッチ処理（OCR/Embedding）の実行管理
+- **Librarian（Python）**: 検索戦略立案、停止判断、エビデンス選定（DB 直接アクセスなし）
+  - LangGraph Agent による推論特化
+  - Professor 経由でのみ検索実行を要求
+  - 検索戦略の最適化と終了判定を担当
+
+### バックエンドサービス仕様への参照
+- Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+- Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
 
 ### 提供形態
 - Chrome拡張機能（LMS利用中の介入）

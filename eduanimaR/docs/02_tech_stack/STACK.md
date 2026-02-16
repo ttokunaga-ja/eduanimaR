@@ -157,6 +157,33 @@ Node（公式 index.json、2026-02-11 に取得）：
 
 ## 2. アーキテクチャ構成図（FSD × Microservices）
 
+### バックエンド技術スタック概要
+
+| サービス | 役割 | 技術スタック |
+|:---|:---|:---|
+| **Professor** | データ所有者、DB/GCS/Kafka 直接アクセス、検索の物理実行、最終回答生成 | Go 1.25.7, Echo v5.0.1, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
+| **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+
+### 責務分担の明確化
+
+#### Professor（Go）の責務
+- **データ所有者**: DB/GCS/Kafka への直接アクセス権限を持つ
+- **外向き API 提供**: HTTP/JSON + SSE でフロントエンドと通信
+- **検索の物理実行**: Elasticsearch/pgvector を用いた実際の検索クエリ実行
+- **最終回答生成**: ユーザーへ返す回答の組み立てと配信
+- **バッチ処理管理**: OCR/Embedding 等の非同期処理を Kafka 経由で管理
+
+#### Librarian（Python）の責務
+- **推論特化**: LangGraph Agent による複雑な推論ロジック
+- **検索戦略立案**: どのような検索を行うべきかの判断
+- **終了判定**: 十分な情報が集まったかの評価と停止判断
+- **制約**: DB/GCS/Kafka への直接アクセスなし（Professor 経由のみ）
+
+#### Frontend（Next.js + FSD）の責務
+- **Professor の外部 API のみを呼ぶ**: OpenAPI 契約に基づく通信
+- **Librarian への直接通信は禁止**: すべて Professor 経由
+- **エビデンス表示**: 回答に含まれるソース情報を UI で適切に表示
+
 ```mermaid
 graph TD
     subgraph "Dev Environment (Code Generation)"
@@ -186,6 +213,11 @@ graph TD
 
     GenHooks -.->|Fetch Data| NextBFF
 ```
+
+**補足説明**:
+- Frontend は Next.js BFF を経由して Professor（Go Gateway）と通信
+- Professor は内部で Librarian（Python）と gRPC で協調
+- すべてのデータアクセス（DB/GCS/検索）は Professor が管理
 
 ---
 

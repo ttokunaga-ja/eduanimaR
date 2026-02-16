@@ -101,10 +101,29 @@ Public API に公開するもの（目安）：
 | `shared/api` (generated) | `repository` interface | - |
 | `shared/ui` (MUI components) | （該当なし） | - |
 
+### Professor OpenAPI 契約の具体例
+
+#### SSE ストリーミング
+- **エンドポイント**: `/v1/questions/{request_id}/events`
+- **用途**: リアルタイム回答配信と進捗通知
+- **実装要件**:
+  - EventSource を使用したクライアント側接続管理
+  - ストリーミング中のエラーイベント処理
+  - 接続断時の再接続戦略（指数バックオフ）
+
+#### エビデンス表示の要件
+- **必須要素**: 回答には必ずソースを表示
+  - クリッカブルな path/url（GCS 署名付き URL または内部 ID）
+  - ページ番号（PDF の場合）またはセクション識別子
+- **目的**: 参照元資料への即座の到達を可能にする
+- **UI 要件**: ユーザーがワンクリックで原典の該当箇所を開けるリンク
+
 ### Frontend固有の注意（MUST）
 - Frontend が直接呼ぶバックエンドは **Professor のみ**（OpenAPI）
-- **Professorが検索の物理実行と最終回答生成を担当**
-- **Librarianとの通信はProfessor側で完結**（Frontend は関与しない）
+- **Professor が検索の物理実行と最終回答生成を担当**
+- **Librarian との通信は Professor 側で完結**（Frontend は関与しない）
+  - Frontend → Professor のみ
+  - Professor ↔ Librarian は内部通信（gRPC、Frontend 関与不可）
 - 生成回答には必ず **Source を表示する**（クリック可能な path/url + ページ番号等）
 
 ### バックエンド詳細の参照先
