@@ -3,13 +3,13 @@ Title: Project Decisions
 Description: eduanimaRプロジェクトの技術決定事項とSSO設定のSSOT
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, project-decisions, authentication, api
 ---
 
 # Project Decisions（SSOT）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 このファイルは「プロジェクトごとに選択が必要」な決定事項の SSOT。
 AI/人間が推測で埋めないために、まずここを埋めてから実装する。
@@ -111,6 +111,53 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **Phase 1（ローカル開発）**: 認証スキップ（固定のdev-user使用）
 - **Phase 2以降**: SSO認証実装（Google / Meta / Microsoft / LINE）
 - **認可**: ユーザー別アクセス制限を厳格に実施（導線（拡張/WEB）に依存しない）
+
+### ユーザー登録の境界（Phase 2 MUST）
+- **新規登録**: Chrome拡張機能でのみ許可
+- **Web版の役割**: 既存ユーザーの再ログイン・閲覧専用
+- **未登録ユーザーのWeb版アクセス時**:
+  - SSO認証は通過するが、Professor APIが `user_not_found` を返却
+  - フロントエンドが拡張機能誘導画面を表示
+  - 誘導先（優先順位順）:
+    1. **Chrome Web Store**（公式配布）
+    2. **GitHub Releases**（手動インストール用）
+    3. **公式導入ガイド**（解説ブログ・ドキュメント）
+
+### 誘導画面の実装要件（Phase 2）
+| 項目 | 内容 |
+|------|------|
+| **ページパス** | `/auth/register-redirect` または `/onboarding/install-extension` |
+| **表示条件** | Professor API `POST /auth/login` が `AUTH_USER_NOT_REGISTERED` を返した場合 |
+| **UI要素** | タイトル、説明文、インストールボタン（Chrome Web Store）、補足リンク（GitHub、導入ガイド） |
+| **アクセス制限** | 未認証ユーザーはSSO認証を要求、認証後に表示 |
+| **デザイン** | MUI Pigment CSSでクリーンなオンボーディングUI |
+| **トラッキング** | 誘導画面の表示回数、各リンクのクリック数を記録（Professor経由） |
+
+### 拡張機能配布URL（Phase 2で確定）
+実装時に `src/shared/config/extension-urls.ts` で以下を管理:
+```typescript
+export const EXTENSION_URLS = {
+  chromeWebStore: 'https://chrome.google.com/webstore/detail/[extension-id]',
+  githubReleases: 'https://github.com/[org]/[repo]/releases',
+  officialGuide: '[公式導入ガイドURL]',
+} as const;
+```
+
+### Professor API仕様（Phase 2で実装）
+未登録ユーザーの応答例:
+```json
+{
+  "error": {
+    "code": "AUTH_USER_NOT_REGISTERED",
+    "message": "User is authenticated but not registered. Please install the Chrome extension to register.",
+    "extension_urls": {
+      "chrome_web_store": "https://chrome.google.com/webstore/detail/[extension-id]",
+      "github_releases": "https://github.com/[org]/[repo]/releases",
+      "official_guide": "[公式導入ガイドURL]"
+    }
+  }
+}
+```
 
 ### バックエンド境界
 - **Professor（Go）**: データの守護者、APIのSSOT（OpenAPI）、唯一DBに直接アクセス

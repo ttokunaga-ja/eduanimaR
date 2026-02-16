@@ -3,13 +3,13 @@ Title: Slices Map
 Description: eduanimaRのFSD機能一覧と配置マップ
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, fsd, architecture, slices
 ---
 
 # Slices Map (機能一覧と配置)
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 このドキュメントは「どの機能がどの slice に存在するか」を定義し、AI が勝手に新規 slice を乱立させないためのマップです。
 
@@ -126,7 +126,19 @@ Last-updated: 2026-02-15
 - **UI**: カレンダー、タスクリスト、進捗グラフ
 
 ### `auth` (認証フロー)
-- **責務**: SSO認証、ログイン/ログアウト（Phase 2以降）
+- **`auth`**: 認証・セッション管理・**拡張機能誘導**
+  - **責務**: SSO認証、セッション取得、ログアウト、未登録ユーザーの拡張機能誘導
+  - **依存**: `shared/api`（Professor `/auth/*` エンドポイント）
+  - **バックエンド境界**: Professor `auth` ドメイン
+  - **Phase 2追加機能**:
+    - 未登録ユーザーの検知（`AUTH_USER_NOT_REGISTERED`）
+    - 拡張機能誘導画面（`ExtensionInstallPrompt`）
+    - 誘導先URL管理（`shared/config/extension-urls`）
+  - **主要コンポーネント**:
+    - `features/auth/ui/LoginForm.tsx`
+    - `features/auth/ui/ExtensionInstallPrompt.tsx`（Phase 2追加）
+    - `features/auth/api/useLogin.ts`
+    - `app/auth/register-redirect/page.tsx`（Phase 2追加）
 - **Professor API**:
   - `POST /v1/auth/verify` - トークン検証
   - `POST /v1/auth/refresh` - トークン更新

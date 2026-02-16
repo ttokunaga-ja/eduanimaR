@@ -3,13 +3,13 @@ Title: Error Codes
 Description: eduanimaR共通エラーコード一覧とUI表示マッピング
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, error-codes, professor, api
 ---
 
 # Error Codes（エラーコード一覧）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 本ドキュメントは Professor（Go）の `ERROR_CODES.md` と同期します。
 
@@ -43,6 +43,37 @@ Last-updated: 2026-02-15
 | `4002` | `GCS_ERROR` | GCS エラー | 「ファイルの取得に失敗しました」 | 可 |
 | `4003` | `KAFKA_ERROR` | Kafka エラー | 「処理の開始に失敗しました。再試行してください」 | 可 |
 | `5001` | `INTERNAL_ERROR` | 内部エラー | 「予期しないエラーが発生しました。サポートに連絡してください」 | 可（最大3回） |
+
+---
+
+## 認証関連エラー（Phase 2）
+
+### AUTH_USER_NOT_REGISTERED
+- **発生条件**: SSO認証は成功したが、Professorにユーザーレコードが存在しない
+- **ステータスコード**: `403 Forbidden`
+- **UI挙動**: 拡張機能誘導画面（`/auth/register-redirect`）へ遷移
+- **表示メッセージ**: 「eduanimaRをご利用いただくには、Chrome拡張機能のインストールが必要です」
+- **アクション**: Chrome Web Store、GitHub、導入ガイドへのリンクを表示
+- **ProfessorレスポンスとFrontendの処理**:
+```json
+{
+  "error": {
+    "code": "AUTH_USER_NOT_REGISTERED",
+    "message": "User is authenticated but not registered. Please install the Chrome extension to register.",
+    "extension_urls": {
+      "chrome_web_store": "https://chrome.google.com/webstore/detail/[extension-id]",
+      "github_releases": "https://github.com/[org]/[repo]/releases",
+      "official_guide": "[公式導入ガイドURL]"
+    }
+  }
+}
+```
+
+### AUTH_EXTENSION_REQUIRED
+- **発生条件**: Web版で新規登録フォームへのアクセスを検知
+- **ステータスコード**: `403 Forbidden`
+- **UI挙動**: 同上
+- **表示メッセージ**: 「新規登録は拡張機能でのみ可能です」
 
 ---
 
