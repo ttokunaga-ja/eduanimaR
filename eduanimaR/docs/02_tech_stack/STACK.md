@@ -175,6 +175,11 @@ Node（公式 index.json、2026-02-11 に取得）：
 | **Professor** | データ所有者、DB/GCS/Kafka 直接アクセス、検索の物理実行、最終回答生成 | Go 1.25.7, Echo v5.0.1, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
 | **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
 
+### Professor ↔ Librarian 通信
+- **プロトコル**: HTTP/JSON
+- **エンドポイント**: `POST /v1/librarian/search-agent`
+- **Librarianの特性**: ステートレス推論サービス（会話履歴・キャッシュなし）
+
 ### 責務分担の明確化
 
 #### Professor（Go）の責務
@@ -193,7 +198,196 @@ Node（公式 index.json、2026-02-11 に取得）：
 #### Frontend（Next.js + FSD）の責務
 - **Professor の外部 API のみを呼ぶ**: OpenAPI 契約に基づく通信
 - **Librarian への直接通信は禁止**: すべて Professor 経由
-- **エビデンス表示**: 回答に含まれるソース情報を UI で適切に表示
+- **選定エビデンス表示**: 回答に含まれる選定エビデンス（Librarianが選定した根拠箇所）を UI で適切に表示
+- **会話履歴管理**: Librarianがステートレスのため、フロントエンドがクライアント側で会話履歴を保持
+
+---
+
+## バックエンドアーキテクチャとフロントエンドへの影響
+
+### Librarianのステートレス性
+
+#### Librarianの特性
+- **ステートレス推論サービス**: 会話履歴・キャッシュ等の永続化なし
+- **1リクエストで推論完結**: Librarian推論ループは1リクエスト内で完結
+- **中断・再開不可**: フロントエンドからの中断・再開は不可
+
+#### フロントエンドへの影響
+
+##### 1. 会話履歴の管理
+- **クライアント側で保持**: 会話履歴を`localStorage`またはTanStack Query永続化で管理
+- **APIリクエストに含める**: Professor APIリクエストに会話履歴を含める必要がある場合、フロントエンドが管理
+- **データ構造例**:
+```typescript
+interface ConversationHistory {
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    request_id?: string;
+  }>;
+  subject_id: string;
+}
+```
+
+##### 2. Librarian推論ループの扱い
+- **ノンストップ実行**: 推論ループは開始後、完了まで中断できない
+- **進行状況のみ表示**: `search_loop_progress`イベントでUI更新
+- **タイムアウト処理**: 推論時間上限超過時は`LIBRARIAN_TIMEOUT`エラーで通知
+
+##### 3. キャッシュ戦略
+- **結果キャッシュ**: TanStack Queryで推論結果をキャッシュ
+- **同一質問の再検索**: キャッシュから即座に表示（ユーザー体験向上）
+
+---
+
+## Professor SSEとの統合
+
+### SSEでのリアルタイム配信
+Professor SSEでは、以下のイベントをリアルタイム配信します：
+
+| イベントタイプ | 内容 | UI反映 |
+|:---|:---|:---|
+| `answer_chunk` | 回答断片 | リアルタイムにテキスト追加表示 |
+| `evidence_selected` | 選定エビデンス | エビデンスカードを表示 |
+| `search_loop_progress` | Librarian推論ループの中間状態 | プログレスバー更新 |
+| `error` | エラー通知 | エラートースト表示 |
+| `done` | 完了通知 | SSE接続を閉じる |
+
+### 設計パターン: Librarian推論ループの中間状態をUIに反映
+
+#### `search_loop_progress`イベントの処理
+```typescript
+eventSource.addEventListener('search_loop_progress', (event) => {
+  const data = JSON.parse(event.data);
+  
+  // プログレスバーを更新
+  updateProgressBar({
+    current: data.current_retry,
+    max: data.max_retries,
+    status: data.status, // SEARCHING / COMPLETED / ERROR
+  });
+  
+  // ステータスメッセージを表示
+  const statusMessage = {
+    SEARCHING: `検索中... (${data.current_retry}/${data.max_retries})`,
+    COMPLETED: '検索完了',
+    ERROR: 'エラーが発生しました',
+  }[data.status];
+  
+  updateStatusMessage(statusMessage);
+});
+```
+
+#### UIコンポーネント例
+```typescript
+// widgets/search-loop-status
+export function SearchLoopStatus({ current, max, status }: SearchLoopStatusProps) {
+  const progress = (current / max) * 100;
+  
+  return (
+    <Box>
+      <LinearProgress variant="determinate" value={progress} />
+      <Typography variant="caption">
+        {status === 'SEARCHING' && `検索中... (${current}/${max})`}
+        {status === 'COMPLETED' && '検索完了'}
+        {status === 'ERROR' && 'エラーが発生しました'}
+      </Typography>
+    </Box>
+  );
+}
+```
+
+---
+
+## TanStack Queryでの状態管理
+
+### Librarian推論結果のキャッシュ
+
+#### キャッシュキー設計
+```typescript
+// Librarian推論結果（選定エビデンス）をキャッシュ
+const queryKey = ['evidence', subjectId, query];
+
+export function useEvidence(subjectId: string, query: string) {
+  return useQuery({
+    queryKey: ['evidence', subjectId, query],
+    queryFn: async () => {
+      // Professor API経由でLibrarian推論結果を取得
+      const response = await api.searchWithEvidence({ subjectId, query });
+      return response.data.evidence;
+    },
+    staleTime: 5 * 60 * 1000, // 5分
+    gcTime: 10 * 60 * 1000, // 10分
+  });
+}
+```
+
+#### 同一質問の再検索時の処理
+```typescript
+// キャッシュがある場合、即座に表示
+export function SearchResults({ subjectId, query }: SearchResultsProps) {
+  const { data: evidence, isLoading, isError } = useEvidence(subjectId, query);
+  
+  if (isLoading) {
+    return <SearchLoopStatus status="SEARCHING" />;
+  }
+  
+  if (isError) {
+    return <ErrorMessage />;
+  }
+  
+  // キャッシュから即座に表示
+  return <EvidenceList evidence={evidence} />;
+}
+```
+
+#### キャッシュの無効化
+```typescript
+// 新しい質問の場合、キャッシュを無効化
+const queryClient = useQueryClient();
+
+function handleNewQuestion(newQuery: string) {
+  // 前回の質問のキャッシュを無効化
+  queryClient.invalidateQueries({ queryKey: ['evidence', subjectId] });
+  
+  // 新しい質問を送信
+  searchWithEvidence(newQuery);
+}
+```
+
+### SSEとTanStack Queryの統合
+
+#### SSEイベントをTanStack Query状態に反映
+```typescript
+export function useSearchStream(subjectId: string, query: string) {
+  const queryClient = useQueryClient();
+  
+  return useQuery({
+    queryKey: ['search', 'stream', subjectId, query],
+    queryFn: async () => {
+      const eventSource = new EventSource(`/v1/search/stream?query=${query}&subject_id=${subjectId}`);
+      
+      eventSource.addEventListener('evidence_selected', (event) => {
+        const data = JSON.parse(event.data);
+        
+        // TanStack Queryキャッシュに反映
+        queryClient.setQueryData(['evidence', subjectId, query], (old: Evidence[]) => [
+          ...(old || []),
+          data.evidence,
+        ]);
+      });
+      
+      return new Promise((resolve) => {
+        eventSource.addEventListener('done', () => {
+          eventSource.close();
+          resolve(true);
+        });
+      });
+    },
+  });
+}
+```
 
 ```mermaid
 graph TD
