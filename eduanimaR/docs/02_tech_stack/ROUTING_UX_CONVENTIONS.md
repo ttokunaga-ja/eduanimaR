@@ -17,6 +17,16 @@
 - UIの文言は翻訳キーとして管理し、表示内容は各言語の JSON から読み出すこと（not-found や error の表示文言もハードコーディングしない）。文字列を条件分岐に使うことは避ける（詳細：`../03_integration/I18N_LOCALE.md`）
 - `global-error.tsx` は最後の砦（最小）
 
+### トーン&マナーの反映（Must）
+
+ルーティング/ページ遷移のUI文言にブランドガイドラインを反映する:
+- 落ち着いて、正確で、学習者に敬意のある表現
+- 失敗時は「次に何をすればよいか」を明示
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`
+- `../../eduanimaRHandbook/03_customer/CUSTOMER_JOURNEY.md`
+
 ---
 
 ## 1) loading.tsx（Must）

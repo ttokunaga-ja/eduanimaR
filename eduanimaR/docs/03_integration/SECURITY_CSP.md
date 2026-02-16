@@ -54,6 +54,39 @@
 
 注意：`X-Frame-Options` は legacy のため、基本は CSP の `frame-ancestors` を優先。
 
+### Librarian呼び出し禁止の明記（CSPレベル）
+
+**CSPヘッダーでLibrarianへの直接通信をブロック**:
+
+```typescript
+// proxy.ts または next.config でのCSP設定例
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+  `style-src 'self' 'nonce-${nonce}'`,
+  "connect-src 'self' https://professor.example.com", // Professorのみ許可
+  // Librarianへの直接通信は許可しない
+  "img-src 'self' blob: data:",
+  "font-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  'upgrade-insecure-requests',
+].join('; ')
+```
+
+**許可されるAPI**:
+- Professor API: `https://professor.example.com` (本番環境)
+- Professor API: `http://localhost:8080` (ローカル開発)
+
+**Chrome拡張機能の特殊対応**:
+- `manifest.json` の `content_security_policy` との整合性を保つ
+- 拡張機能からのProfessor API通信も同様の制約を適用
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/02_tech_stack/TS_GUIDE.md` (Librarian呼び出し禁止)
+
 ---
 
 ## 実装場所（推奨）

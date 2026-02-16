@@ -164,6 +164,39 @@ eventSource.addEventListener('error', (event) => {
 
 ---
 
+## Professor ERROR_CODESとの同期（SSOT）
+
+### 同期の原則
+
+フロントエンドのエラーコードは、Professor（Go）の `ERROR_CODES.md` を**SSOT（Single Source of Truth）**として参照します。
+
+- **バックエンド（Professor）**: エラーコードの定義元
+- **フロントエンド**: Professorの定義を参照し、UI表示メッセージを追加
+
+### 標準エラーコード（Professor由来）
+
+| カテゴリ | コード範囲 | 説明 |
+|:---|:---|:---|
+| 認証・認可 | 1xxx | 認証失敗、トークン無効、権限不足 |
+| リクエスト | 2xxx | バリデーション、必須パラメータ不足 |
+| リソース不在 | 3xxx | 科目・ファイルが存在しない |
+| 外部サービス | 4xxx | Gemini API、GCS、Kafka |
+| 内部エラー | 5xxx | 予期しないエラー |
+
+### ユーザー向けメッセージ（トーン&マナーに沿った表現）
+
+エラーメッセージは、ブランドガイドラインのトーン&マナーに沿って作成:
+- 落ち着いて、正確で、学習者に敬意のある表現
+- 次に何をすべきかを明示
+- 技術用語を避け、分かりやすい言葉で説明
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`
+- `../../eduanimaR_Professor/docs/03_integration/ERROR_HANDLING.md`
+- `../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`
+
+---
+
 ## エラーコードの追加・更新手順
 
 1. **Professor（Go）で追加**:

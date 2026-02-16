@@ -1,5 +1,7 @@
 # Test Strategy
 
+Last-updated: 2026-02-16
+
 このドキュメントは、テスト範囲と責務を固定し、AI が過剰な E2E や不適切な層にテストを書かないようにするためのガイドです。
 
 ## 採用ツール（固定）
@@ -71,6 +73,30 @@ Integration を書く基準：
 - テストというより **CI の検査** として、以下のいずれかを導入する（プロジェクトで選択）：
 	- `npm run api:generate` を実行し、生成物に差分が出ないことを確認（diff チェック）
 	- OpenAPI を固定（リポジトリに同梱）し、生成を再現可能にする
+
+## 契約テスト(Contract Testing)の追加（Must）
+
+### CI/CDでの契約テスト必須化
+
+契約駆動開発を徹底するため、CI/CDで契約テストを必須化:
+
+- **契約コードのチェック**: CI/CDで `contract-codegen-check` ジョブを必須化
+- **OpenAPI契約の変更検出**: 再生成差分の検出
+- **Breaking Changesの明示的な検出**: 既存エンドポイント・型の変更を検出
+
+### テストピラミッド（推奨）
+
+テストの重点化の順序:
+
+1. **Unit**: 純粋関数・ロジック（最多）
+2. **Integration**: API統合・状態管理
+3. **Contract**: OpenAPI契約の整合性
+4. **E2E**: 主要導線のみ（最少）
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/05_operations/CI_CD.md` (標準ジョブ名)
+- `../../eduanimaR_Librarian/docs/05_operations/CI_CD.md` (契約テストの方針)
+
 
 ---
 

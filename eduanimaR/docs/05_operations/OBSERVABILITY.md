@@ -1,5 +1,7 @@
 # Observability（ログ/エラー/計測）
 
+Last-updated: 2026-02-16
+
 このドキュメントは、運用フェーズでの「見えない」をなくすために、
 ログ・エラー・パフォーマンス計測の最小契約を固定します。
 
@@ -54,6 +56,39 @@
 
 - Authorization ヘッダー、Cookie、セッショントークン、API key はログに出さない
 - エラー出力に request body を丸ごと含めない（必要ならフィールド単位で許可リスト）
+
+## OpenTelemetryとの統合（推奨）
+
+### trace/log correlationを前提とした設計
+
+- **request_id/trace_idでログ相関**: フロントエンド → Professor → Librarianの全ログにrequest_id/trace_idを含める
+- **分散トレーシング**: OpenTelemetryを使用して、リクエストの全体像を追跡
+
+### Professor APIとのトレース連携
+
+フロントエンド → Professor → Librarianのトレースを一貫して追跡:
+
+```typescript
+// トレースID伝搬の例
+const response = await fetch('/api/professor/qa/ask', {
+  headers: {
+    'X-Request-ID': requestId,
+    'traceparent': traceParent, // W3C Trace Context
+  },
+})
+```
+
+### SLO/アラート（運用基準の適用）
+
+バックエンドと同様の運用基準を適用:
+
+- **Core Web Vitals**: LCP/INP/CLS の目標値設定
+- **エラー率**: 5xx エラー率の監視
+- **レイテンシ**: P95/P99 レイテンシの監視
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/05_operations/OBSERVABILITY.md`
+- `../../eduanimaR_Librarian/docs/02_tech_stack/STACK.md` (Observability)
 
 ---
 

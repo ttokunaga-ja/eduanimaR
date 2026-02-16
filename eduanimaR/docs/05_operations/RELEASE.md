@@ -48,6 +48,36 @@ Last-updated: 2026-02-15
   - もしくは “戻せない” ことの合意
 を必ず行う
 
+## Phase 1-4のスコープ明記（Must）
+
+### Phase別のリリーススコープ
+
+- **Phase 1**: ローカル開発（認証スキップ）
+  - 基本的なQ&A機能、資料管理
+  - Professorとの基本連携
+  
+- **Phase 2**: SSO認証実装、Web版・拡張機能同時リリース
+  - Google/Meta/Microsoft/LINE認証
+  - 本番環境デプロイ
+  
+- **Phase 3-4**: 段階的な機能追加
+  - Librarian推論ループ連携、高度な検索（Phase 3）
+  - 学習計画、進捗管理（Phase 4）
+  - **注意**: グループ共有は含まない
+
+### リリース可否の判断基準（Must）
+
+以下の基準をすべて満たすことをリリース条件とする:
+
+- **SLO基準**: Core Web Vitals、エラー率、レイテンシが目標値内
+- **契約テスト**: `contract-codegen-check` が成功
+- **セキュリティスキャン**: 依存関係の脆弱性なし、シークレット漏洩なし
+- **E2Eテスト**: 主要導線が正常動作
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/04_product/ROADMAP.md`
+- `../../eduanimaR_Professor/docs/05_operations/RELEASE_DEPLOY.md`
+
 ---
 
 ## 本番環境での禁止事項（Must）
