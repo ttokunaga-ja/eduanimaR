@@ -7,6 +7,61 @@
 
 ---
 
+## eduanimaR固有の責務境界（Must）
+
+### フロントエンド ↔ バックエンドの責務分離
+
+eduanimaRでは、以下の3層構成でシステムを構成します：
+
+- **Frontend（Next.js + FSD）**: 
+  - **責務**: 質問受付 + SSE受信 + エビデンス表示のみ
+  - **禁止事項**: 検索戦略判断、Librarian直接通信、エビデンス選定ロジック
+  
+- **Professor（Go）**: 
+  - **責務**: 認証・DB/GCS管理・検索戦略決定・最終回答生成
+  - **権限**: PostgreSQL（pgvector含む）、GCS、Kafka への唯一の直接アクセス権限
+  
+- **Librarian（Python）**: 
+  - **責務**: 検索クエリ生成・推論ループ制御（ステートレス）
+  - **制約**: DB/GCS直接アクセス禁止（すべてProfessor経由）
+
+### フロントエンドが実装してはならないこと（禁止事項）
+
+以下はバックエンドの責務であり、フロントエンドで実装してはなりません：
+
+- ❌ **検索戦略の判断ロジック**（Professor Phase 2の責務）
+  - 「検索すべきか」「ヒアリングすべきか」の判断
+  - 検索戦略（広範囲/精密/根拠探索）の決定
+  
+- ❌ **LibrarianとのgRPC通信**（Professorが仲介）
+  - Librarianへのクエリリクエスト送信
+  - Librarianからの検索結果受信
+  
+- ❌ **エビデンス選定ロジック**（Librarian Phase 3の責務）
+  - `keyword_list` / `semantic_query` の生成
+  - `evidence_snippets` の抽出・評価
+  
+- ❌ **ファイルアップロードUI**（Phase 1/2は拡張機能の自動アップロードのみ）
+  - Phase 1: API直接呼び出し（curl/Postman） + 拡張機能実装
+  - Phase 2: 拡張機能の自動アップロードのみ（Web版にUIを実装してはならない）
+
+### フロントエンドが実装すべきこと（Must）
+
+- ✅ **質問の受付と送信**: ユーザー入力を Professor API (`POST /v1/qa/ask`) へ送信
+- ✅ **SSE受信と状態表示**: `thinking` / `searching` / `evidence` / `answer` イベントをリアルタイム表示
+- ✅ **エビデンスの表示**: 
+  - 根拠（資料名・ページ・抜粋）を主役に配置
+  - クリッカブルなGCS署名付きURL + ページ番号
+  - `why_relevant`（なぜこの箇所が選ばれたか）を明示
+- ✅ **Chrome拡張機能の自動アップロード**: LMS資料の自動検知・アップロード（Phase 1で実装、Phase 2で本番適用）
+
+**参照**: 
+- [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+- [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+- [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+
+---
+
 ## 1) 依存ルール（最重要）
 
 ### 1.1 レイヤー依存（単方向）

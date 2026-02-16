@@ -24,12 +24,30 @@ Last-updated: 2026-02-16
 
 | Slice | 責務 | 主要エクスポート | 備考 |
 |-------|------|--------------|------|
-| `qa-chat` | **汎用質問対応**（資料収集、質問明確化、小テスト解説すべて含む） | `QAChatPanel`, `useQAStream` | すべてのユースケースを単一UIで実現 |
+| `qa-chat` | **汎用質問対応**（すべてのユースケースを単一UIで実現） | `QAChatPanel`, `useQAStream` | SSEイベント（thinking/searching/evidence/answer）を受信して状態を更新。以下すべてに対応:<br>- 資料収集依頼<br>- 質問内容の明確化<br>- 小テスト解説<br>- 明確な質問への直接回答<br><br>**重要**: 個別のFeature（`search-materials`、`clarify-question`など）は作らない。すべて`qa-chat`の責務。 |
 | `auth-sso` | SSO認証（Google/Meta/Microsoft/LINE） | `SSOLoginButton` | Phase 2 |
 
-**重要**: 
-- 「資料検索機能」「質問精緻化機能」といった個別Featureは作らない。すべて`qa-chat`の責務。
-- `qa-chat`は、SSEイベント（thinking/searching/evidence/answer）を受信してUI状態を更新する単一コンポーネント。
+---
+
+### `qa-chat` のユースケース例（すべて単一UIで実現）
+
+以下のユースケースは、すべて `features/qa-chat` の単一UIで実現されます：
+
+| ユースケース | Professor Phase 2の判断 | フロントエンドのUI動作 |
+|------------|----------------------|-------------------|
+| **資料収集依頼**<br>「統計学の資料を集めて」 | 収集戦略決定 | SSEで `searching` イベント受信 → 資料一覧をエビデンスとして表示 |
+| **曖昧な質問**<br>「決定係数って何？」 | ヒアリング優先 | SSEで `thinking` イベント受信 → Phase 4-Aで意図候補3つ表示 → ユーザー選択 |
+| **小テスト解説**<br>「問題3の答えが間違ってた」 | 解答根拠検索 | SSEで `searching` → `evidence` イベント受信 → 正答の根拠資料を表示 |
+| **明確な質問**<br>「決定係数の計算式は？」 | 検索実行 | SSEで `searching` → `evidence` → `answer` イベント受信 → 直接回答 + エビデンス表示 |
+
+**重要な設計原則**:
+- ❌ **禁止**: 「資料検索機能」「質問精緻化機能」といった個別Featureを作る
+- ✅ **正解**: すべて`qa-chat`の単一UIで実現し、SSEイベントに応じて表示を切り替える
+- **理由**: バックエンド（Professor Phase 2）が戦略を判断するため、フロントエンドは「質問を投げてSSEで受け取る」だけでよい
+
+**参照**: 
+- [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)（Phase 2の検索 vs ヒアリング判断）
+- [`../README.md`](../README.md)（AI Agent質問システムの柔軟性）
 
 ---
 

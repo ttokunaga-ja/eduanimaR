@@ -81,6 +81,119 @@ interface EvidenceCardProps {
 
 ---
 
+## eduanimaR固有のUI設計原則（Must）
+
+### 情報階層の厳守（Evidence-forward）
+
+すべてのQA回答UIは、以下の順序で情報を配置する:
+
+#### 1. 根拠（Evidence）- 主役
+
+**必須要素**:
+- 資料名、ページ番号、セクション名
+- クリッカブルなGCS署名付きURL
+- `why_relevant`（なぜこの箇所が選ばれたか）
+- 抜粋は引用として視覚的に区別（`blockquote`など）
+
+**視覚的優先度**: 最も目立つ位置・スタイルで配置
+
+#### 2. 要点（Key Points）- 次点
+
+**必須要素**:
+- 箇条書き形式で学習者が理解すべきポイントを提示
+- 断定より根拠・前提を示す表現
+
+**視覚的優先度**: 根拠の次に配置、読みやすいタイポグラフィ
+
+#### 3. 次の一歩（Next Action）- 行動
+
+**必須要素**:
+- 復習すべき箇所、関連トピック、関連資料の探索
+- 複雑さを増やさず短く提示
+
+**視覚的優先度**: 最後に配置、アクションを促す控えめなスタイル
+
+---
+
+### UI実装の悪い例・良い例
+
+#### ❌ 悪い例（情報階層が逆転）
+
+```tsx
+<Card>
+  <Typography variant="h6">決定係数の説明</Typography>
+  <Typography>決定係数は回帰分析の説明力を示す指標です。</Typography>
+  <Typography variant="caption">参考: 統計学テキスト p.45</Typography>
+</Card>
+```
+
+**問題点**:
+- 根拠（資料名・ページ・抜粋）が主役になっていない
+- `why_relevant` が欠落
+- クリッカブルなリンクがない
+
+#### ✅ 良い例（情報階層を厳守）
+
+```tsx
+<Card>
+  <Box sx={{ mb: 2 }}>
+    <Typography variant="subtitle2" fontWeight="bold">
+      📚 根拠資料
+    </Typography>
+    <Link href={evidenceUrl} target="_blank" sx={{ fontSize: '1.1rem' }}>
+      統計学テキスト（p.45）
+    </Link>
+    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+      なぜこの資料か: 決定係数の定義と計算式が明示されています
+    </Typography>
+    <blockquote style={{ borderLeft: '3px solid #ccc', paddingLeft: '1rem' }}>
+      決定係数（R²）は、回帰モデルの説明力を0〜1の範囲で示す指標です。
+    </blockquote>
+  </Box>
+  
+  <Box sx={{ mb: 2 }}>
+    <Typography variant="subtitle2" fontWeight="bold">
+      📝 要点
+    </Typography>
+    <ul>
+      <li>決定係数は回帰分析の説明力を示す</li>
+      <li>0〜1の範囲で、1に近いほど説明力が高い</li>
+    </ul>
+  </Box>
+  
+  <Box>
+    <Typography variant="subtitle2" fontWeight="bold">
+      🔍 次の一歩
+    </Typography>
+    <Typography variant="body2">
+      関連トピック: 相関係数、回帰分析の前提
+    </Typography>
+  </Box>
+</Card>
+```
+
+**正しい点**:
+- 根拠が最も目立つ位置・スタイルで配置
+- クリッカブルなリンク（GCS署名付きURL）
+- `why_relevant` の明示
+- 抜粋が引用として視覚的に区別されている
+
+---
+
+### トーン&マナー（UI表現の原則）
+
+すべてのUI文言は、以下の原則に基づき設計する:
+
+1. **落ち着いて正確**: パニックを煽らない、事実ベースで伝える
+2. **敬意のある表現**: 学習者に対して丁寧で前向きな言葉遣い
+3. **次の行動を示す**: 「エラーです」で終わらず、解決策を提示
+
+**参照**: 
+- [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)（情報階層）
+- [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)（トーン&マナー）
+
+---
+
 ## 結論（Must）
 
 - “画面合成” は `pages` / `widgets` が責務（features/entities を寄せ集める）

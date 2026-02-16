@@ -14,6 +14,94 @@ Last-updated: 2026-02-16
 
 サービス全体のコンセプトを理解してからフロントエンド実装に入ることで、設計判断の背景が明確になります。
 
+---
+
+## Phase別の実装制約（SSOT）
+
+eduanimaRは段階的リリースを前提とし、Phase 1〜4で機能を積み上げます。各Phaseで「実装すべきこと」「実装してはならないこと」を明確にします。
+
+詳細は [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md) を参照してください。
+
+---
+
+### Phase 1（ローカル開発 + Librarian統合）
+
+**目的**: ローカル環境でのLibrarian推論ループの動作確認
+
+#### ✅ 実装すべきこと
+
+1. **基本的なQA UI**（`features/qa-chat`）
+   - ユーザー入力欄（テキスト）
+   - SSE受信ロジック（thinking/searching/evidence/answer）
+   - エビデンス表示（資料名・ページ・抜粋・クリッカブルURL）
+   
+2. **Chrome拡張機能の自動アップロード**
+   - LMS資料の自動検知
+   - Professor API (`POST /v1/files/upload`) への自動送信
+   - アップロード状態の表示
+   
+3. **開発環境での動作確認**
+   - Web版: curlやPostmanでAPIテスト + SSE動作確認
+   - 拡張機能: Chromeにローカル読み込みで動作確認
+
+#### ❌ 実装してはならないこと
+
+1. **ファイルアップロードUI**
+   - Web版にファイル選択・アップロードUIを実装してはならない
+   - API直接呼び出し（curl/Postman）で代替する
+   
+2. **ユーザー登録UI**
+   - Phase 2のSSO実装後に対応
+   
+3. **本番環境へのデプロイ**
+   - Phase 1は開発環境のみ
+
+---
+
+### Phase 2（本番環境・同時リリース）
+
+**目的**: Chrome拡張機能とWebアプリを同時に本番リリース
+
+#### ✅ 追加すべきこと
+
+1. **SSO認証**（Google/Meta/Microsoft/LINE）
+   - `features/auth-sso` の実装
+   - Professor API (`POST /v1/auth/login`) との統合
+   
+2. **Chrome Web Store公開**
+   - 非公開配布（限定公開）
+   - 拡張機能でのユーザー登録フロー
+   
+3. **Web版からの未登録ユーザー誘導UI**
+   - SSO認証後、`AUTH_USER_NOT_REGISTERED` を受信した場合
+   - 拡張機能ダウンロードページへ誘導
+   
+4. **Librarian連携の本番適用**
+   - Phase 1で実装済みの推論ループを本番環境で稼働
+
+#### ❌ 実装してはならないこと
+
+1. **Web版からの新規登録UI**
+   - 新規登録は拡張機能でのみ可能
+   - Web版は「既存ユーザーのログイン専用」
+   
+2. **拡張機能以外のアップロードUI**
+   - Web版にファイルアップロードUIを実装してはならない
+   - Phase 2でも拡張機能の自動アップロードのみ
+
+---
+
+### Phase 3以降（将来）
+
+**予定機能**:
+- 学習ロードマップ生成（Learning Support）
+- 小テストHTML解析（Feedback Loop）
+- コンテキスト自動認識サポート（Seamless Experience）
+
+詳細は [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md) を参照。
+
+---
+
 ## 0) 前提
 
 - **Node.js**: LTS 推奨（v20以上、最新は v24.13.1）

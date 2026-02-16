@@ -197,6 +197,100 @@ eventSource.addEventListener('error', (event) => {
 
 ---
 
+## UI表現のトーン&マナー（Handbook準拠）
+
+エラーメッセージは、以下の原則に基づき設計する:
+
+### 原則（SSOT: Handbook `BRAND_GUIDELINES.md`）
+
+1. **落ち着いて正確**: パニックを煽らない、事実ベースで伝える
+2. **敬意のある表現**: 学習者に対して丁寧で前向きな言葉遣い
+3. **次の行動を示す**: 「エラーです」で終わらず、解決策を提示
+
+**参照**: [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)
+
+---
+
+### エラーメッセージの悪い例・良い例
+
+| code | ❌ 悪い例（技術的・冷たい） | ✅ 良い例（敬意・解決策提示） |
+|------|------------------------|---------------------------|
+| `INSUFFICIENT_EVIDENCE` | 資料が不足しています | 質問に答えるための資料が見つかりませんでした。**質問を具体化する**（例: 「統計学の決定係数の計算式」）か、**関連資料を追加**してください。 |
+| `AUTH_USER_NOT_REGISTERED` | ユーザーが存在しません | eduanimaRをご利用いただくには、**Chrome拡張機能のインストール**が必要です。<br>👉 [拡張機能をインストール](Chrome Web Store URL) |
+| `RATE_LIMITED` | リクエストが多すぎます | 短時間に多くのリクエストが送信されました。**{wait_seconds}秒後に再試行**してください。 |
+| `VALIDATION_FAILED` | 入力が不正です | 入力内容に誤りがあります。以下をご確認ください:<br>- {field_name}: {error_detail} |
+| `UPSTREAM_TIMEOUT` | タイムアウトしました | 処理に時間がかかっています。**再試行**するか、しばらく待ってから試してください。 |
+
+---
+
+### エラー表示UIのガイドライン
+
+#### 必須要素
+
+1. **エラーの原因**: 何が起きたかを明確に伝える
+2. **次の行動**: ユーザーが何をすべきかを具体的に示す
+3. **request_id**: トラブルシューティング用に表示（折りたたみ可）
+
+#### 良い例（UIコンポーネント）
+
+```tsx
+<Alert severity="warning">
+  <AlertTitle>質問に答えるための資料が見つかりませんでした</AlertTitle>
+  <Typography variant="body2" sx={{ mb: 1 }}>
+    検索を5回試行しましたが、十分なエビデンスを収集できませんでした。
+  </Typography>
+  <Typography variant="body2">
+    以下をお試しください:
+  </Typography>
+  <ul>
+    <li>質問をより具体的にする（例: 「統計学の決定係数の計算式」）</li>
+    <li>関連資料を追加する</li>
+    <li>科目を指定する</li>
+  </ul>
+  <Button variant="outlined" sx={{ mt: 1 }}>
+    再試行
+  </Button>
+  <Accordion sx={{ mt: 2 }}>
+    <AccordionSummary>トラブルシューティング情報</AccordionSummary>
+    <AccordionDetails>
+      <Typography variant="caption">
+        Request ID: {requestId}
+      </Typography>
+    </AccordionDetails>
+  </Accordion>
+</Alert>
+```
+
+---
+
+### eduanimaR固有のエラーメッセージ
+
+#### Librarian推論失敗時（`INSUFFICIENT_EVIDENCE`）
+
+**状況**: Librarianが停止条件を満たせず終了した場合（`event: error`、`reason: insufficient_evidence`）
+
+**UI表示**:
+```
+⚠️ 質問に答えるための資料が見つかりませんでした
+
+検索を5回試行しましたが、十分なエビデンスを収集できませんでした。
+
+以下をお試しください:
+• 質問をより具体的にする（例: 「統計学の決定係数の計算式」）
+• 関連資料を追加する
+• 科目を指定する
+
+[再試行] ボタン（ユーザー判断で再度質問）
+```
+
+**重要**: 
+- ❌ **自動リトライしない**（コスト・時間考慮）
+- ✅ **「再試行」ボタンを提供**（ユーザー判断）
+
+**参照**: [`../01_architecture/RESILIENCY.md`](../01_architecture/RESILIENCY.md)
+
+---
+
 ## エラーコードの追加・更新手順
 
 1. **Professor（Go）で追加**:
