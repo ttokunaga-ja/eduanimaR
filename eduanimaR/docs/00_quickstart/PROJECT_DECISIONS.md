@@ -155,6 +155,40 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
     - Professorの物理検索パラメータ（取得件数k等）とは独立して管理
   - ステートレス設計: 会話履歴・キャッシュなし（1リクエストで推論完結）
 
+### 検索パラメータの決定事項
+
+#### 動的k値設定
+**目的**: 母数N（全チャンク数）に応じて取得件数を調整し、探索範囲と精度のバランスを取る。
+
+**設定方針**:
+| 母数N | k（初回） | k（2回目） | k（3回目以降） |
+|:---:|:---:|:---:|:---:|
+| N < 1,000 | 5 | 10 | 15 |
+| 1,000 ≤ N < 100,000 | 10 | 20 | 30 |
+| N ≥ 100,000 | 20 | 40 | 50 |
+
+**実装場所**: Professor（Go）のSearch Tool内部
+**計算式**: `k = base_k(N) × retry_multiplier`
+
+**理由**: 
+- 小規模データセット（N < 1,000）: k=5で十分（ノイズ混入を防ぐ）
+- 大規模データセット（N ≥ 100,000）: k=20で多様性を確保（類似チャンクの密集に対応）
+
+#### RRF（Reciprocal Rank Fusion）パラメータ
+- **k定数**: 60（業界標準値）
+- **統合式**: `Score = 1/(k + Rank_vector) + 1/(k + Rank_keyword)`
+- **理由**: BM25スコア（0〜無限大）とコサイン類似度（0〜1）の単位差を吸収
+
+#### ハイブリッド検索の適用条件
+- **キーワード検索のみ**: `keyword_list`のみ指定、`semantic_query`が空
+- **ベクトル検索のみ**: `semantic_query`のみ指定、`keyword_list`が空
+- **ハイブリッド検索**: 両方指定時、RRFで統合
+
+**フロントエンド影響**:
+- 検索結果の順序がRRFスコア順になる（API契約は変更なし）
+- SSEイベント`search_loop_progress`で`total_searched`を表示可能
+- プログレスバーに`current_retry / max_retries`を反映
+
 ### バックエンドサービス仕様への参照
 - Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
 - Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
