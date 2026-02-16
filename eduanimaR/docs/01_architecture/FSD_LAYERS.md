@@ -60,6 +60,62 @@ eduanimaRでは、以下の3層構成でシステムを構成します：
 - [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
 - [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
 
+### Chrome拡張機能の責務（Phase 1から実装）
+
+Chrome拡張機能は、以下の責務を持ちます：
+
+#### ✅ 実装すべきこと
+
+1. **UI統合（Content Script）**
+   - Moodle FABメニュー（PENアイコン）への「AI質問」アイテム追加
+   - FABメニュー検出: `document.querySelector('.float-button-menu')`
+   - メニューアイテム挿入: DOM操作でリスト項目追加
+
+2. **サイドパネル表示（Plasmo CSUI）**
+   - Plasmo CSUIでReactコンポーネントをマウント
+   - Shadow DOM隔離戦略でLMS CSSと衝突回避
+   - サイドパネルの開閉制御（transform: translateX）
+
+3. **状態永続化（sessionStorage）**
+   - パネル開閉状態の保存・復元
+   - 会話履歴の保存・復元
+   - ページ遷移後の状態維持
+
+4. **資料自動収集（MutationObserver）**
+   - LMS資料の自動検知（PDF、スライド等）
+   - Professor API (`POST /v1/materials/upload`) への自動送信
+   - アップロード状態のUI表示
+
+5. **認証管理（Phase 2）**
+   - SSO認証トークンの取得・保存（Chrome Storage API）
+   - トークン有効期限の管理
+   - 認証エラー時の再認証フロー
+
+#### ❌ 実装してはならないこと
+
+1. **Moodleの既存DOMを破壊的に変更**
+   - FABメニューの完全置き換え禁止
+   - 既存メニューアイテムの削除禁止
+   - Moodleのイベントハンドラを上書き禁止
+
+2. **検索戦略判断・エビデンス選定ロジック**
+   - これらはProfessor/Librarianの責務（バックエンド）
+   - フロントエンドは「質問を投げてSSEで受け取る」のみ
+
+3. **会話履歴の永続化（localStorage）**
+   - Phase 1はsessionStorageのみ使用
+   - 永続化はPhase 2以降（Professor側で管理）
+
+#### バックエンドとの責務境界
+
+- **Frontend（Chrome拡張）**: UI統合、SSE受信、エビデンス表示、状態永続化
+- **Professor（Go）**: 検索戦略決定、DB/GCS管理、最終回答生成
+- **Librarian（Python）**: 検索クエリ生成、推論ループ制御（ステートレス）
+
+**参照**: 
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144
+- [`../02_tech_stack/STACK.md`](../02_tech_stack/STACK.md)
+
 ---
 
 ## 1) 依存ルール（最重要）

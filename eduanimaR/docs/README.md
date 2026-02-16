@@ -27,6 +27,40 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 **参照**: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L37-39, L128-144
 
+### Chrome拡張機能のUI統合方式（Phase 1）
+
+**統合アプローチ**: MoodleのFABメニュー（PENアイコン）統合 + サイドパネル
+
+#### 起動方法
+1. Moodle画面右下のPENアイコン（FABメニュー）をクリック
+2. メニュー内の「AI質問」アイテムをクリック
+3. 画面右端からサイドパネルがスライドイン表示
+
+#### サイドパネル仕様
+- **配置**: 画面右端固定（position: fixed）
+- **幅**: 400px（デフォルト）、将来的にリサイズ可能
+- **高さ**: 画面全体（top: 0, bottom: 0）
+- **z-index**: 999999（最前面）
+- **開閉アニメーション**: transform: translateX(100%) ↔ translateX(0)、0.3秒（ease）
+
+#### 閉じる方法
+- サイドパネル左端の「>」ボタンをクリック（主要）
+- FABメニューから「AI質問」を再クリック（トグル動作）
+
+#### 状態永続化
+- **sessionStorage**で以下を保存
+  - パネル開閉状態（isOpen）
+  - パネル幅（width、将来のリサイズ対応）
+  - スクロール位置（scrollPosition）
+  - 会話履歴（conversationHistory）
+- ページ遷移後も状態を復元（通常遷移・SPAナビゲーション両対応）
+
+#### 利点
+- ✅ 画面遷移に耐える（sessionStorage永続化）
+- ✅ Moodleを見ながらチャット可能（サイドパネル方式）
+- ✅ シンプルなUI（Moodleの既存メニューに統合）
+- ✅ 独立ボタン不要（FABメニューをトリガーとして活用）
+
 ### Mission & North Star（詳細は Handbook 参照）
 - **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
 - **Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態を当たり前にする

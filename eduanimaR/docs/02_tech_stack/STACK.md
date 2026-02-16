@@ -279,6 +279,161 @@ Professor が実行するハイブリッド検索戦略:
 | **認証** | Phase 1: `dev-user`固定、Phase 2: SSO（OAuth/OIDC） | クライアントは信用しない（サーバー側で認可強制） |
 | **トークン保存** | Chrome Storage API（`chrome.storage.local`） | Service Workerの揮発性を考慮した永続化 |
 
+#### Chrome拡張機能のUI統合戦略（Phase 1確定方式）
+
+**統合アプローチ**: MoodleのFABメニュー（PENアイコン）統合 + サイドパネル
+
+##### 1. FABメニュー統合（トリガー）
+
+**目的**: Moodleの既存UIに自然に統合し、独立ボタンを配置しない
+
+**実装手順**:
+1. **FABメニュー検出**: Content ScriptでMoodleのFABメニュー（PENアイコン）を検出
+   ```typescript
+   const fabMenu = document.querySelector('.float-button-menu');
+   ```
+2. **メニューアイテム追加**: 「AI質問」アイテムをDOM操作で挿入
+   ```typescript
+   const menuItem = document.createElement('li');
+   menuItem.innerHTML = '<a href="#"><i class="icon fa fa-comments"></i> AI質問</a>';
+   menuItem.addEventListener('click', () => toggleSidePanel());
+   fabMenu.appendChild(menuItem);
+   ```
+3. **トグル動作**: FABメニューをクリックするたびにサイドパネルを開閉
+
+##### 2. サイドパネル表示（Plasmo CSUI）
+
+**目的**: 画面右端に固定パネルを表示し、Moodleコンテンツと並行して使用可能にする
+
+**実装例**:
+```typescript
+// apps/extension/contents/sidepanel.tsx (Plasmo CSUI)
+import { createRoot } from "react-dom/client"
+import { QAChatPanel } from "../components/QAChatPanel"
+
+export const getStyle = () => {
+  const style = document.createElement("style")
+  style.textContent = `
+    #eduanima-sidepanel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 400px;
+      height: 100vh;
+      z-index: 999999;
+      background: white;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    #eduanima-sidepanel.open {
+      transform: translateX(0);
+    }
+  `
+  return style
+}
+
+export const getShadowHostId = () => "eduanima-sidepanel"
+
+const SidePanel = () => {
+  return (
+    <QAChatPanel />
+  )
+}
+
+export default SidePanel
+```
+
+##### 3. 状態永続化（sessionStorage）
+
+**目的**: ページ遷移後も状態を維持
+
+**実装例**:
+```typescript
+// apps/extension/contents/state-manager.ts
+interface PanelState {
+  isOpen: boolean;
+  width: number;
+  scrollPosition: number;
+  conversationHistory: Message[];
+}
+
+export const savePanelState = (state: PanelState) => {
+  sessionStorage.setItem('eduanima-panel-state', JSON.stringify(state));
+}
+
+export const restorePanelState = (): PanelState | null => {
+  const saved = sessionStorage.getItem('eduanima-panel-state');
+  return saved ? JSON.parse(saved) : null;
+}
+
+// Content Script再実行時に状態復元
+window.addEventListener('load', () => {
+  const state = restorePanelState();
+  if (state?.isOpen) {
+    toggleSidePanel(); // パネルを開く
+  }
+});
+```
+
+##### 4. ページ遷移対応
+
+**課題**: Moodleのページ遷移（通常遷移・SPAナビゲーション）でContent Scriptが再実行される
+
+**対策**:
+
+1. **通常遷移（ページ全体リロード）**
+   - Content Script再実行 → sessionStorageから状態復元 → パネル再作成
+
+2. **SPAナビゲーション（Turbo等）**
+   - `turbo:load`イベントをリスナー登録 → 状態維持
+   ```typescript
+   document.addEventListener('turbo:load', () => {
+     const state = restorePanelState();
+     if (state?.isOpen) {
+       // パネルが既に存在するか確認 → 存在しなければ再作成
+       if (!document.getElementById('eduanima-sidepanel')) {
+         createSidePanel();
+       }
+     }
+   });
+   ```
+
+3. **DOM再構築（Ajax等）**
+   - MutationObserverでFABメニューの削除・再挿入を監視 → 「AI質問」アイテムを再挿入
+
+##### 5. 開閉方法
+
+| 操作 | 動作 |
+|------|------|
+| **開く** | FABメニュー → 「AI質問」クリック |
+| **閉じる（主要）** | サイドパネル左端の「>」ボタンをクリック |
+| **閉じる（トグル）** | FABメニュー → 「AI質問」再クリック |
+
+##### 6. Moodleレイアウトへの影響
+
+**パネル開時の調整**:
+```typescript
+// パネル開時: メインコンテンツの幅を自動調整
+document.body.style.marginRight = '400px';
+
+// パネル閉時: 元に戻す
+document.body.style.marginRight = '0';
+```
+
+##### 7. 利点
+
+- ✅ **画面遷移に耐える**: sessionStorageで状態を永続化
+- ✅ **Moodleを見ながらチャット可能**: サイドパネル方式でコンテンツ並行表示
+- ✅ **シンプルなUI**: Moodleの既存FABメニューに統合、独立ボタン不要
+- ✅ **トグル動作**: FABメニューで開閉を一元管理
+
+##### 8. Phase 1スコープ
+
+- ✅ **FABメニュー統合 + サイドパネル方式のみ**を実装
+- ❌ フォールバック（独立ボタン等）は実装しない
+- ❌ Popup/新規タブ方式は採用しない
+
 #### Shadow DOM隔離戦略
 
 **課題**: LMSサイトのCSSと拡張機能のCSSが衝突し、レイアウトが崩れる（`!important`地獄）
@@ -301,10 +456,7 @@ const shadowRoot = container.attachShadow({ mode: "open" })
 // Shadow Root内でReact描画
 const root = createRoot(shadowRoot)
 root.render(
-  <div>
-    <style>{/* MUI Pigment CSS をここに注入 */}</style>
-    <QAChatPanel />
-  </div>
+  <QAChatPanel />
 )
 ```
 
