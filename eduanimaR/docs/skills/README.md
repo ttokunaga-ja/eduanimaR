@@ -9,6 +9,16 @@
 注意：本リポジトリは 2026 年時点の運用を意図しますが、モデルの知識は固定です。
 そのため Skill は「最新仕様の丸暗記」ではなく、**変化に強い判断軸（境界/禁止/確認手順）** を中心に書きます。
 
+## 上流ドキュメントへの参照
+
+本フロントエンドドキュメントは、以下の上流ドキュメントと整合性を保ちます：
+
+- **Handbook（サービスコンセプト全体）**: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
+- **Professor Skills（バックエンド Go サービス）**: [`../../eduanimaR_Professor/docs/skills/README.md`](../../eduanimaR_Professor/docs/skills/README.md)
+- **Librarian Skills（バックエンド Python サービス）**: [`../../eduanimaR_Librarian/docs/skills/README.md`](../../eduanimaR_Librarian/docs/skills/README.md)
+
+フロントエンド開発時は、これらの上流ドキュメントを参照して、サービス全体の責務分担とコンセプトを理解してください。
+
 ---
 
 ## 最新版の確認（2026-02-11 時点）

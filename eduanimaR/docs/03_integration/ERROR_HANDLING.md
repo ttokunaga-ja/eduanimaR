@@ -137,7 +137,18 @@ apiClient.interceptors.response.use(
 
 ## SSE接続エラー処理
 
-### 指数バックオフ再接続
+### Professor の SSE ストリーミング中のエラーハンドリング
+
+#### SSE 切断時の再接続戦略
+
+**指数バックオフ再接続**:
+- 初回: 1秒後に再接続
+- 2回目: 2秒後に再接続
+- 3回目: 4秒後に再接続
+- 4回目: 8秒後に再接続
+- 5回目: 16秒後に再接続
+- 最大リトライ回数: 5回（設定可能）
+- リトライ上限到達時: ユーザーへエラー通知
 
 ```typescript
 function connectSSE(url: string, maxRetries = 5) {
@@ -166,6 +177,62 @@ function connectSSE(url: string, maxRetries = 5) {
   return connect();
 }
 ```
+
+#### ストリーミング中のエラーイベント処理
+
+**エラーイベントの種類**:
+- `error`: 一般的なエラー（リトライ可能）
+- `rate_limit`: レート制限超過（待機後リトライ）
+- `internal_error`: サーバー内部エラー（リトライ制限あり）
+- `timeout`: タイムアウト（再送信可能）
+
+**処理方針**:
+```typescript
+eventSource.addEventListener('error', (event) => {
+  const errorData = JSON.parse(event.data);
+  const errorCode = errorData.code;
+  
+  switch (errorCode) {
+    case 'RATE_LIMIT_EXCEEDED':
+      // レート制限: 待機時間を表示してリトライ
+      const retryAfter = errorData.retryAfter || 60;
+      showWarningToast(`レート制限に達しました。${retryAfter}秒後に再試行します。`);
+      setTimeout(() => reconnect(), retryAfter * 1000);
+      break;
+      
+    case 'INTERNAL_ERROR':
+      // 内部エラー: ユーザーに通知して終了
+      showErrorToast('サーバーエラーが発生しました。後ほど再試行してください。');
+      eventSource.close();
+      break;
+      
+    case 'TIMEOUT':
+      // タイムアウト: 自動リトライ
+      showWarningToast('タイムアウトしました。再接続中...');
+      reconnect();
+      break;
+      
+    default:
+      // その他のエラー: 詳細をログに記録してユーザーに通知
+      console.error('SSE Error:', errorData);
+      showErrorToast('エラーが発生しました');
+  }
+});
+```
+
+#### エラーコードと Handbook 品質原則の整合性
+
+Professor の OpenAPI エラーレスポンス形式とフロントエンドのエラーハンドリングは、Handbook で定義された品質原則に従います:
+- **追跡可能性**: すべてのエラーに `requestId` を含める
+- **説明可能性**: ユーザーが理解できるエラーメッセージ
+- **透明性**: エラーの原因と対処方法を明示
+
+**参照**:
+- Professor OpenAPI エラーレスポンス形式: [`../../eduanimaR_Professor/docs/openapi.yaml`](../../eduanimaR_Professor/docs/openapi.yaml)
+- エラーコード一覧: `ERROR_CODES.md`
+- Handbook 品質原則: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
+---
 
 ## エラー表示UI
 
