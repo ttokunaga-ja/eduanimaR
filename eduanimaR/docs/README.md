@@ -66,13 +66,29 @@ eduanimaRは以下の4大原則に基づき設計されています：
 **参照**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)、[`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
 
 #### Frontend（Next.js + FSD）の責務
-**役割**: UI/UX 提供、Professor API との統合
+**役割**: AI Agentとの単一インターフェース
 
-- **Professor API のみを呼ぶ**: HTTP/JSON + SSE でバックエンドと通信（OpenAPI/Orval 生成）
-- **Librarian への直接通信は禁止**: すべて Professor 経由
-- **SSE リアルタイム表示**: 推論状態（thinking/searching/evidence/answer）をユーザーに可視化
+- **質問を受け取る**: ユーザーの入力（自然言語テキスト、画像、将来的に音声）を Professor API へ送信
+- **推論状態を可視化**: SSEイベント（thinking/searching/evidence/answer）をリアルタイム表示
+- **根拠を提示**: Agent が選定した資料へのクリッカブルリンク（GCS署名付きURL + ページ番号）
 - **Chrome拡張機能**: LMS資料の自動検知・アップロード、ユーザー登録（Phase 2以降）
 - **Web版**: 既存ユーザーの閲覧専用（Phase 2以降、新規登録は拡張機能でのみ可能）
+
+**重要**: フロントエンドは Professor APIに質問を投げてSSEで受け取るだけ。バックエンド内部の Phase 2/3/4 は関知しない。
+
+#### システムの本質: 単一の汎用パイプライン
+
+eduanimaRは、**AI Agentによる質問対応**という単一のパイプラインですべてのユースケースに対応します。
+
+**ユースケース例（すべて同じパイプラインで実現）**:
+1. **資料収集の依頼**: 「統計学の資料を集めて」→ Agent が検索戦略で収集範囲を決定
+2. **曖昧な質問**: 「決定係数って何？」→ Agent が広範囲検索 → 複数候補を提示してヒアリング
+3. **小テスト解説**: 「問題3の答えが間違ってた」→ Agent が正答の根拠資料を収集して解説
+4. **明確な質問**: 「決定係数の計算式は？」→ Agent が直接回答 + 根拠提示
+
+**Agentが自律判断**:
+- 「資料収集優先」「ヒアリング優先」「直接回答」の判断は Agent（Librarian）が検索戦略立案時に実行
+- フロントエンドは特別な機能分岐を持たず、すべて同じ UI（`features/qa-chat`）で処理
 
 #### 通信プロトコル
 - **Frontend ↔ Professor**: HTTP/JSON（OpenAPI） + SSE（リアルタイム回答配信）

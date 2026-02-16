@@ -213,29 +213,45 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 ---
 
-## 重要な実装フロー（Phase 1）
+---
 
-### Reasoning Loop（検索・回答）
+## 重要な実装フロー: 汎用質問対応パイプライン
+
+### 単一フロー（すべてのユースケースで共通）
 1. **Frontend → Professor**: ユーザーが質問を送信（SSE接続開始）
-2. **Phase 2（Professor/大戦略）**: 
-   - Gemini 3 Flash で「タスク分割・停止条件・コンテキスト」を生成
-3. **Phase 3（Librarian/小戦略）**: 
-   - Professor が HTTP/JSON で Librarian を起動（gRPCではない）
-   - LangGraph でLibrarian推論ループ（最大5回）
-   - 各イテレーションで Professor に検索要求（HTTP/JSON）
-   - Professor が DB検索を実行し結果を返却
-   - Librarian が停止条件を判定
-4. **Phase 4（Professor/最終回答）**: 
-   - Librarian が選定したエビデンスに基づき、Professor が Gemini 3 Pro で最終回答を生成
-5. **Professor → Frontend**: SSE で回答・引用・進捗をストリーミング配信
+   - エンドポイント: `POST /v1/qa/ask` + SSE
+   - リクエスト例: `{"question": "決定係数とは？", "subject_id": "xxx-xxx-xxx"}`
+
+2. **Professor → Frontend**: SSEイベントで推論状態を配信
+   - `thinking` → `searching` → `evidence` → `answer` → `done`
+
+3. **Frontend**: イベントごとにUI更新
+   - `evidence`: 参照資料カード表示（クリッカブル）
+   - `answer`: Markdown形式で回答を逐次表示
+
+### ユースケースごとの振る舞い（Agent推論で自動判断）
+
+| ユースケース | ユーザー入力例 | Agentの判断（フロントエンド不可視） |
+|------------|-------------|--------------------------|
+| 資料収集依頼 | 「統計学の資料を集めて」 | 広範囲検索 → リスト提示 |
+| 曖昧な質問 | 「決定係数って何？」 | 複数候補検索 → ヒアリング |
+| 小テスト解説 | 「問題3が不正解だった」 | 正答の根拠資料を検索 → 解説 |
+| 明確な質問 | 「決定係数の計算式は？」 | 直接回答 + 根拠提示 |
+
+**重要**: フロントエンドの実装は1つ。どのユースケースも同じコンポーネント（`features/qa-chat`）で処理。
 
 ### SSEイベント種別
-- `thinking`: Phase 2実行中
-- `searching`: Librarian推論ループ実行中
-- `evidence`: 選定エビデンス選定完了
-- `answer`: 最終回答生成中（チャンク配信）
-- `done`: 完了
-- `error`: エラー発生（再試行可能）
+
+| イベント | 意味 | UI表示例 |
+|---------|------|---------|
+| `thinking` | Agentが戦略を立案中 | 「考えています...」 |
+| `searching` | 資料を検索中 | 「資料を探しています...」（プログレスバー） |
+| `evidence` | 根拠資料を選定完了 | 参照元カード表示（クリッカブル） |
+| `answer` | 回答生成中（チャンク配信） | Markdown形式で逐次表示 |
+| `done` | 完了 | 入力欄を再度有効化 |
+| `error` | エラー発生（再試行可能） | 再試行ボタン表示 |
+
+**注**: SSEイベントの背後で何が起きているか（Professor/Librarianの内部Phase）はフロントエンド関知せず。
 
 ---
 
