@@ -3,7 +3,7 @@
 ## 目的
 Frontend ↔ Professor（Go）の外向きAPIを **OpenAPI（SSOT）** で契約駆動にし、契約逸脱を防ぐ。
 
-補足: Professor ↔ Librarian（推論サービス）の内部通信は gRPC/Proto を SSOT とし、本ドキュメントでは外向き OpenAPI を主対象とする。
+補足: Professor ↔ Librarian（推論サービス）の内部通信は **gRPC/Proto（双方向ストリーミング）を SSOT** とし、本ドキュメントでは外向き OpenAPI を主対象とする。内部契約は `proto/librarian/v1/librarian.proto` および `PROTOBUF_GRPC_STANDARDS.md` を参照。
 
 ## 前提（確定）
 本プロジェクトの通信は以下を採用する:
@@ -16,6 +16,7 @@ Frontend ↔ Professor
 
 ## SSOT
 - 外向き（OpenAPI）: `docs/openapi.yaml`
+- 内向き（gRPC/Proto）: `proto/librarian/v1/librarian.proto`
 - エラー形式/コード: `ERROR_HANDLING.md` / `ERROR_CODES.md`
 
 ## 原則（MUST）

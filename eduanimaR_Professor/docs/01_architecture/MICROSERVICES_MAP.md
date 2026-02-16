@@ -11,7 +11,7 @@
 
 ## 契約（SSOT）
 - 外向き契約（Frontend ↔ Professor）: OpenAPI（`docs/openapi.yaml`）
-- 内向き契約（Professor ↔ Librarian）: gRPC/Proto（`proto/`）
+- 内向き契約（Professor ↔ Librarian）: gRPC/Proto（`proto/librarian/v1/librarian.proto`）双方向ストリーミング対応
 
 > 注: 現時点でファイルが未作成の場合でも、SSOT の置き場は上記に固定する。
 
@@ -57,8 +57,8 @@
 ## 依存関係（通信方向）
 - Frontend → Professor（HTTP/OpenAPI）
 - Frontend ← Professor（SSE: 進捗/引用/回答ストリーム）
-- Professor → Librarian（gRPC: 探索開始/評価ループ）
-- Librarian → Professor（gRPC応答: 検索要求/探索完了通知/資料ID候補）
+- Professor ↔ Librarian（**gRPC双方向ストリーミング**: 探索開始/評価ループ/検索要求/探索完了通知）
+  - 契約: `proto/librarian/v1/librarian.proto`
 - Professor → DB/GCS/Kafka（直接アクセス）
 
 ## 主要フロー
