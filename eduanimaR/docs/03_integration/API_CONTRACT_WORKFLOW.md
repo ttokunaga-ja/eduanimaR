@@ -34,6 +34,82 @@ Last-updated: 2026-02-16
 
 ---
 
+## Professor/Librarianとの通信パターン（Librarian推論ループ）
+
+### Librarian推論ループの概要
+
+Librarian は LangGraph による自律的な推論ループを実行し、最大5回の反復で検索戦略を立案・修正します：
+
+**フェーズ**:
+1. **Plan/Refine**: 検索戦略立案、クエリ生成（初回はPlan、2回目以降はRefine）
+2. **Search Tool**: Professor経由で検索実行（HTTP/JSON）
+3. **Evaluate**: 検索結果から選定エビデンス抽出、充足度評価
+4. **Route**: 停止条件判定（COMPLETE → 終了、CONTINUE → Planに戻る、ERROR → エラー）
+
+**停止条件**:
+- 十分なエビデンスが収集された（COMPLETE）
+- 最大試行回数（5回）に到達（MAX_RETRIES_REACHED）
+- エラー発生（ERROR）
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)、[`../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md)
+
+### SSEストリーミング要件（Librarian推論ループの進捗イベント）
+
+Professor SSEは、Librarian推論ループの進捗を以下のイベントでリアルタイム配信します：
+
+| イベントタイプ | 内容 | UI反映 |
+|:---|:---|:---|
+| `thinking` | Phase 2実行中（タスク分割・停止条件生成） | 「AI Agentが検索方針を決定しています」 |
+| `searching` | Librarian推論ループ実行中 | プログレスバー（例：「2/5回目の検索」） |
+| `evidence` | 選定エビデンス提示 | エビデンスカード表示 |
+| `answer` | 最終回答生成中 | リアルタイムテキスト追加 |
+| `done` | 完了 | SSE接続を閉じる |
+| `error` | エラー | エラートースト |
+
+**search_loop_progress イベントの詳細**:
+```json
+{
+  "type": "search_loop_progress",
+  "request_id": "req_abc123",
+  "node": "Plan",
+  "status": "SEARCHING",
+  "current_retry": 2,
+  "max_retries": 5,
+  "message": "検索クエリ生成中...",
+  "timestamp": "2026-02-16T12:34:58Z"
+}
+```
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+
+### エラーハンドリング（監査ログ・request_id伝播）
+
+**監査ログ要件**:
+- すべてのAPIリクエストに`request_id`を付与（`X-Request-ID`ヘッダー）
+- Professor → Librarian推論ループでも`request_id`を伝播
+- エラーレスポンスに`request_id`を含める
+- ログ横断検索で原因調査が可能
+
+**request_id伝播フロー**:
+1. Frontend → Professor: `X-Request-ID`ヘッダー
+2. Professor → Librarian: gRPC metadata で `request_id` 伝播
+3. Professor → Frontend: SSEイベント・エラーレスポンスに`request_id`を含める
+
+**エラーレスポンス例**:
+```json
+{
+  "error": {
+    "code": "LIBRARIAN_TIMEOUT",
+    "message": "Librarian推論ループがタイムアウトしました",
+    "request_id": "req_abc123"
+  }
+}
+```
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)、[`../../eduanimaR_Professor/docs/05_operations/OBSERVABILITY.md`](../../eduanimaR_Professor/docs/05_operations/OBSERVABILITY.md)
+
+---
+
 ## enum と UI文言の扱い（重要）
 
 ### 禁止事項（MUST NOT）

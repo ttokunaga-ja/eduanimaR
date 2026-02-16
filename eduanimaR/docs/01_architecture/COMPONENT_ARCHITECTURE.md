@@ -16,6 +16,71 @@ Last-updated: 2026-02-16
 
 ---
 
+## コンポーネント設計原則（情報階層とデザイン原則）
+
+### 情報階層（Handbookより）
+
+eduanimaRのUI設計は、以下の情報階層に基づきます：
+
+1. **主役：根拠（Evidence）**
+   - 資料名、ページ番号、セクション、抜粋
+   - クリッカブルなpath/url
+   - why_relevant（なぜこの箇所が選ばれたか）
+2. **次点：要点（Key Points）**
+   - 箇条書き形式
+   - 学習者が理解すべきポイント
+3. **行動：次の一歩（Next Action）**
+   - 復習すべき箇所
+   - 次に学ぶべき関連トピック
+   - 関連資料の探索
+
+**参照**: [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
+
+### UI/UX要件（デザイン4原則）
+
+eduanimaRのデザインは、以下の4原則に基づきます：
+
+1. **Calm & Academic**: 落ち着いた学術的な雰囲気
+   - 過度なアニメーションを避ける
+   - 学習に集中できる落ち着いた配色
+2. **Clarity First**: 可読性を装飾より優先
+   - 情報の階層を明確にする
+   - タイポグラフィの一貫性を保つ
+3. **Trust by Design**: 権限が曖昧にならない設計
+   - データの共有範囲を明示
+   - 誤って他者のデータが見えることがない
+4. **Evidence-forward**: ソースが主役
+   - 根拠となる資料を常に明示
+   - クリッカブルなリンクで原典にアクセス可能
+
+**参照**: [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)、[`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
+
+### エビデンス表示コンポーネント要件
+
+Professor OpenAPI契約に基づく必須要素：
+
+- **クリッカブルpath/url**: GCS署名付きURLまたは資料へのリンク
+- **ページ番号**: 該当箇所のページ番号（例：「p.3」）
+- **why_relevant**: なぜこの箇所が選ばれたかの説明文
+- **snippets**: 資料からの抜粋（Markdown形式）
+- **heading**: 該当セクションの見出し
+
+**実装例（参考）**:
+```typescript
+interface EvidenceCardProps {
+  documentId: string;
+  path: string; // クリッカブルURL
+  page: number;
+  heading: string;
+  snippets: string[];
+  whyRelevant: string;
+}
+```
+
+**参照**: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)、[`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+
+---
+
 ## 結論（Must）
 
 - “画面合成” は `pages` / `widgets` が責務（features/entities を寄せ集める）

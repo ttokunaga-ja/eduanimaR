@@ -18,18 +18,33 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 
 eduanimaRは、学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツールです。
 
+### ミッション・ビジョン・プロダクト原則
+
+**Mission**:
+学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
+
+**Vision**:
+必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態を当たり前にする
+
+**プロダクト4大原則**:
+1. **学習支援目的（Learning Support First）**: 学習者の発見・理解・計画を支援する（自動回答生成ではない）
+2. **データ最小化（Data Minimization）**: 必要最小限のデータのみ収集・保持する
+3. **厳格なアクセス制御（Strict Access Control）**: SSO基盤、ユーザー別データ分離、デフォルト非共有
+4. **透明性（Traceability & Explainability）**: すべての重要な操作をログ記録し、ユーザーが「なぜ」を理解できるようにする
+
 **North Star Metric（重要指標）**:
 - 資料から根拠箇所に到達するまでの時間短縮
 - 具体的には「質問から関連箇所（資料名 + ページ番号）へ到達する時間」を計測
 - ユーザーが「理解する時間」を最大化するための指標
 
-**参照元SSOT**:
-- [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
-- [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
-
 **学習支援特化の原則**:
 - 評価・試験での不正な優位を得る目的での利用は想定しない
 - 資料の「着眼点」を示し、原典への回帰を促す支援を提供
+
+**参照元SSOT**:
+- [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+- [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
+- [`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)
 
 ## 基本
 - **プロジェクト名**: eduanimaR
@@ -43,18 +58,72 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
   - Professor（Go）: 外向きAPI、DB/GCS/Kafka管理、最終回答生成
   - Librarian（Python）: LangGraphによる推論ループ、検索戦略立案
 
-## 提供形態（Phase 1-4）
+## 提供形態（Phase 1-4での制約）
 
 **Chrome拡張機能 + Webアプリ**の両方を提供しますが、Phase 1-4では以下の制約を明示します：
 
 - **個人利用のみ**: Phase 1-4では科目内グループ共有は対象外
 - **Chrome拡張機能**: LMS資料の自動収集、ユーザー登録、ファイルアップロード
-- **Webアプリ**: 既存ユーザーの閲覧・チャット専用（新規登録・ファイルアップロードは不可）
+- **Webアプリ**: 既存ユーザーの閲覧・チャット専用
+  - **新規登録不可**: Web版では新規ユーザー登録を受け付けない
+  - **ファイルアップロード制限**: Web版ではファイルアップロード機能を提供しない
+  - **Phase 1-4の一貫した制約**: ロードマップで明示された段階的提供を遵守
 - **導線統一**: どちらの導線でも同一のログイン体験（SSO/OAuth）と同一の権限境界を維持
+
+**Phase別の提供内容**:
+- **Phase 1（開発環境）**: 自動アップロード実装・検証、Q&A機能動作確認、Chrome拡張のLMS資料自動検知
+- **Phase 2（本番環境）**: SSO go-live、Chrome Web Store公開、Web版デプロイ、履修科目の自動同期
+- **Phase 3以降**: 学習計画生成、小テストHTML解析、コンテキスト自動認識
 
 **参照元SSOT**:
 - [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
 - [`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)
+
+### ペルソナ要約（主要ペルソナ：忙しい学部生）
+
+**Pain（ペイン・課題）**:
+- 複数科目を並行履修し、資料が散在
+- 「どこに何が書いてあったか」を探す時間が負担
+- 資料の重要箇所が分からず、探す時間が溶ける
+- 手動でのファイル収集・管理が面倒
+
+**Goals（目標）**:
+- 「何を勉強すべきか」を1分以内に特定したい
+- 資料の該当箇所（ページ番号）をすぐに見つけたい
+- 学習計画を自分で立てられるようになりたい
+
+**Success Metric（成功指標）**:
+- 質問から根拠箇所に1分以内に到達
+- 次の3-5項目が明確にリストされている
+- ファイル収集のオーバーヘッドがゼロ
+
+**参照**: [`../../eduanimaRHandbook/03_customer/PERSONAS.md`](../../eduanimaRHandbook/03_customer/PERSONAS.md)
+
+### ブランド原則（トーン&マナー）
+
+**Voice（不変の声）**:
+- 落ち着いて（Calm）、正確で（Accurate）、学習者に敬意がある（Respectful）
+- 結論より根拠を示す（Show rationale over conclusions）
+- 次の一歩を短く、複雑さを避ける（Keep next step short, avoid complexity）
+
+**Tone（文脈で変わるトーン）**:
+- **初回利用時**: 不安を軽減（何が安全で、何が安全でないか）
+- **検索結果表示時**: ソースを先頭に（資料名、セクション、重要ポイント）
+- **学習計画提示時**: 行動重視（今日やること、所要時間見積もり、優先順位）
+
+**UI Copy Rules（UI文言のルール）**:
+- 結論を先に、その後に根拠
+- 専門用語を最小化
+- 失敗時は次のステップを表示
+- 共有・削除の影響を明示
+
+**デザイン4原則**:
+1. **Calm & Academic**: 落ち着いた学術的な雰囲気
+2. **Clarity First**: 可読性を装飾より優先
+3. **Trust by Design**: 権限が曖昧にならない設計
+4. **Evidence-forward**: ソースが主役
+
+**参照**: [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)、[`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
 
 ## 認証（Must）
 
@@ -179,11 +248,25 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
   - 具体的には「質問から関連箇所（資料名 + ページ番号）へ到達する時間」を計測
   - ユーザーが「理解する時間」を最大化するための指標
 
-### ペルソナ要約
-- **主要ペルソナ**: 忙しい学部生
-  - 複数科目を並行履修し、資料が散在
-  - 「どこに何が書いてあったか」を探す時間が負担
-  - 資料の「着眼点」を示し、原典への回帰を促す支援が必要
+### ペルソナ要約（主要ペルソナ：忙しい学部生）
+
+**Pain（ペイン・課題）**:
+- 複数科目を並行履修し、資料が散在
+- 「どこに何が書いてあったか」を探す時間が負担
+- 資料の重要箇所が分からず、探す時間が溶ける
+- 手動でのファイル収集・管理が面倒
+
+**Goals（目標）**:
+- 「何を勉強すべきか」を1分以内に特定したい
+- 資料の該当箇所（ページ番号）をすぐに見つけたい
+- 学習計画を自分で立てられるようになりたい
+
+**Success Metric（成功指標）**:
+- 質問から根拠箇所に1分以内に到達
+- 次の3-5項目が明確にリストされている
+- ファイル収集のオーバーヘッドがゼロ
+
+**参照**: [`../../eduanimaRHandbook/03_customer/PERSONAS.md`](../../eduanimaRHandbook/03_customer/PERSONAS.md)
 
 ### Professor / Librarian の責務境界
 

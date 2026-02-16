@@ -7,6 +7,55 @@ Last-updated: 2026-02-16
 
 ---
 
+## 計測指標（North Star Metric & KPI）
+
+### 北極星指標（North Star Metric）
+
+**主要タスク完了時間：資料から根拠箇所に到達するまでの時間**
+
+- **定義**: 質問送信から、エビデンス（資料名 + ページ番号 + 抜粋）の初回表示までの時間
+- **目標**: 1分以内に到達
+- **計測方法**: 質問送信時刻 → エビデンス初回表示時刻
+
+**補助指標**:
+- **根拠提示率（Evidence Provision Rate）**: 回答にソースが紐づいている割合
+- **目標行動明確化率（Goal Clarity Rate）**: ユーザーが「次のステップが明確」と感じる割合
+
+**参照**: [`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)
+
+### フロントエンド計測要件（主要タスク完了時間の計測）
+
+**計測実装方針**:
+
+1. **質問送信時刻の記録**:
+   ```typescript
+   const questionStartTime = performance.now();
+   ```
+
+2. **エビデンス初回表示時刻の記録**:
+   ```typescript
+   eventSource.addEventListener('evidence', (event) => {
+     const evidenceDisplayTime = performance.now();
+     const timeToEvidence = evidenceDisplayTime - questionStartTime;
+     // メトリクス送信: Professor経由でログ記録
+     sendMetric('time_to_evidence', timeToEvidence);
+   });
+   ```
+
+3. **Professor API経由でメトリクス送信**:
+   - エンドポイント: `POST /v1/metrics/time_to_evidence`
+   - リクエストボディ: `{ request_id, time_ms, user_id_hash }`
+
+**個人情報最小化（Handbookより）**:
+- **指標のために不要なデータを増やさない**
+- ユーザーIDはハッシュ化して送信
+- 質問内容・資料内容は送信しない
+- request_idのみで追跡可能にする
+
+**参照**: [`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)、[`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)
+
+---
+
 ## 結論（Must）
 
 - 例外/障害は “検知できる形” で残す（握りつぶさない）

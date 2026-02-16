@@ -8,6 +8,42 @@
 
 ---
 
+## セキュリティ原則（Handbookより）
+
+eduanimaRは、以下のセキュリティ原則に基づきます：
+
+### 厳格なアクセス制御（Strict Access Control）
+- **SSO基盤**: Google/Meta/Microsoft/LINEによるSSO認証のみ
+- **ユーザー別データ分離**: user_id / subject_id による厳格な分離
+- **デフォルト非共有**: すべてのデータはユーザー専用（明示的共有まで非公開）
+
+### 透明性（Traceability & Explainability）
+- **監査ログ**: すべての重要な操作をログ記録
+- **request_id伝播**: フロントエンド → Professor → Librarianで一貫した追跡
+- **エビデンス**: 「なぜこの箇所が選ばれたか」を常に明示
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
+### クライアント側ログ制約（Handbookより）
+
+**個人情報・トークンをログに含めない**:
+- ユーザーID・メールアドレスはハッシュ化
+- 質問内容・資料内容は本番ログに含めない（デバッグ時のみローカル）
+- Authorization ヘッダー、Cookie、セッショントークン、API keyはログに出さない
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)
+
+### ユーザーデータの安全性（Handbookより）
+
+**ユーザーのデータを安全に扱い、誤って他者のデータが見える体験を作らない**:
+- データの共有範囲を明示
+- 権限が曖昧にならない設計
+- user_id / subject_id による厳格な分離を信頼
+
+**参照**: [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)
+
+---
+
 ## 結論（Must）
 
 - セキュリティヘッダーは Next.js の設定で一元管理する

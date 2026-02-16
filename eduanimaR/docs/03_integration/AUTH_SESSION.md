@@ -31,6 +31,18 @@ if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
 
 ## Phase 2: SSO認証と拡張機能への誘導
 
+### SSO連携方針（Handbookより）
+
+eduanimaRは、以下のSSO方針に基づきます：
+
+- **SSO-only認証**: Google/Meta/Microsoft/LINE（パスワードを保存しない）
+- **データ最小化**: メールアドレス等を必須登録情報として求めない
+- **セキュリティ・分析のみ**: ロケーション/IP/ログは、セキュリティ・分析のみに使用
+- **コンテンツ取り扱い**: 抽出・派生データ（OCR、埋め込み、要約）は元データと同等に機密扱い
+- **デフォルト個人利用**: すべてのコンテンツ・履歴はユーザー専用（明示的共有まで非公開）
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)
+
 ### 新規ユーザー登録の境界
 - **拡張機能**: 新規登録を許可（SSO認証 → Professor API `POST /auth/register`）
 - **Web版**: 新規登録を禁止（SSO認証後、未登録ユーザーは拡張機能へ誘導）
@@ -145,6 +157,20 @@ if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
 **参照元SSOT**:
 - `../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md` (SSO/OAuth)
 - `../../eduanimaRHandbook/04_product/ROADMAP.md` (Phase 1-2の認証方針)
+
+### Phase別の認証方針（Handbookより）
+
+**Phase 1（ローカル開発）**:
+- 認証スキップ（固定dev-user使用）
+- 認証UIは実装しない
+
+**Phase 2以降（本番環境）**:
+- SSO認証実装（Google/Meta/Microsoft/LINE）
+- Web版からの新規登録は禁止、拡張機能でのみユーザー登録可能
+- **データ最小化**: メールアドレス等を必須登録情報として求めない
+- **セッション管理**: Cookie（httpOnly, Secure, SameSite=Lax）
+
+**参照**: [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)、[`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
 
 ## セキュリティ要件
 - **トークン暗号化**: HTTPS通信必須
