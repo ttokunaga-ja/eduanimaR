@@ -95,6 +95,177 @@ src/shared/api/
 - Cookie 認証：BFF（Next）経由の同一オリジンに寄せる（CORS/SameSite 地獄を避ける）
 - Bearer：`client.ts` で header を一元付与（各featureで勝手に付けない）
 
+### Chrome拡張機能からのAPI通信
+
+Chrome拡張機能からProfessor APIへの通信は、以下の方針で実装します。
+
+#### 通信方式（Plasmo Framework前提）
+
+1. **Content Scripts**:
+   - LMS DOMを監視（MutationObserver）、資料を検知
+   - Plasmo Messaging経由でBackground/Service Workerへファイルデータを送信
+   - **HTTP通信は行わない**（CSP/CORS制約により直接通信は不可）
+
+2. **Background/Service Worker**:
+   - Content Scriptsからのメッセージを受信
+   - Orval生成クライアント（`packages/shared-api`）を使用してProfessor APIへHTTPリクエスト
+   - **CORS制約がない**ため、直接`http://localhost:8080`（開発）または`https://api.eduanimar.example.com`（本番）へ通信可能
+
+#### 実装パターン（Plasmo Messaging）
+
+**1. Background Message Handler（ファイルアップロード）**:
+
+```typescript
+// apps/extension/background/messages/upload-material.ts
+import type { PlasmoMessaging } from "@plasmohq/messaging"
+import { apiClient } from "@packages/shared-api"
+
+export type UploadMaterialRequest = {
+  file: File
+  subjectId: string
+}
+
+export type UploadMaterialResponse = {
+  success: boolean
+  materialId?: string
+  error?: string
+}
+
+const handler: PlasmoMessaging.MessageHandler<
+  UploadMaterialRequest,
+  UploadMaterialResponse
+> = async (req, res) => {
+  try {
+    const { file, subjectId } = req.body
+    const result = await apiClient.uploadMaterial(file, subjectId)
+    res.send({ success: true, materialId: result.id })
+  } catch (error) {
+    res.send({ success: false, error: error.message })
+  }
+}
+
+export default handler
+```
+
+**2. Content Script（資料検知・送信）**:
+
+```typescript
+// apps/extension/contents/lms-material-detector.ts
+import { sendToBackground } from "@plasmohq/messaging"
+
+// MutationObserverでLMS資料を検知
+const observer = new MutationObserver(async (mutations) => {
+  for (const mutation of mutations) {
+    const materialLinks = detectMaterialLinks(mutation.target)
+    for (const link of materialLinks) {
+      const file = await fetchFileFromLink(link.href)
+      const subjectId = extractSubjectId(link)
+      
+      // Background/Service Workerへ送信
+      const response = await sendToBackground({
+        name: "upload-material",
+        body: { file, subjectId }
+      })
+      
+      if (response.success) {
+        console.log(`Uploaded: ${response.materialId}`)
+      }
+    }
+  }
+})
+
+observer.observe(document.body, { childList: true, subtree: true })
+```
+
+**3. Sidepanel/Popup（質問送信、SSE受信）**:
+
+```typescript
+// apps/extension/sidepanel/components/QAChatPanel.tsx
+import { sendToBackground } from "@plasmohq/messaging"
+import { useQAStream } from "@packages/shared-api" // 共有Hook
+
+export function QAChatPanel() {
+  const { stream, send, isLoading } = useQAStream()
+  
+  const handleSend = async (question: string) => {
+    // Background経由でSSE接続を確立
+    const response = await sendToBackground({
+      name: "qa-ask",
+      body: { question, subjectId: "xxx" }
+    })
+    // SSEイベントはBackground → Sidepanelへストリーミング
+  }
+  
+  return (
+    <div>{/* UI */}</div>
+  )
+}
+```
+
+#### 認証トークン管理（Phase別）
+
+| Phase | 認証方式 | トークン保存 | 実装詳細 |
+|------|---------|------------|---------|
+| **Phase 1** | `dev-user`固定 | 環境変数 | `PLASMO_PUBLIC_DEV_USER_TOKEN` を Background/Service Worker で読み取り、各リクエストの`Authorization`ヘッダーに付与 |
+| **Phase 2** | SSO（OAuth/OIDC） | Chrome Storage API | SSO認証後、Access Tokenを`chrome.storage.local`に保存し、Background/Service Worker で各リクエストに付与 |
+
+**実装例（Phase 2認証）**:
+
+```typescript
+// apps/extension/background/messages/auth-login.ts
+import type { PlasmoMessaging } from "@plasmohq/messaging"
+import { apiClient } from "@packages/shared-api"
+
+const handler: PlasmoMessaging.MessageHandler = async (req, res) => {
+  const { idToken } = req.body // SSOプロバイダーからのIDトークン
+  
+  try {
+    const result = await apiClient.login({ idToken })
+    
+    // Access Tokenを Chrome Storage へ保存
+    await chrome.storage.local.set({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresAt: Date.now() + result.expiresIn * 1000
+    })
+    
+    res.send({ success: true })
+  } catch (error) {
+    res.send({ success: false, error: error.message })
+  }
+}
+
+export default handler
+```
+
+#### baseURL設定（環境別）
+
+Chrome拡張機能では、環境変数を使用してbaseURLを切り替えます。
+
+**Plasmo環境変数**:
+- `.env.development`:
+  ```
+  PLASMO_PUBLIC_API_BASE_URL=http://localhost:8080
+  ```
+- `.env.production`:
+  ```
+  PLASMO_PUBLIC_API_BASE_URL=https://api.eduanimar.example.com
+  ```
+
+**API Client設定**:
+```typescript
+// packages/shared-api/src/client.ts
+export const baseURL = 
+  process.env.PLASMO_PUBLIC_API_BASE_URL || // Chrome拡張機能
+  process.env.NEXT_PUBLIC_API_BASE_URL ||   // Next.js Web
+  'http://localhost:8080'                   // Fallback
+```
+
+**参照**:
+- Plasmo Messaging: https://docs.plasmo.com/framework/messaging
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144
+- [`../00_quickstart/QUICKSTART.md`](../00_quickstart/QUICKSTART.md)（Chrome拡張機能セクション）
+
 ---
 
 ## 4) 生成設定（方針）

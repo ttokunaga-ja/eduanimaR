@@ -13,6 +13,20 @@ Last-updated: 2026-02-16
 
 eduanimaRは、学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツールです。大学LMS資料の自動収集・検索・学習支援を、Chrome拡張機能とWebアプリで提供します。
 
+### プロダクト形態
+
+本プロジェクトは**WebアプリとChrome拡張機能を同時提供**するため、Monorepo構成を前提とします。
+
+- **Chrome拡張機能**（主要チャネル）: LMS上での資料自動収集・質問対応（Plasmo Framework、Manifest V3）
+- **Webアプリ**（補助チャネル）: 検索・整理・設定・監査/履歴（Next.js App Router + FSD）
+
+**重要な前提**:
+- 新規ユーザー登録は**Chrome拡張機能でのみ可能**（SSO認証）
+- Web版は**既存ユーザーのログイン専用**（Phase 2以降）
+- ファイルアップロードは**拡張機能の自動アップロードのみ**（Web版にUIなし）
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L37-39, L128-144
+
 ### Mission & North Star（詳細は Handbook 参照）
 - **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
 - **Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態を当たり前にする
@@ -145,6 +159,29 @@ eduanimaRは、**AI Agentによる質問対応**という単一のパイプラ�
 #### 通信プロトコル
 - **Frontend ↔ Professor**: HTTP/JSON（OpenAPI） + SSE（リアルタイム回答配信）
 - **Professor ↔ Librarian**: **gRPC（双方向ストリーミング、契約: `proto/librarian/v1/librarian.proto`）**
+
+#### Monorepo構成（前提）
+
+本プロジェクトは**WebアプリとChrome拡張機能を同一リポジトリで管理**します。
+
+**想定ディレクトリ構成**:
+```
+apps/
+  ├── web/           # Next.js（App Router） - Webアプリ
+  └── extension/     # Plasmo Framework - Chrome拡張機能
+packages/
+  ├── shared-api/    # Orval生成クライアント（Web/拡張で共有）
+  ├── shared-ui/     # FSD shared/ui（共通コンポーネント）
+  └── shared-types/  # 共通型定義
+```
+
+**共有戦略**:
+- **FSD Shared層**: `packages/shared-*`として切り出し、Web/拡張で共有
+- **Entities/Features**: ビジネスロジックが同一なら共有（例: `entities/user`）
+- **Pages**: 各アプリ固有（Webはルーティング、拡張はSidepanel/Popup）
+- **API通信**: Orval生成クライアント（`packages/shared-api`）を共通化
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L112-150
 
 #### ハイブリッド検索（RRF統合）の詳細設計
 

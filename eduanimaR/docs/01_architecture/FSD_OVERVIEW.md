@@ -57,6 +57,85 @@ eduanimaRでは、以下の情報階層を厳守します：
 
 **FSDの適用により、バックエンドとの境界を明確にし、API契約（OpenAPI）を介した疎結合を実現します。**
 
+### Monorepo構成とコード共有戦略
+
+本プロジェクトは**WebアプリとChrome拡張機能を同時提供**するため、Monorepo構成を前提とします。
+
+#### ディレクトリ構成（想定）
+
+```
+apps/
+  ├── web/                      # Next.js（App Router） - Webアプリ
+  │   ├── src/
+  │   │   ├── app/              # Next.js App Router（routing/providers）
+  │   │   ├── pages/            # FSD Pages（画面実体）
+  │   │   ├── widgets/          # 合成Widget
+  │   │   ├── features/         # ユーザー価値機能
+  │   │   ├── entities/         # ビジネス実体
+  │   │   └── shared/           # Web固有の共通部品
+  │   └── package.json
+  └── extension/                # Plasmo Framework - Chrome拡張機能
+      ├── src/
+      │   ├── contents/         # Content Scripts
+      │   ├── background/       # Background/Service Worker
+      │   ├── sidepanel/        # Sidepanel（質問UI）
+      │   ├── popup/            # Popup（設定UI）
+      │   ├── features/         # 拡張機能固有のFeatures
+      │   ├── entities/         # 共有Entity（packages/から参照）
+      │   └── shared/           # 拡張機能固有の共通部品
+      └── package.json
+packages/
+  ├── shared-api/               # Orval生成クライアント（共通）
+  │   ├── src/
+  │   │   ├── generated/        # 自動生成
+  │   │   ├── client.ts         # baseURL/認証設定
+  │   │   └── index.ts          # Public API
+  │   └── package.json
+  ├── shared-ui/                # FSD shared/ui（共通コンポーネント）
+  │   ├── src/
+  │   │   ├── button/
+  │   │   ├── evidence-card/    # 根拠資料カード（QAチャット用）
+  │   │   └── index.ts
+  │   └── package.json
+  └── shared-types/             # 共通型定義
+      ├── src/
+      │   └── index.ts
+      └── package.json
+```
+
+#### 共有方針（FSD層別）
+
+| FSD層 | 共有方針 | 配置 | 例 |
+|------|---------|------|-----|
+| **Shared** | ✅ **積極的に共有** | `packages/shared-*` | ボタン、カード、型定義、API Client |
+| **Entities** | ✅ **ビジネスロジックが同一なら共有** | `packages/entities` or 各アプリに配置 | `entities/user`（表示/状態） |
+| **Features** | △ **ケースバイケース** | 基本は各アプリ固有、共通化できるなら`packages/features` | `features/qa-chat`（Web/拡張で共通化可能） |
+| **Widgets** | ❌ **各アプリ固有** | 各アプリ内 | Web: `widgets/file-tree`、拡張: `widgets/upload-status` |
+| **Pages** | ❌ **必ず各アプリ固有** | 各アプリ内 | Web: `pages/home`、拡張: `sidepanel/qa` |
+
+#### 実装ガイドライン
+
+1. **API通信の統一**:
+   - Orval生成クライアント（`packages/shared-api`）を両アプリで共有
+   - Web: Server Components/Route Handler、拡張: Background/Service Worker から呼び出し
+
+2. **UI資産の共有**:
+   - MUI + Pigment CSS を両アプリで使用
+   - 共通コンポーネント（`EvidenceCard`, `LoadingSpinner` 等）は`packages/shared-ui`へ配置
+   - 拡張機能ではShadow DOM隔離戦略を適用
+
+3. **FSD境界の維持**:
+   - `packages/*`も FSD Public API（`index.ts`）を徹底
+   - 各アプリ内の`features`/`entities`は、まず各アプリに配置し、共通化が明確になったら`packages/*`へ移動
+
+4. **依存方向**:
+   - `apps/*` → `packages/*` の一方向依存のみ許可
+   - `packages/*` 間の依存は最小限に（`shared-types` ← `shared-api` ← `shared-ui`）
+
+**参照**: 
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L112-150
+- FSD公式ドキュメント: https://feature-sliced.design/
+
 ---
 
 ## 1. FSDの構造：3つの階層レベル

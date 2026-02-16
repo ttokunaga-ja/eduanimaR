@@ -262,6 +262,122 @@ Professor が実行するハイブリッド検索戦略:
 - Phase 2以降: SSO（Google / Meta / Microsoft / LINE）
 - **Web版からの新規登録禁止**: 拡張機能でSSO登録したユーザーのみログイン可能
 
+### Chrome拡張機能の技術詳細（TECHNICAL_STRATEGY準拠）
+
+本プロジェクトのChrome拡張機能は、以下の技術スタックで実装します（SSOT: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144）。
+
+| 技術要素 | 詳細 | 理由・制約 |
+|---------|------|----------|
+| **Framework** | **Plasmo Framework**（Manifest V3対応） | Reactベース、型安全、ビルド自動化 |
+| **UI System** | MUI v6 + Pigment CSS | Web版と統一、Shadow DOM隔離戦略 |
+| **Shadow DOM隔離** | Shadow DOMでCSS隔離 | LMS CSSとの衝突回避（!important地獄の防止） |
+| **DOM検知** | **MutationObserver** | LMS資料の自動検知（DOMツリーの変更監視） |
+| **拡張内通信** | **Plasmo Messaging** | Content Scripts ⇔ Background/Service Worker間の型安全通信 |
+| **外部通信** | Background/Service Worker → Professor API（HTTP） | CORS制約なし、Content Scriptsは直接通信不可 |
+| **Service Worker前提** | 常駐しない設計（起動/停止の揺らぎを許容） | Manifest V3の制約、永続化はChrome Storage API使用 |
+| **Content Scripts制約** | CSP/権限/注入制約あり | 機密情報の扱いとログ設計を厳格化 |
+| **認証** | Phase 1: `dev-user`固定、Phase 2: SSO（OAuth/OIDC） | クライアントは信用しない（サーバー側で認可強制） |
+| **トークン保存** | Chrome Storage API（`chrome.storage.local`） | Service Workerの揮発性を考慮した永続化 |
+
+#### Shadow DOM隔離戦略
+
+**課題**: LMSサイトのCSSと拡張機能のCSSが衝突し、レイアウトが崩れる（`!important`地獄）
+
+**解決策**: Shadow DOMで拡張機能UIを隔離
+
+**実装例**:
+```typescript
+// apps/extension/contents/sidepanel-injector.tsx
+import { createRoot } from "react-dom/client"
+import { QAChatPanel } from "../sidepanel/components/QAChatPanel"
+
+// Shadow Rootを作成
+const container = document.createElement("div")
+container.id = "eduanima-extension-root"
+document.body.appendChild(container)
+
+const shadowRoot = container.attachShadow({ mode: "open" })
+
+// Shadow Root内でReact描画
+const root = createRoot(shadowRoot)
+root.render(
+  <div>
+    <style>{/* MUI Pigment CSS をここに注入 */}</style>
+    <QAChatPanel />
+  </div>
+)
+```
+
+#### MutationObserver設計
+
+**目的**: LMS資料のDOM変更を監視し、新しい資料を自動検知
+
+**実装例**:
+```typescript
+// apps/extension/contents/lms-material-detector.ts
+const observer = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === "childList") {
+      const links = mutation.target.querySelectorAll('a[href$=".pdf"]')
+      links.forEach((link) => {
+        const materialUrl = link.getAttribute("href")
+        detectAndUpload(materialUrl)
+      })
+    }
+  }
+})
+
+observer.observe(document.body, {
+  childList: true,    // 子要素の追加・削除を監視
+  subtree: true,      // 全子孫要素を監視
+  attributes: false   // 属性変更は監視しない（パフォーマンス最適化）
+})
+```
+
+#### Service Worker設計（揮発性対策）
+
+**Manifest V3の制約**: Service Workerは常駐せず、イベント駆動で起動/停止
+
+**対策**:
+1. **永続化はChrome Storage API使用**（`chrome.storage.local`）
+2. **状態をメモリに持たない**（各リクエストで必要な状態を再取得）
+3. **長時間処理は避ける**（30秒以内に完了、それ以上はContent Scripts側で分割）
+
+**実装例**:
+```typescript
+// apps/extension/background/index.ts
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "upload-material") {
+    // 毎回 Chrome Storage からトークン取得
+    chrome.storage.local.get(["accessToken"], async (result) => {
+      const { accessToken } = result
+      const response = await apiClient.uploadMaterial(message.file, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      sendResponse({ success: true, data: response })
+    })
+    return true // 非同期レスポンス
+  }
+})
+```
+
+#### Content Scripts制約とセキュリティ
+
+**制約**:
+1. **CSP（Content Security Policy）**: LMSサイトのCSPにより、`eval()`やインラインスクリプトが禁止される場合がある
+2. **Same-Originポリシー**: Content ScriptsからのHTTPリクエストはLMSと同一オリジン扱い（CORS制約あり）
+3. **機密情報の扱い**: Content Scriptsは任意のコードを注入できるため、トークンを直接保持しない
+
+**対策**:
+1. **HTTP通信はBackground/Service Workerに集約**（CORS制約を回避）
+2. **トークンはChrome Storage APIで管理**（Content Scriptsには渡さない）
+3. **ログ出力を慎重に**（機密情報をconsole.logしない）
+
+**参照**:
+- Plasmo Framework公式: https://docs.plasmo.com/
+- Manifest V3 Migration: https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144
+
 ---
 
 ## Executive Summary (BLUF)

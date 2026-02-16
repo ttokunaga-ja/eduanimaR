@@ -101,28 +101,250 @@ SSEイベントごとにUI更新：
 
 ---
 
-## 実装例（疑似コード）
+## Phase 1実装スコープ（詳細）
 
+Phase 1では、以下のコンポーネント/機能を**完全実装**します。
+
+### 必須実装コンポーネント
+
+#### 1. `features/qa-chat/ui/QAChatPanel.tsx`（Web版・拡張機能共通）
+
+**責務**: 質問入力 + SSE受信 + UI状態管理
+
+**依存**:
+- `packages/shared-api`（Orval生成Hook）
+- `packages/shared-ui/EvidenceCard`
+- MUI v6コンポーネント（TextField, Button, CircularProgress 等）
+
+**実装例**:
 ```typescript
-// features/qa-chat/ui/QAChatPanel.tsx
-'use client';
+// packages/features/qa-chat/ui/QAChatPanel.tsx
+'use client'; // Web版（Next.js）ではClient Component
 
 import { useState } from 'react';
-import { Box, TextField, Button, CircularProgress } from '@mui/material';
-import { EvidenceCard } from '@/shared/ui/EvidenceCard';
+import { Box, TextField, Button, CircularProgress, LinearProgress, Alert } from '@mui/material';
+import { EvidenceCard } from '@packages/shared-ui/evidence-card';
 import { useQAStream } from '../model/useQAStream';
 
-export function QAChatPanel({ subjectId }: { subjectId: string }) {
+interface QAChatPanelProps {
+  subjectId: string;
+}
+
+export function QAChatPanel({ subjectId }: QAChatPanelProps) {
   const [question, setQuestion] = useState('');
-  const { stream, send, isLoading } = useQAStream(subjectId);
+  const { events, send, isLoading, error, retry } = useQAStream(subjectId);
+
+  const handleSend = () => {
+    if (question.trim()) {
+      send(question);
+      setQuestion('');
+    }
+  };
 
   return (
-    <Box>
-      {/* 実装 */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* SSEイベント表示 */}
+      {events.map((event, idx) => {
+        switch (event.type) {
+          case 'thinking':
+            return <CircularProgress key={idx} size={24} />;
+          case 'searching':
+            return (
+              <Box key={idx}>
+                <p>資料を探しています...</p>
+                <LinearProgress variant="determinate" value={(event.data.current_retry / event.data.max_retries) * 100} />
+              </Box>
+            );
+          case 'evidence':
+            return (
+              <EvidenceCard
+                key={idx}
+                materialName={event.data.material_name}
+                pageNumber={event.data.page_number}
+                sectionName={event.data.section_name}
+                url={event.data.url}
+                whyRelevant={event.data.why_relevant}
+                snippet={event.data.snippet}
+              />
+            );
+          case 'answer':
+            return <div key={idx} dangerouslySetInnerHTML={{ __html: event.data.markdown }} />;
+          case 'error':
+            return (
+              <Alert key={idx} severity="error">
+                {event.data.message}
+                <Button onClick={retry}>再試行</Button>
+              </Alert>
+            );
+          default:
+            return null;
+        }
+      })}
+
+      {/* 質問入力欄 */}
+      <TextField
+        multiline
+        rows={3}
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder="質問を入力してください"
+        disabled={isLoading}
+      />
+      <Button onClick={handleSend} disabled={isLoading || !question.trim()}>
+        送信
+      </Button>
     </Box>
   );
 }
 ```
+
+#### 2. `packages/shared-ui/evidence-card/EvidenceCard.tsx`
+
+**責務**: 根拠資料カードの表示（クリッカブル、ツールチップ付き）
+
+**Props**:
+```typescript
+interface EvidenceCardProps {
+  materialName: string;      // 資料名（例: 「統計学講義資料.pdf」）
+  pageNumber: number;        // ページ番号（例: 15）
+  sectionName?: string;      // セクション名（例: 「3.2 決定係数の定義」）
+  url: string;               // GCS署名付きURL（例: "https://storage.googleapis.com/..."）
+  whyRelevant: string;       // 選定理由（例: 「計算式が記載されているため」）
+  snippet: string;           // Markdown抜粋（例: "> 決定係数は..."）
+}
+```
+
+**実装例**:
+```typescript
+import { Card, CardContent, Typography, Tooltip, Box } from '@mui/material';
+import ReactMarkdown from 'react-markdown';
+
+export function EvidenceCard({
+  materialName,
+  pageNumber,
+  sectionName,
+  url,
+  whyRelevant,
+  snippet
+}: EvidenceCardProps) {
+  return (
+    <Card
+      elevation={3}
+      sx={{ cursor: 'pointer', '&:hover': { elevation: 6 } }}
+      onClick={() => window.open(`${url}#page=${pageNumber}`, '_blank')}
+    >
+      <CardContent>
+        <Typography variant="h6">{materialName}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          p.{pageNumber} {sectionName && `- ${sectionName}`}
+        </Typography>
+        <Tooltip title={whyRelevant}>
+          <Box sx={{ mt: 1 }}>
+            <ReactMarkdown>{snippet}</ReactMarkdown>
+          </Box>
+        </Tooltip>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+#### 3. `features/qa-chat/model/useQAStream.ts`
+
+**責務**: SSEストリーミングの受信・パース・状態管理
+
+**依存**: EventSource API（または`@microsoft/fetch-event-source`）
+
+**実装例**:
+```typescript
+import { useState, useCallback } from 'react';
+
+interface SSEEvent {
+  type: 'thinking' | 'searching' | 'evidence' | 'answer' | 'done' | 'error';
+  data: any;
+}
+
+export function useQAStream(subjectId: string) {
+  const [events, setEvents] = useState<SSEEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = useCallback((question: string) => {
+    setIsLoading(true);
+    setEvents([]);
+    setError(null);
+
+    const eventSource = new EventSource(
+      `/api/qa/ask?subject_id=${subjectId}&question=${encodeURIComponent(question)}`
+    );
+
+    eventSource.addEventListener('thinking', (e) => {
+      setEvents((prev) => [...prev, { type: 'thinking', data: JSON.parse(e.data) }]);
+    });
+
+    eventSource.addEventListener('searching', (e) => {
+      setEvents((prev) => [...prev, { type: 'searching', data: JSON.parse(e.data) }]);
+    });
+
+    eventSource.addEventListener('evidence', (e) => {
+      setEvents((prev) => [...prev, { type: 'evidence', data: JSON.parse(e.data) }]);
+    });
+
+    eventSource.addEventListener('answer', (e) => {
+      setEvents((prev) => [...prev, { type: 'answer', data: JSON.parse(e.data) }]);
+    });
+
+    eventSource.addEventListener('done', () => {
+      setIsLoading(false);
+      eventSource.close();
+    });
+
+    eventSource.addEventListener('error', (e) => {
+      setError('エラーが発生しました');
+      setIsLoading(false);
+      eventSource.close();
+    });
+  }, [subjectId]);
+
+  const retry = useCallback(() => {
+    // 最後の質問を再送信（実装詳細は略）
+  }, []);
+
+  return { events, send, isLoading, error, retry };
+}
+```
+
+### 実装除外（Phase 2以降）
+
+Phase 1では以下を**実装しません**:
+
+- ❌ **ファイルアップロードUI（Web版）**: Phase 1では拡張機能の自動アップロードのみ、Phase 2以降も実装しない
+- ❌ **ユーザー登録UI**: Phase 2でSSO認証実装後に対応
+- ❌ **SSO認証フロー**: Phase 1は`dev-user`固定
+
+### Chrome拡張機能（Phase 1実装必須）
+
+Phase 1では、以下の拡張機能を**完全実装**します:
+
+1. ✅ **LMS資料の自動検知**（MutationObserver）
+   - DOM変更監視、資料リンク検出
+   - 検出した資料をローカルストレージに一時保存
+
+2. ✅ **自動アップロード**（Plasmo Messaging + Professor API）
+   - Content Scripts → Background/Service Worker → Professor API (`POST /v1/materials/upload`)
+   - アップロード状態表示（成功/失敗/進行中）
+
+3. ✅ **質問機能（QAチャット）**
+   - Sidepanel/Popup内で`QAChatPanel`を表示
+   - SSEイベントのリアルタイム表示
+
+4. ✅ **ローカル動作検証**
+   - `npm run build:extension` → Chromeに手動読み込み
+   - ローカルProfessor API（`http://localhost:8080`）に接続
+
+**参照**:
+- [`../00_quickstart/QUICKSTART.md`](../00_quickstart/QUICKSTART.md)（Chrome拡張機能セクション）
+- [`../03_integration/API_GEN.md`](../03_integration/API_GEN.md)（Chrome拡張機能からのAPI通信）
 
 ---
 
