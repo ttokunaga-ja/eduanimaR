@@ -3,13 +3,13 @@ Title: Caching Strategy
 Description: eduanimaRのキャッシュ・再検証戦略（Next.js App Router）
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, caching, tanstack-query, revalidation
 ---
 
 # Caching & Revalidation Strategy（Next.js App Router）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 このドキュメントは、Next.js（App Router）の複数キャッシュ（Data/Route/Router）を前提に、
 「どこで」「何を」「どの粒度で」キャッシュし、いつ無効化するかを固定するための契約です。
@@ -134,6 +134,29 @@ tag は “人間が意味を読める” ことを優先します。
 - `no-store` / `revalidate: 0` を理由なく乱用する（コスト増）
 - Dynamic API を Root Layout で使って “全ルートを動的化” する（意図せず性能劣化）
 - RSC が Route Handler を呼ぶ（サーバ内で無駄な hop）
+
+---
+
+## eduanimaR のキャッシュ設計
+
+### 科目・ファイル一覧
+- **tag**: `subject-${subjectId}`, `files-${subjectId}`
+- **revalidate**: ファイルアップロード時に `revalidateTag` で無効化
+- **fetch 設定**: `{ next: { tags: ['subject-xxx'], revalidate: 300 } }`
+
+### 質問履歴
+- **動的取得**: `cookies()` 使用により自動的に動的化
+- **キャッシュなし**: `{ cache: 'no-store' }`（ユーザー固有データ）
+
+### Librarian推論結果
+- **キャッシュしない**（リアルタイム性重視）
+- SSEストリームは常に最新データを配信
+- 質問履歴（DB保存済み）の再表示のみキャッシュ可
+
+### 参照資料（GCS URL）
+- **tag**: `material-${materialId}`
+- **CDN**: GCS の Public URL は外部CDNでキャッシュ
+- **revalidate**: 資料更新時に `revalidateTag` で無効化
 
 ---
 

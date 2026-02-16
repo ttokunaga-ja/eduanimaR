@@ -19,6 +19,22 @@ FSDの重要コンセプト（公式の要点）：
 
 ---
 
+## eduanimaRにおけるFSDの適用
+
+本プロジェクトでは、以下のバックエンドサービスと連携します：
+
+- **Professor（Go）**: 外向きAPI（OpenAPI）、DB/GCS管理、最終回答生成
+- **Librarian（Python）**: 推論ループ（LangGraph）、検索戦略立案
+
+フロントエンドの責務：
+- Professor APIとの統合（Orval生成クライアント使用）
+- SSEによるリアルタイム推論状態の表示
+- Chrome拡張機能による自動アップロード
+
+**FSDの適用により、バックエンドとの境界を明確にし、API契約（OpenAPI）を介した疎結合を実現します。**
+
+---
+
 ## 1. FSDの構造：3つの階層レベル
 
 ### Level 1: Layers（レイヤー）

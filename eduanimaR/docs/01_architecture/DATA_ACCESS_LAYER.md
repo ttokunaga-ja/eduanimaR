@@ -3,13 +3,13 @@ Title: Data Access Layer
 Description: eduanimaRのデータアクセス層ポリシーとProfessor API統合
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, dal, api, professor
 ---
 
 # Data Access Layer（DAL）ポリシー
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 このドキュメントは、Next.js App Router（RSC）時代の「データ取得の置き場所」を固定し、
 - 認可漏れ
@@ -27,6 +27,12 @@ Last-updated: 2026-02-15
 - **DAL は server-only**（クライアントに import されるとビルドが落ちる状態を目指す）
 - **DAL は認可チェックと DTO 最小化を責務に含める**
 - **`process.env` / secret の参照は DAL に集約**（他レイヤーに散らさない）
+
+### eduanimaR固有の考慮事項
+- **Professor OpenAPI統合**: Orvalで生成されたクライアントを使用
+- **SSE接続**: `/v1/qa/ask` はSSEのため、`EventSource`または`fetch`（ReadableStream）で実装
+- **Librarian推論状態**: SSEイベント（`thinking`, `searching`, `evidence`）をUI状態に反映
+- **認証**: Phase 1はdev-user固定、Phase 2でSSO統合
 
 ---
 
@@ -134,25 +140,63 @@ apiClient.interceptors.request.use(async (config) => {
 });
 ```
 
-### SSE（Server-Sent Events）の扱い
+## 3) SSE（Server-Sent Events）の扱い
 
-#### 回答ストリーミング
+Professor の `/v1/qa/ask` はSSEでストリーミング応答を返します。
+
+### Client Component での実装例
 ```typescript
-// src/shared/api/sse.ts
-export function streamAnswer(questionId: string, onMessage: (chunk: string) => void) {
-  const eventSource = new EventSource(`/v1/qa/stream?questionId=${questionId}`);
+// features/qa-chat/api/askQuestion.ts
+export async function* streamAnswer(question: string, subjectId: string) {
+  const response = await fetch('/api/qa/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, subject_id: subjectId }),
+  });
   
-  eventSource.onmessage = (event) => {
-    onMessage(event.data);
-  };
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
   
-  eventSource.onerror = () => {
-    eventSource.close();
-  };
-  
-  return () => eventSource.close();
+  while (true) {
+    const { done, value } = await reader!.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value);
+    const events = parseSSE(chunk); // SSEパース処理
+    
+    for (const event of events) {
+      yield event; // { type: 'thinking' | 'searching' | 'answer', data: ... }
+    }
+  }
 }
 ```
+
+### Route Handler でのプロキシ（推奨）
+```typescript
+// app/api/qa/ask/route.ts
+export async function POST(request: Request) {
+  const body = await request.json();
+  
+  // Professor APIへプロキシ（認証ヘッダー付与等）
+  const professorResponse = await fetch(`${PROFESSOR_API_URL}/v1/qa/ask`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await getServerSession()}` // Phase 2
+    },
+    body: JSON.stringify(body),
+  });
+  
+  // SSEをそのまま返す
+  return new Response(professorResponse.body, {
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+}
+```
+
+SSOT：`../03_integration/API_CONTRACT_WORKFLOW.md`
+
+---
 
 ### エラーハンドリング統一
 
