@@ -1,8 +1,17 @@
 # Quickstart（Frontend / FSD Template）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 目的：eduanimaR フロントエンドを30分で起動・開発開始できる状態にする。
+
+## 読む順序（推奨）
+
+**まず最初に上流ドキュメントを参照してください**:
+- `../../eduanimaRHandbook/README.md` - サービス全体のコンセプトと設計原則
+- `../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md` - Mission/Vision/North Star
+- `../../eduanimaRHandbook/04_product/ROADMAP.md` - Phase別のリリース計画
+
+サービス全体のコンセプトを理解してからフロントエンド実装に入ることで、設計判断の背景が明確になります。
 
 ## 0) 前提
 - **Node.js**: LTS 推奨（v20以上）

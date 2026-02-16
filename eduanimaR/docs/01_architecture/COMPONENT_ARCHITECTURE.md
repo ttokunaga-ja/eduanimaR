@@ -1,5 +1,7 @@
 # Component Architecture（UI設計の責務境界）
 
+Last-updated: 2026-02-16
+
 このドキュメントは、FSD（Feature-Sliced Design）を前提に、UIコンポーネントの責務と配置を固定します。
 
 目的：
@@ -21,6 +23,43 @@
 - “ドメイン実体の表示” は `entities` が責務（表示と最小ロジック）
 - “再利用UIプリミティブ” は `shared/ui`（ビジネスルール禁止）
 - API 由来の生データを UI に丸渡ししない（DTO最小化はDAL/adapterで）
+
+---
+
+## プログレスフィードバックのパターン
+
+### ❌ 禁止: 技術用語をユーザーに見せる
+以下のような技術用語は UI に表示しない：
+- 「検索クエリ生成中」
+- 「Librarian推論実行中」
+- 「ベクトル検索実行中」
+- 「RRFスコア計算中」
+
+### ✅ 推奨: ライトユーザー向けの簡潔な表現
+以下のような分かりやすい表現を使用：
+- 「AI Agentが資料を検索中です」
+- 「AI Agentが検索方針を決定しています」
+- 「AI Agentが回答を生成しています」
+
+### 段階的なフィードバック例
+
+```typescript
+// プログレスフィードバックの段階例
+const progressStages = [
+  'AI Agentが検索方針を決定しています',
+  'AI Agentが資料を検索中です',
+  'AI Agentが回答を生成しています',
+];
+```
+
+### ビジュアルフィードバック
+- プログレスバーまたはスピナーで視覚的にフィードバック
+- 進捗状況を数値で表示（例: 「3/5」）
+- 完了予測時間は表示しない（不正確になりやすい）
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md` (Voice & Tone)
+- `../../eduanimaRHandbook/04_product/ROADMAP.md` (UI/UXコンセプト)
 
 ---
 

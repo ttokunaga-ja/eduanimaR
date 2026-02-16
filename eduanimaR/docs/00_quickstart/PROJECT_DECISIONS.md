@@ -14,6 +14,23 @@ Last-updated: 2026-02-16
 このファイルは「プロジェクトごとに選択が必要」な決定事項の SSOT。
 AI/人間が推測で埋めないために、まずここを埋めてから実装する。
 
+## サービスコンセプト（上流参照）
+
+eduanimaRは、学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツールです。
+
+**North Star Metric（重要指標）**:
+- 資料から根拠箇所に到達するまでの時間短縮
+- 具体的には「質問から関連箇所（資料名 + ページ番号）へ到達する時間」を計測
+- ユーザーが「理解する時間」を最大化するための指標
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`
+- `../../eduanimaRHandbook/04_product/ROADMAP.md`
+
+**学習支援特化の原則**:
+- 評価・試験での不正な優位を得る目的での利用は想定しない
+- 資料の「着眼点」を示し、原典への回帰を促す支援を提供
+
 ## 基本
 - **プロジェクト名**: eduanimaR
 - **リポジトリ**: ttokunaga-ja/eduanimaR
@@ -26,12 +43,34 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
   - Professor（Go）: 外向きAPI、DB/GCS/Kafka管理、最終回答生成
   - Librarian（Python）: LangGraphによる推論ループ、検索戦略立案
 
+## 提供形態（Phase 1-4）
+
+**Chrome拡張機能 + Webアプリ**の両方を提供しますが、Phase 1-4では以下の制約を明示します：
+
+- **個人利用のみ**: Phase 1-4では科目内グループ共有は対象外
+- **Chrome拡張機能**: LMS資料の自動収集、ユーザー登録、ファイルアップロード
+- **Webアプリ**: 既存ユーザーの閲覧・チャット専用（新規登録・ファイルアップロードは不可）
+- **導線統一**: どちらの導線でも同一のログイン体験（SSO/OAuth）と同一の権限境界を維持
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/04_product/ROADMAP.md`
+- `../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`
+
 ## 認証（Must）
-- **方式**: Cookie（SSO/OAuth 2.0による）
-- **SSO対応プロバイダー（Phase 2）**: Google / Meta / Microsoft / LINE
+
+**SSO/OAuth 2.0による認証**:
+- **方式**: Cookie（httpOnly, Secure, SameSite=Lax）
+- **SSO対応プロバイダー（Phase 2）**:
+  - Google (OAuth 2.0)
+  - Meta (Facebook/Instagram)
+  - Microsoft (Entra ID)
+  - LINE
 - **Phase 1**: ローカル開発のみ、認証スキップ（固定dev-user使用）
 - **セッション保存場所**: Cookie（httpOnly, Secure, SameSite=Lax）
 - **401/403 の UI 振る舞い**: ログイン画面へリダイレクト、元ページURLを保持
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`
 
 ## API（Must）
 - **OpenAPI の取得元**: eduanimaR_Professor（Go）が提供

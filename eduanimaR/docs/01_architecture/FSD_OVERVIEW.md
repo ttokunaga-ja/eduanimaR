@@ -1,5 +1,7 @@
 # Feature-Sliced Design (FSD) Overview（運用版）
 
+Last-updated: 2026-02-16
+
 このドキュメントは、FSD（Feature-Sliced Design）の核心・2026年時点の実践パターン・実装例をまとめ、AI/人間が同じ判断基準で設計できるようにするための「共通認識」です。
 
 - レイヤーの責務定義は [FSD_LAYERS.md](./FSD_LAYERS.md)
@@ -16,6 +18,28 @@ FSDは、コードを「技術的な役割（Components/Hooks）」ではなく�
 FSDの重要コンセプト（公式の要点）：
 - **Public API**：各モジュールはトップレベルに公開面（`index.ts` 等）を定義し、外部からの参照点を固定する
 - **Isolation**：同一レイヤーの別sliceに直接依存しない（必要なら上位で合成する）
+
+---
+
+## 情報階層の原則（UI設計の指針）
+
+eduanimaRでは、以下の情報階層を厳守します：
+
+### 1. 根拠（Evidence）→ 2. 要点 → 3. 次の行動
+
+**根拠提示（Evidence-forward）**:
+- 回答には必ず参照元資料がクリッカブルに添付される
+- 資料名、ページ番号、セクション名を明示
+- 抜粋は引用として分かる体裁を維持
+
+**トーン&マナー（UI表現の原則）**:
+- 落ち着いて、正確で、学習者に敬意のある表現を維持
+- 断定よりも根拠・前提を示す
+- 複雑さを増やさず、次の一歩を短く提示する
+
+**参照元SSOT**:
+- `../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md` (情報階層)
+- `../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md` (トーン&マナー)
 
 ---
 
