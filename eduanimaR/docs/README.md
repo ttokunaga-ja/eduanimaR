@@ -11,55 +11,99 @@ Last-updated: 2026-02-16
 
 ## サービス全体のコンセプト
 
-### Mission & North Star
-- **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
-- **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+eduanimaRは、学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツールです。大学LMS資料の自動収集・検索・学習支援を、Chrome拡張機能とWebアプリで提供します。
 
-### Professor / Librarian の役割
+### Mission & North Star（詳細は Handbook 参照）
+- **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
+- **Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態を当たり前にする
+- **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮（主要タスク完了時間の削減）
+- **補助指標**: 根拠提示率、目標行動明確化率
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)、[`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)
+
+### Professor / Librarian の責務境界（SSOT）
+
+本システムは **2サービス構成** です。DB/GCS/検索インデックスへの直接アクセス権限は Professor のみに付与します（最重要不変条件）。
 
 #### Professor（Go）の責務
-- **Phase 1（認証・認可）**: ユーザー認証、科目/資料アクセス制御
-- **Phase 2（大戦略）**: Gemini 3 Flashで「調査項目（WHAT）」「停止条件」を生成
+**役割**: データの守護者、システムの司令塔、学習支援の最終執筆者
+
+- **認証・認可**: SSO（OAuth/OIDC）トークン検証、ユーザー/科目/資料のアクセス制御
+- **Phase 2（大戦略）**: Gemini 3 Flashで「タスク分割（調査項目：WHAT）」「停止条件」「コンテキスト」を生成
 - **Phase 3（物理実行）**: 
-  - Librarianからの検索依頼を受け、**ハイブリッド検索（RRF統合）** を実行
+  - Librarianからの検索依頼（HTTP/JSON）を受け、**ハイブリッド検索（RRF統合）** を物理的に実行
   - **動的k値設定**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を調整
   - **除外制御**: `seen_chunk_ids`でDB層で物理的に既読除外
-- **Phase 4（合成）**: 選定エビデンスをもとにGemini 3 Flashで最終回答生成
+  - **権限強制**: `subject_id`/`user_id`/`is_active` 等の WHERE を SQL 層で必ず強制
+- **Phase 4（合成）**: 選定エビデンスをもとにGemini 3 Proで学習支援としての最終回答を生成
+- **データ管理**: PostgreSQL（pgvector含む）、GCS、Kafka への**唯一の直接アクセス権限**を持つ
+- **バッチ処理**: OCR/Embedding 生成を Gemini Batch API + Kafka で管理
+
+**参照**: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)、[`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
 
 #### Librarian（Python）の責務
-- **Phase 3（小戦略・ループ制御）**: LangGraphによる自律的検索ループ
-  - **Plan/Refine**: 検索クエリ生成（`keyword_list` + `semantic_query`）
-  - **Search Tool**: ProfessorのHTTP/JSONエンドポイント`POST /v1/search-tool`呼び出し
-  - **Evaluate**: 検索結果から`evidence_snippets`抽出（`temp_index`使用）
-  - **Route**: 停止条件判定（`COMPLETE` / `CONTINUE`）
+**役割**: 探索・根拠収集の専門家（DB-less、ステートレス）
+
+- **Phase 3（小戦略・ループ制御）**: LangGraphによる自律的検索ループ（最大5回推奨）
+  - **Plan/Refine**: 検索クエリ生成（`keyword_list` + `semantic_query`）、反省/再試行
+  - **Search Tool**: ProfessorのHTTP/JSONエンドポイント経由で検索実行を依頼
+  - **Evaluate**: 検索結果から選定エビデンス（`evidence_snippets`）を抽出、`temp_index`を使用
+  - **Route**: 停止条件判定（`COMPLETE` / `CONTINUE` / `ERROR`）
+- **ステートレス設計**: 会話履歴・キャッシュなし（1リクエスト内で推論完結）
+- **DB/GCS 直接アクセス禁止**: すべて Professor 経由でデータ取得
 - **LLMには実IDを見せない**: Professorが割り当てた`temp_index`のみ扱う
 
+**参照**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)、[`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+
+#### Frontend（Next.js + FSD）の責務
+**役割**: UI/UX 提供、Professor API との統合
+
+- **Professor API のみを呼ぶ**: HTTP/JSON + SSE でバックエンドと通信（OpenAPI/Orval 生成）
+- **Librarian への直接通信は禁止**: すべて Professor 経由
+- **SSE リアルタイム表示**: 推論状態（thinking/searching/evidence/answer）をユーザーに可視化
+- **Chrome拡張機能**: LMS資料の自動検知・アップロード、ユーザー登録（Phase 2以降）
+- **Web版**: 既存ユーザーの閲覧専用（Phase 2以降、新規登録は拡張機能でのみ可能）
+
 #### 通信プロトコル
-- **Professor ↔ Librarian**: HTTP/JSON（エンドポイント: `POST /v1/librarian/search-agent`）
-- **Professor → Frontend**: SSE（`/v1/search/stream`）
+- **Frontend ↔ Professor**: HTTP/JSON（OpenAPI） + SSE（リアルタイム回答配信）
+- **Professor ↔ Librarian**: HTTP/JSON（内部通信、エンドポイント: `POST /v1/librarian/search-agent`）
 
-#### ハイブリッド検索（RRF）の設計
-- **実行主体**: Professor（Go）
-- **入力**: LibrarianからのHTTP POSTリクエスト
-  ```json
-  {
-    "keyword_list": ["決定係数", "定義"],
-    "semantic_query": "決定係数の定義と計算式",
-    "exclude_ids": ["chunk_001", "chunk_005"]
-  }
-  ```
-- **処理フロー**:
-  1. **並列検索**: BM25（全文検索） + pgvector（ベクトル検索）
-  2. **RRF統合**: 順位ベースで統合（スコアの単位差を吸収）
-  3. **動的k値**: `k = f(N, retry_count)`（N: 全チャンク数）
-  4. **除外**: `WHERE id NOT IN (exclude_ids)`をSQL層で強制
-- **返却**: `temp_index`付きチャンクリスト（最大k件）
+#### ハイブリッド検索（RRF統合）の詳細設計
 
-- **Frontend（Next.js）**: 
-  - UI/UX提供
-  - Professor APIとの統合（OpenAPI/Orval生成）
-  - SSEによる推論状態のリアルタイム表示
-  - Chrome拡張機能による自動アップロード
+本システムの検索戦略は、**全文検索を基盤** とし、必要に応じて **ベクトル検索（pgvector）** を併用するハイブリッドアプローチです。
+
+**検索戦略の基本方針**（参照: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md)）:
+- **ベースは全文検索**: 固有名詞・専門用語・数式に強い（講義資料の特性に適合）
+- **pgvector併用**: 同義語・言い換え・抽象度の高い問いに対応
+- **事前OCR**: テキスト化で全文検索の費用対効果を最大化
+
+**実行主体**: Professor（Go）の検索ツール
+**入力**: LibrarianからのHTTP POSTリクエスト
+```json
+{
+  "keyword_list": ["決定係数", "定義"],
+  "semantic_query": "決定係数の定義と計算式",
+  "exclude_ids": ["chunk_001", "chunk_005"]
+}
+```
+
+**処理フロー**:
+1. **並列検索**: BM25（全文検索、PostgreSQL `tsvector`） + pgvector（ベクトル検索、コサイン類似度）
+2. **RRF統合**: Reciprocal Rank Fusion（k=60）で順位ベースに統合
+   - 統合式: `Score = 1/(60 + Rank_vector) + 1/(60 + Rank_keyword)`
+   - 目的: BM25スコア（0〜∞）とコサイン類似度（0〜1）の単位差を吸収
+3. **動的k値**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を調整
+   | 母数N | k（初回） | k（2回目） | k（3回目以降） |
+   |:---:|:---:|:---:|:---:|
+   | N < 1,000 | 5 | 10 | 15 |
+   | 1,000 ≤ N < 100,000 | 10 | 20 | 30 |
+   | N ≥ 100,000 | 20 | 40 | 50 |
+4. **除外制御**: `WHERE id NOT IN (exclude_ids)`をSQL層で強制（既読チャンクの除外）
+5. **権限強制**: `subject_id`/`user_id`/`is_active` を SQL WHERE で必ず強制
+
+**返却**: `temp_index`付きチャンクリスト（最大k件、Markdown断片 + メタデータ）
+
+**参照**: [`00_quickstart/PROJECT_DECISIONS.md`](00_quickstart/PROJECT_DECISIONS.md)（検索パラメータの決定事項）、[`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)（Phase 3検索ループの設定指針）
 
 ### 上流ドキュメントへの参照
 - サービスコンセプト全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
@@ -74,12 +118,17 @@ Last-updated: 2026-02-16
 0. `00_quickstart/QUICKSTART.md`（30分で着手できる状態にする）
 1. `00_quickstart/PROJECT_DECISIONS.md`（プロジェクト固有の決定事項SSOT）
 
-**重要な前提（Phase構成）**:
+**重要な前提（Phase構成とロードマップ）**:
+
+本プロジェクトは段階的リリースを前提とし、Phase 1〜4で機能を積み上げます。**Phase 2で Chrome拡張機能とWebアプリを同時リリース** し、Chrome拡張機能が主要チャネル、Webアプリが補助チャネルとなります。
+
+詳細は [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md) を参照してください。
+
 - **Phase 1（開発環境 + Librarian統合）**: 
   - ローカルでの動作確認のみ
   - 認証なし（dev-user固定）
   - **Librarian推論ループの実装と検証（必須要件）**
-  - Professor → Librarian（gRPC）→ Professor のフロー確認
+  - Professor → Librarian（HTTP/JSON）→ Professor のフロー確認
   - 自動アップロード機能の実装と検証
   - Web版: curlやPostmanでAPIテスト + SSE動作確認
   - 拡張機能: Chromeにローカル読み込みで動作確認
@@ -95,15 +144,15 @@ Last-updated: 2026-02-16
     2. GitHubリリースページ（代替ダウンロード）
     3. 公式導入ガイド・解説ブログ
   
-- **Phase 3（学習支援機能強化）**:
-  - 学習ロードマップ生成
+- **Phase 3以降（将来）**:
+  - 学習ロードマップ生成（Learning Support）
   - 小テストHTML解析（Feedback Loop）
-  - コンテキスト自動認識サポート
+  - コンテキスト自動認識サポート（Seamless Experience）
   
-- **ファイルアップロード**: 
-  - フロントエンドにUIを実装してはならない
-  - Phase 1: API直接呼び出し + 拡張機能実装
-  - Phase 2: 拡張機能の自動アップロードのみ
+- **ファイルアップロード（重要）**: 
+  - **フロントエンドにUIを実装してはならない**
+  - Phase 1: API直接呼び出し（curl/Postman） + 拡張機能実装
+  - Phase 2: 拡張機能の自動アップロードのみ（Phase 1で実装済みの機能を本番適用）
 
 ## まず読む（最短ルート）
 1. **プロジェクト固有の前提**: `00_quickstart/PROJECT_DECISIONS.md` ← **最優先**
@@ -111,7 +160,7 @@ Last-updated: 2026-02-16
 
 ## 認証とユーザー登録の境界（Phase 2）
 
-### ユーザー登録フロー
+### ユーザー登録フロー（Chrome拡張機能とWebの役割分離）
 - **新規登録**: Chrome拡張機能でのSSO認証のみ許可
 - **既存ユーザーのログイン**: Web版でも可能（拡張機能で登録済みのユーザーのみ）
 
@@ -132,6 +181,63 @@ Web版でSSO認証後、未登録ユーザーと判定された場合：
 - Professor API: `POST /auth/login` が `user_not_found` を返した場合
 - フロントエンド: 拡張機能誘導画面へルーティング
 - エラーコード: `AUTH_USER_NOT_REGISTERED`（`ERROR_CODES.md`に追加）
+
+---
+
+## エラーコードと品質原則の整合性
+
+eduanimaRのエラーハンドリングは、Handbookで定義された品質原則（追跡可能性・説明可能性・透明性）に基づきます。
+
+### 品質原則との対応（SSOT: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)）
+
+#### 1. 追跡可能性（Traceability）
+- **原則**: 重要な処理・アクセスは後から検証できる形で記録し、ユーザーが何が起きたか理解できるようにする
+- **実装**:
+  - すべてのAPIリクエストに`request_id`を付与（`X-Request-ID`ヘッダー）
+  - Professor → Librarian推論ループでも`request_id`を伝播
+  - エラーレスポンスに`request_id`を含める
+  - ログ横断検索で原因調査が可能
+
+#### 2. 説明可能性（Explainability）
+- **原則**: ユーザーが「なぜそうなったか」を理解できる情報を提供
+- **実装**:
+  - エラーメッセージは機械可読（`code`）と人間可読（`message`）を分離
+  - 選定エビデンスには「なぜ選ばれたか」（`why_relevant`）を付与
+  - 検索結果0件時には「検索条件を緩める」などの提案を表示
+
+#### 3. 透明性（Transparency）
+- **原則**: 何を保存し、何に使い、どこへ送信されるかを明確にする
+- **実装**:
+  - SSEイベントで推論進行状態をリアルタイム表示（thinking/searching/evidence/answer）
+  - 参照元資料へのクリッカブルリンク（GCS署名付きURL + ページ番号）
+  - データ取り扱い方針をプライバシーポリシーで明示
+
+### エラーコード体系（SSOT: `03_integration/ERROR_CODES.md`、Professor: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)）
+
+**共通レスポンス形式**:
+```json
+{
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "message": "User not found",
+    "details": { "field": "user_id" },
+    "request_id": "abc-123-def"
+  }
+}
+```
+
+**主要エラーコードとUI対応**:
+| code | HTTP | 意味 | フロントエンド対応例 |
+| --- | --- | --- | --- |
+| `VALIDATION_FAILED` | 400 | 入力が不正 | フォームエラーを表示（Zod） |
+| `UNAUTHORIZED` | 401 | 認証なし/無効 | ログイン画面へリダイレクト |
+| `FORBIDDEN` | 403 | 権限なし | 権限不足のメッセージ表示 |
+| `NOT_FOUND` | 404 | リソース無し | 404ページ表示 |
+| `CONFLICT` | 409 | 競合（重複/状態不整合） | 再試行を促す |
+| `RATE_LIMITED` | 429 | レート制限 | リトライ待機時間を表示 |
+| `INTERNAL` | 500 | 想定外エラー | 汎用エラーページ |
+| `DEPENDENCY_UNAVAILABLE` | 503 | 依存サービス障害 | メンテナンス中表示 |
+| `AUTH_USER_NOT_REGISTERED` | 403 | 認証済み・未登録 | 拡張機能誘導画面表示 |
 
 ---
 
@@ -156,19 +262,24 @@ Web版でSSO認証後、未登録ユーザーと判定された場合：
 
 ## 観測性とrequest_id追跡
 
-### request_idの伝播
+### request_idの伝播（エビデンスのトレース）
 eduanimaRでは、リクエストの追跡可能性を確保するため、以下の経路で`request_id`を伝播します：
 
 1. **フロントエンド → Professor**: Professor APIリクエストに`X-Request-ID`ヘッダーを含める
-2. **Professor → Librarian**: Librarian推論ループ呼び出し時に`request_id`を渡す
+2. **Professor → Librarian**: Librarian推論ループ呼び出し（HTTP/JSON）時に`request_id`を渡す
 3. **Professor → フロントエンド**: SSEイベントおよびレスポンスに`request_id`を含める
 
-### トレース方法
+### トレース方法（説明責任の担保）
 - **ログ検索**: `request_id`でProfessor/Librarianのログを横断検索
 - **エラー追跡**: エラー発生時、`request_id`を含むログで原因調査
 - **パフォーマンス分析**: `request_id`単位でリクエスト処理時間を計測
+- **エビデンス検証**: 「なぜこの資料が選ばれたか」を`request_id`で追跡可能
 
-詳細は `05_operations/OBSERVABILITY.md` を参照。
+**品質原則との対応**:
+- **追跡可能性**: 問題発生時に原因を特定できる（Handbook 品質原則4）
+- **説明可能性**: エビデンス選定理由を後から検証できる
+
+詳細は `05_operations/OBSERVABILITY.md` および [`../../eduanimaR_Professor/docs/05_operations/OBSERVABILITY.md`](../../eduanimaR_Professor/docs/05_operations/OBSERVABILITY.md) を参照。
 
 ---
 
@@ -254,3 +365,11 @@ eduanimaRでは、リクエストの追跡可能性を確保するため、以�
 - バックエンド全体の責務と契約：`../eduanimaR_Professor/docs/README.md`
 - バックエンドとフロントエンドの対応関係：`01_architecture/FSD_LAYERS.md` 内の対応表を参照
 - API契約の詳細：`03_integration/API_CONTRACT_WORKFLOW.md` および `../eduanimaR_Professor/docs/03_integration/API_GEN.md`
+### バックエンド設計への直接リンク（SSOT）
+- **Professor 全体の責務と契約**: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
+- **サービス境界（MICROSERVICES_MAP）**: [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+- **DB スキーマ設計**: [`../../eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`](../../eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_DESIGN.md)
+- **DB テーブル定義**: [`../../eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_TABLES.md`](../../eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_TABLES.md)
+- **ENUM 参照**: DB設計ドキュメント内に記載（StatusEnum、RoleEnum 等）
+- **Professor の Clean Architecture**: [`../../eduanimaR_Professor/docs/01_architecture/CLEAN_ARCHITECTURE.md`](../../eduanimaR_Professor/docs/01_architecture/CLEAN_ARCHITECTURE.md)
+- **Librarian 責務詳細**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
