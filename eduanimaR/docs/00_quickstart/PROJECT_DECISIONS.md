@@ -198,9 +198,9 @@ export const EXTENSION_URLS = {
 - **Phase 2**: SSO認証、本番環境デプロイ
 - **Phase 3**: Librarian推論ループ連携、高度な検索
   - **Librarian連携UI要件**:
-    - 検索ループ進行表示（`widgets/search-loop-status`）
+    - Librarian推論ループ進行表示（`widgets/search-loop-status`）
     - 選定エビデンス表示（`entities/evidence`）
-    - 推論理由の可視化（なぜこのエビデンスが選ばれたか）
+    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
   - Professor SSEでのリアルタイム配信（`search_loop_progress`、`evidence_selected`イベント）
 - **Phase 4**: 学習計画、進捗管理
 

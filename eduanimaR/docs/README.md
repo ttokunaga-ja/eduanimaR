@@ -20,8 +20,8 @@ Last-updated: 2026-02-16
   - 外向き API（HTTP/JSON + SSE）を提供
   - Librarian推論ループ結果を受け取り、安定ID（`document_id`）に変換してフロントエンドへ配信
 - **Librarian（Python）**: 検索戦略立案、LangGraph Agent による推論（Professor経由でのみ検索実行）
-  - **推論ループ制御**: LangGraphによる検索ループ制御と`max_retries`設定
-  - **停止条件**: 十分なエビデンスが集まった時点で推論を終了
+  - **推論ループ制御**: LangGraphによるLibrarian推論ループ制御と`max_retries`設定
+  - **停止条件**: 十分な選定エビデンスが集まった時点で推論を終了
   - **通信プロトコル**: Professor ↔ Librarian間はHTTP/JSON（エンドポイント: `POST /v1/librarian/search-agent`）
   - **ステートレス**: 会話履歴・キャッシュ等の永続化なし（1リクエスト内で推論完結）
 
@@ -58,9 +58,9 @@ Last-updated: 2026-02-16
   
 - **Phase 3（Librarian推論ループ連携）**:
   - Librarian推論ループのUI反映
-    - 検索ループ進行状況の表示（現在の試行回数、停止条件達成状況）
+    - Librarian推論ループ進行状況の表示（現在の試行回数、停止条件達成状況）
     - 選定エビデンス（Librarianが選定した根拠箇所）の表示
-    - 推論理由の可視化（なぜこのエビデンスが選ばれたか）
+    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
   - Professor SSEでのリアルタイム配信
     - `search_loop_progress` イベント（推論ループの中間状態）
     - `evidence_selected` イベント（選定エビデンス）
