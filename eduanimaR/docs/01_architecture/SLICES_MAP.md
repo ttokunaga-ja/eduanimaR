@@ -24,7 +24,7 @@ Last-updated: 2026-02-16
 
 | Slice | 責務 | 主要エクスポート | 備考 |
 |-------|------|--------------|------|
-| `qa-chat` | **汎用質問対応**（すべてのユースケースを単一UIで実現） | `QAChatPanel`, `useQAStream` | SSEイベント（thinking/searching/evidence/answer）を受信して状態を更新。以下すべてに対応:<br>- 資料収集依頼<br>- 質問内容の明確化<br>- 小テスト解説<br>- 明確な質問への直接回答<br><br>**重要**: 個別のFeature（`search-materials`、`clarify-question`など）は作らない。すべて`qa-chat`の責務。 |
+| `qa-chat` | **汎用質問対応**（すべてのユースケースを単一UIで実現） | `QAChatPanel`, `useQAStream` | SSEイベント（thinking/searching/evidence/answer）を受信して状態を更新。以下すべてに対応:<br>- 資料収集依頼<br>- 質問内容の明確化<br>- 小テスト解説<br>- 明確な質問への直接回答<br><br>**提供チャネル**:<br>- **Chrome拡張**: MoodleのFABメニューから起動 → サイドパネル表示（画面右端、幅400px、リサイズ可能、状態永続化）<br>- **Webアプリ**: ページ内に常時表示（Phase 2以降）<br><br>**重要**: 個別のFeature（`search-materials`、`clarify-question`など）は作らない。すべて`qa-chat`の責務。 |
 | `auth-sso` | SSO認証（Google/Meta/Microsoft/LINE） | `SSOLoginButton` | Phase 2 |
 
 ---

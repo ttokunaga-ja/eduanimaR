@@ -242,30 +242,68 @@ npm run build:extension
 
 Phase 1では、以下を**完全実装**します:
 
-1. **LMS資料の自動検知**:
+1. **FABメニュー統合**:
+   - MoodleのFABメニュー（PENアイコン）を検出
+   - メニュー内に「AI質問」アイテムを追加（DOM操作）
+   - クリック時にサイドパネルをトグル表示
+   - **完了条件**: FABメニューから「AI質問」を起動でき、トグル動作が機能する
+
+2. **サイドパネル実装**:
+   - Plasmo CSUIでReactコンポーネントをマウント
+   - 画面右端に固定（position: fixed、幅400px、高さ100vh）
+   - 開閉アニメーション（transform: translateX、0.3秒）
+   - 閉じるボタン（「>」ボタン、パネル左端）
+   - **完了条件**: サイドパネルが正常に表示され、開閉アニメーションが動作する
+
+3. **状態永続化**:
+   - sessionStorageに以下を保存
+     - パネル開閉状態（isOpen）
+     - スクロール位置（scrollPosition）
+     - 会話履歴（conversationHistory）
+   - ページリロード時に状態復元
+   - **完了条件**: ページ遷移後も状態が維持される
+
+4. **ページ遷移対応**:
+   - 通常遷移（ページ全体リロード）: Content Script再実行 → 状態復元
+   - SPAナビゲーション（Turbo等）: `turbo:load`イベントリスナー → 状態維持
+   - DOM再構築: MutationObserverでFABメニュー再検出 → アイテム再挿入
+   - **完了条件**: すべての遷移パターンで状態が維持される
+
+5. **LMS資料の自動検知**:
    - MutationObserverでLMS DOMを監視
    - 資料ダウンロードリンク・PDFファイル名を抽出
    - 検知した資料をローカルストレージに一時保存
+   - **完了条件**: LMSページで新しい資料が追加されたときに自動検知される
 
-2. **自動アップロード**:
+6. **自動アップロード**:
    - Plasmo Messagingで Content Scripts → Background/Service Worker へファイル送信
    - Background/Service Worker から Professor API (`POST /v1/materials/upload`) へ送信
    - アップロード状態（成功/失敗/進行中）をUIに表示
+   - **完了条件**: 資料が自動アップロードされ、状態がUI表示される
 
-3. **質問機能（QAチャット）**:
-   - Sidepanel/Popup内で質問入力欄を表示
+7. **質問機能（QAチャット）**:
+   - サイドパネル内で質問入力欄を表示
    - Professor API (`POST /v1/qa/ask`、SSE) へ質問送信
    - SSEイベント（thinking/searching/evidence/answer）をリアルタイム表示
+   - エビデンスカード表示（クリッカブルURL、why_relevant、snippets）
+   - **完了条件**: 質問を送信でき、SSEイベントがリアルタイム表示される
 
-4. **ローカル動作検証**:
+8. **ローカル動作検証**:
    - `npm run build:extension` でビルド
    - Chromeに手動読み込み（`chrome://extensions/` → 「デベロッパーモード」→「パッケージ化されていない拡張機能を読み込む」）
    - ローカルProfessor API（`http://localhost:8080`）に接続して動作確認
+   - **検証項目**:
+     - FABメニューから「AI質問」を起動できる
+     - サイドパネルが正常に表示される
+     - ページ遷移後も状態が維持される
+     - 質問を送信でき、SSEイベントが表示される
 
 **Phase 1で実装しないこと**（Phase 2以降）:
 - ❌ SSO認証（Phase 1は`dev-user`固定）
 - ❌ Chrome Web Storeへの公開
 - ❌ 本番環境へのデプロイ
+- ❌ パネルのリサイズ機能
+- ❌ フォールバック（独立ボタン等）
 
 ### Phase 2での拡張機能公開
 - **SSO認証**: LMS上でのGoogle/Meta/Microsoft/LINE認証
