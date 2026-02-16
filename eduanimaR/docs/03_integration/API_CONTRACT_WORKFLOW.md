@@ -22,7 +22,8 @@ Last-updated: 2026-02-16
 
 ## 結論（Must）
 
-- OpenAPI は **契約のSSOT**（フロントで推測実装しない）
+- OpenAPI は **外部API契約（Frontend ↔ Professor）のSSOT**（フロントで推測実装しない）
+- **内部RPC（Professor ↔ Librarian）はgRPC/Protoが正**（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）
 - 固定値（enum）は **API契約（OpenAPI）で定義した enum を SSOT とし、生成物（Orval等）でフロントに取り込む**
   - バックエンドでは可能な箇所で **DB の ENUM（PostgreSQL ENUM）を採用**し、API / DB / アプリケーション間で enum の意味とマッピングを明確に保つ
   - フロントで TypeScript の `enum` を使用するかどうかは、変更頻度・互換性（未知値の扱い）・運用性を考慮して判断する
@@ -60,7 +61,11 @@ Last-updated: 2026-02-16
 
 ## 1) SSOT（Single Source of Truth）
 
-SSOT の優先順位：
+**契約の種類と管理**:
+- **外部API（Frontend ↔ Professor）**: OpenAPI（`openapi/openapi.yaml`）
+- **内部RPC（Professor ↔ Librarian）**: gRPC/Proto（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）
+
+**フロントエンドのSSOT優先順位**：
 1. OpenAPI（バックエンド）
 2. Orval生成物（フロントの型/クライアント）
 3. フロント実装（UI/画面）

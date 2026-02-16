@@ -5,7 +5,7 @@
 | 項目 | バージョン | リリース日 | 備考・新機能要約 |
 | :--- | :--- | :--- | :--- |
 | **Go** | **1.25.7** | 2026/02/04 | 最新安定版。セキュリティ修正およびコンパイラ最適化を含む。 |
-| **gRPC (google.golang.org/grpc)** | **latest** | - | **Professor ↔ Librarian** の内部通信。Protocol Buffers(.proto)で型安全な契約。 |
+| **gRPC (google.golang.org/grpc)** | **latest** | - | **Professor ↔ Librarian** の内部通信。Protocol Buffers(.proto)で型安全な契約。双方向ストリーミングに対応。契約: `proto/librarian/v1/librarian.proto` |
 | **PostgreSQL** | **18.1** | 2025/10頃~ | `uuidv7()`、非同期I/O (AIO)、B-tree Skip Scanの正式サポート。 |
 | **pgvector** | **0.8.1** | 2025/09/04 | HNSWインデックスの構築・検索パフォーマンス向上。反復インデックススキャン対応。 |
 | **Atlas** | **v1.0.0** | 2025/12/24 | メジャーリリース到達。Monitoring as Code、Schema Statistics機能追加。 |
@@ -53,7 +53,7 @@
 
 ## 通信スタック（SSOT）
 - Frontend ↔ Professor: **HTTP/JSON（OpenAPI）** + **SSE**
-- Professor ↔ Librarian: **gRPC（Proto）**
+- Professor ↔ Librarian: **gRPC（Proto、双方向ストリーミング）**、契約: `proto/librarian/v1/librarian.proto`
 
 ## 設計ポリシー
 - **UUID + NanoID**: 内部主キーはUUID（推奨: UUIDv7）、外部公開キーはNanoIDを採用し、セキュリティとユーザビリティを両立する。

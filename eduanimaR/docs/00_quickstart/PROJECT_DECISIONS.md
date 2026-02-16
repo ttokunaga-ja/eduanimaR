@@ -83,7 +83,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
     - 検索の物理実行・権限強制
     - 最終回答生成（Gemini 3 Pro）
     - Phase 2（大戦略）: タスク分割・停止条件定義
-    - **責務境界**: HTTP/JSONのみを提供（Librarianとの通信もHTTP/JSON）
+    - **責務境界**: HTTP/JSONのみを提供（Librarianとの内部通信はgRPC）
     - **参照**: [`../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md)
     
   - **Librarian（Python）**: 
@@ -97,7 +97,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
     
   - **通信**:
     - Frontend ↔ Professor: HTTP/OpenAPI + SSE
-    - Professor ↔ Librarian: HTTP/JSON（内部通信、gRPCではない）
+    - Professor ↔ Librarian: **gRPC（双方向ストリーミング）**、契約: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
 
 ## Next.js（Must）
 - **SSR/Hydration**: 原則 Must（学習支援UIの即応性を重視）

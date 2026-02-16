@@ -4,7 +4,7 @@
 
 他コンポーネント（例: フロントエンド / Librarian 推論サービス）については、このリポジトリでは **通信（契約）と役割（責務境界）** のみを扱い、実装詳細は扱いません。
 
-特に、検索戦略は **大戦略（Phase 2: GoがWHAT/停止条件）** と **小戦略（Phase 3: PythonがHOW/終了判定）** に分担し、Professor（Go）が検索の物理実行と最終回答生成を担います。責務分離の正は `01_architecture/MICROSERVICES_MAP.md` を参照してください。
+特に、検索戦略は **大戦略（Phase 2: GoがWHAT/停止条件）** と **小戦略（Phase 3: PythonがHOW/終了判定）** に分担し、Professor（Go）が検索の物理実行と最終回答生成を担います。Professor ↔ Librarian間の通信は **gRPC（双方向ストリーミング）** で行い、契約は `proto/librarian/v1/librarian.proto` で定義されています。責務分離の正は `01_architecture/MICROSERVICES_MAP.md` を参照してください。
 
 ## Quickstart（最短で開発開始）
 0. `00_quickstart/QUICKSTART.md`
