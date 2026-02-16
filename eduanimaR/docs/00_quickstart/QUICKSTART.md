@@ -212,6 +212,61 @@ npm run build:extension
 - ローカル環境での動作検証（Chromeに手動読み込み）
 - **Librarian推論ループとの統合確認**（質問機能のテスト）
 
+### 技術スタック（確定）
+
+本プロジェクトのChrome拡張機能は、以下の技術スタックで実装します:
+
+| 技術要素 | 詳細 |
+|---------|------|
+| **Framework** | **Plasmo Framework**（Manifest V3対応、Reactベース） |
+| **UI System** | MUI v6 + Pigment CSS（Shadow DOM隔離戦略） |
+| **DOM検知** | **MutationObserver**（LMS資料の自動検知） |
+| **拡張内通信** | **Plasmo Messaging**（Content Scripts ⇔ Background/Service Worker） |
+| **外部通信** | Background/Service Workerから Professor API へHTTP（CORS制約なし） |
+| **Service Worker前提** | 常駐しない設計（起動/停止の揺らぎを許容） |
+| **認証** | Phase 1: dev-user固定、Phase 2: SSO（OAuth/OIDC）トークンをChrome Storageへ保存 |
+
+**Shadow DOM隔離戦略**:
+- LMSサイトのCSSと拡張機能のCSSが衝突しないよう、Shadow DOMで隔離
+- MUI Pigment CSS をShadow Root内で適用
+
+**MutationObserver設計**:
+- LMS資料のDOM変更を監視し、新しい資料を自動検知
+- 検知後、Professor API (`/v1/materials/upload`) へ自動送信
+
+**参照**: 
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144
+- [`../02_tech_stack/STACK.md`](../02_tech_stack/STACK.md)
+
+### Phase 1実装範囲（詳細）
+
+Phase 1では、以下を**完全実装**します:
+
+1. **LMS資料の自動検知**:
+   - MutationObserverでLMS DOMを監視
+   - 資料ダウンロードリンク・PDFファイル名を抽出
+   - 検知した資料をローカルストレージに一時保存
+
+2. **自動アップロード**:
+   - Plasmo Messagingで Content Scripts → Background/Service Worker へファイル送信
+   - Background/Service Worker から Professor API (`POST /v1/materials/upload`) へ送信
+   - アップロード状態（成功/失敗/進行中）をUIに表示
+
+3. **質問機能（QAチャット）**:
+   - Sidepanel/Popup内で質問入力欄を表示
+   - Professor API (`POST /v1/qa/ask`、SSE) へ質問送信
+   - SSEイベント（thinking/searching/evidence/answer）をリアルタイム表示
+
+4. **ローカル動作検証**:
+   - `npm run build:extension` でビルド
+   - Chromeに手動読み込み（`chrome://extensions/` → 「デベロッパーモード」→「パッケージ化されていない拡張機能を読み込む」）
+   - ローカルProfessor API（`http://localhost:8080`）に接続して動作確認
+
+**Phase 1で実装しないこと**（Phase 2以降）:
+- ❌ SSO認証（Phase 1は`dev-user`固定）
+- ❌ Chrome Web Storeへの公開
+- ❌ 本番環境へのデプロイ
+
 ### Phase 2での拡張機能公開
 - **SSO認証**: LMS上でのGoogle/Meta/Microsoft/LINE認証
 - **ユーザー登録**: 拡張機能からのみユーザー登録可能
