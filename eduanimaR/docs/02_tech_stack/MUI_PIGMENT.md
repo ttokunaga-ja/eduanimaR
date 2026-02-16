@@ -9,6 +9,55 @@
 
 ---
 
+## デザイン原則（Handbookより）
+
+eduanimaRのデザインは、以下の4原則に基づきます：
+
+1. **Calm & Academic（落ち着いた学術的雰囲気）**
+   - 過度なアニメーションを避ける
+   - 学習に集中できる落ち着いた配色
+   - 装飾より可読性を優先
+2. **Clarity First（明瞭性優先）**
+   - 情報の階層を明確にする
+   - タイポグラフィの一貫性を保つ
+   - 専門用語を最小化
+3. **Trust by Design（信頼できる設計）**
+   - データの共有範囲を明示
+   - 権限が曖昧にならない
+   - 誤って他者のデータが見えることがない
+4. **Evidence-forward（エビデンスを主役に）**
+   - 根拠となる資料を常に明示
+   - ソース（資料名・ページ番号）を先頭に表示
+   - クリッカブルなリンクで原典にアクセス可能
+
+**参照**: [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)、[`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)
+
+## 色の使用方針（Handbookより）
+
+eduanimaRの色使用は、以下の原則に基づきます：
+
+- **色は意味に紐づける**: 装飾目的での色の増殖を避ける
+  - Neutral（グレースケール）: デフォルト
+  - Accent（ブランドカラー）: アクションボタン
+  - Success/Warning/Error: 状態フィードバック
+- **重要な警告は色だけに依存しない**: アイコンやテキストを併用
+- **アクセシビリティ**: WCAG AA準拠のコントラスト比を確保
+
+**参照**: [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
+
+## タイポグラフィ原則（Handbookより）
+
+eduanimaRのタイポグラフィは、以下の原則に基づきます：
+
+- **可読性優先**: 行間・文字間を適切に設定
+- **階層の明確化**: h1-h6、body、captionで情報階層を表現
+- **一貫性**: フォントサイズ・ウェイトを統一
+- **和文対応**: 日本語フォントの可読性を考慮
+
+**参照**: [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
+
+---
+
 ## セットアップ方針（Next.js）
 
 Pigment CSS はビルド時にスタイルを抽出します。Next.js ではプラグイン設定と stylesheet の import が必要です。

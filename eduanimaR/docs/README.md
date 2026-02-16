@@ -21,6 +21,16 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 **参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)、[`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)
 
+### プロダクト4大原則
+eduanimaRは以下の4大原則に基づき設計されています：
+
+1. **学習支援目的（Learning Support First）**: 学習者の発見・理解・計画を支援する（自動回答生成ではない）
+2. **データ最小化（Data Minimization）**: 必要最小限のデータのみ収集・保持する
+3. **厳格なアクセス制御（Strict Access Control）**: SSO基盤、ユーザー別データ分離、デフォルト非共有
+4. **透明性（Traceability & Explainability）**: すべての重要な操作をログ記録し、ユーザーが「なぜ」を理解できるようにする
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
 ### Professor / Librarian の責務境界（SSOT）
 
 本システムは **2サービス構成** です。DB/GCS/検索インデックスへの直接アクセス権限は Professor のみに付与します（最重要不変条件）。
@@ -106,11 +116,32 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 **参照**: [`00_quickstart/PROJECT_DECISIONS.md`](00_quickstart/PROJECT_DECISIONS.md)（検索パラメータの決定事項）、[`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)（Phase 3検索ループの設定指針）
 
 ### 上流ドキュメントへの参照
-- サービスコンセプト全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
-- Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
-- Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+
+#### eduanimaRHandbook（サービスコンセプト全体）
+- Handbook全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
+- **01_philosophy（哲学・価値観）**:
+  - ミッション・ビジョン・プロダクト原則: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+  - プライバシーポリシー: [`../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md`](../../eduanimaRHandbook/01_philosophy/PRIVACY_POLICY.md)
+- **02_strategy（戦略）**:
+  - リーンキャンバス: [`../../eduanimaRHandbook/02_strategy/LEAN_CANVAS.md`](../../eduanimaRHandbook/02_strategy/LEAN_CANVAS.md)
+  - Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+  - Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+- **03_customer（顧客理解）**:
+  - ペルソナ: [`../../eduanimaRHandbook/03_customer/PERSONAS.md`](../../eduanimaRHandbook/03_customer/PERSONAS.md)
+  - カスタマージャーニー: [`../../eduanimaRHandbook/03_customer/CUSTOMER_JOURNEY.md`](../../eduanimaRHandbook/03_customer/CUSTOMER_JOURNEY.md)
+- **04_product（プロダクト）**:
+  - ブランドガイドライン: [`../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md`](../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md)
+  - ビジュアルアイデンティティ: [`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
+  - ロードマップ: [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
+- **05_goals（目標・指標）**:
+  - OKR/KPI: [`../../eduanimaRHandbook/05_goals/OKR_KPI.md`](../../eduanimaRHandbook/05_goals/OKR_KPI.md)
+
+#### バックエンドサービス実装
 - バックエンド Professor 実装: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
+  - マイクロサービス構成: [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+  - エラーコード体系: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)
 - バックエンド Librarian 実装: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
+  - Librarian詳細仕様: [`../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md)
 
 ---
 

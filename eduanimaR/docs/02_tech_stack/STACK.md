@@ -15,7 +15,39 @@ Last-updated: 2026-02-16
 
 **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
 
+**Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態を当たり前にする
+
 **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
+### 独自価値提案（Unique Value Proposition）
+
+> **「あなたのLMS資料を、あなた専用の生きた知識ベースに変える司書と教授」**
+
+**Vision Reasoning（画像・数式の意味理解）**:
+- 図やグラフ、数式を「意味」として理解（単なるテキスト抽出ではない）
+
+**LangGraph Agent（自動再試行検索パターン）**:
+- 検索戦略を自律的に立案・修正
+- 高い資料発見率を実現
+
+**Go/Python ハイブリッド**:
+- 堅牢なデータ管理（Go）+ 高度なAI推論（Python）の組み合わせ
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/LEAN_CANVAS.md`](../../eduanimaRHandbook/02_strategy/LEAN_CANVAS.md)
+
+### 提供価値（学習支援特化）
+
+eduanimaRは「資料の着眼点を示し、原典への回帰を促す」学習支援ツールです：
+
+- **探索支援**: 資料のどこに何が書いてあるかを素早く特定
+- **理解支援**: 重要箇所を示し、学習者の理解を促進
+- **学習計画**: 次に何を学ぶべきかを明確化
+
+**原則**:
+- 評価・試験での不正な優位を得る目的での利用は想定しない
+- 学習者の自律的な学習を支援する
 
 **参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
 
@@ -72,6 +104,38 @@ Last-updated: 2026-02-16
 - **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
 - **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示
 - **会話履歴管理**: Librarianがステートレスのため、クライアント側で保持
+
+### Professor OpenAPI契約の詳細（SSEストリーミング・エビデンス表示）
+
+#### SSEイベントタイプと処理要件
+
+Professor の `/v1/qa/stream` エンドポイントは、以下のSSEイベントをリアルタイム配信します：
+
+| イベントタイプ | 内容 | フロントエンド処理 |
+|:---|:---|:---|
+| `thinking` | Phase 2実行中（タスク分割・停止条件生成） | プログレス表示「AI Agentが検索方針を決定しています」 |
+| `searching` | Librarian推論ループ実行中（最大5回） | プログレスバー更新（例：「2/5回目の検索」） |
+| `evidence` | 選定エビデンス提示 | エビデンスカード表示（クリッカブルURL、why_relevant、snippets） |
+| `answer` | 最終回答生成中（Gemini 3 Pro） | リアルタイムにテキスト追加表示 |
+| `done` | 完了通知 | SSE接続を閉じる |
+| `error` | エラー通知 | エラートースト表示 |
+
+#### エビデンス表示の必須要素
+
+Professor OpenAPI契約に基づく、エビデンスカードの必須表示要素：
+
+- **クリッカブルpath/url**: GCS署名付きURLで原典にアクセス可能
+- **ページ番号（page）**: 該当箇所のページ番号（例：「p.3」）
+- **why_relevant**: なぜこの箇所が選ばれたかの説明文
+- **snippets**: 資料からの抜粋（Markdown形式）
+- **heading**: 該当セクションの見出し
+
+**実装要件**:
+- エビデンスカードは「主役」として画面上部に配置（情報階層に基づく）
+- クリック時に原典（PDF/GCSリンク）へ遷移
+- why_relevantを明示し、学習者が「なぜ」を理解できるようにする
+
+**参照**: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)、[`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
 
 ### Gemini モデル役割分担
 - **Gemini 3 Flash**: 
