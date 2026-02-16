@@ -7,19 +7,27 @@ Last-updated: 2026-02-16
 ## 読む順序（推奨）
 
 **まず最初に上流ドキュメントを参照してください**:
-- `../../eduanimaRHandbook/README.md` - サービス全体のコンセプトと設計原則
-- `../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md` - Mission/Vision/North Star
-- `../../eduanimaRHandbook/04_product/ROADMAP.md` - Phase別のリリース計画
+- [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md) - サービス全体のコンセプトと設計原則（テンプレート説明）
+- [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md) - Mission/Vision/North Star（**最重要**: 学習支援の目的と原則）
+- [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md) - Phase別のリリース計画（Phase 1〜4の詳細）
+- [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) - 技術方針（検索戦略/セキュリティ前提/データ基盤）
 
 サービス全体のコンセプトを理解してからフロントエンド実装に入ることで、設計判断の背景が明確になります。
 
 ## 0) 前提
-- **Node.js**: LTS 推奨（v20以上）
+
+- **Node.js**: LTS 推奨（v20以上、最新は v24.13.1）
 - **パッケージマネージャ**: `npm`（統一）
 - **バックエンド**: 
   - Professor（Go）がローカルまたはCloud Runで稼働
   - Librarian（Python）がローカルまたはCloud Runで稼働
-  - Professor ↔ Librarian 間のgRPC通信が確立されていること
+  - Professor ↔ Librarian 間のHTTP/JSON通信が確立されていること（エンドポイント: `POST /v1/librarian/search-agent`）
+
+**重要**: Librarianはステートレスサービス（会話履歴・キャッシュなし）です。1リクエスト内で推論が完結します。
+
+**バックエンド詳細参照**:
+- Professor: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
+- Librarian: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
 
 ## 1) ローカル起動（最短）
 ```bash
@@ -48,6 +56,10 @@ SSOT：`03_integration/DOCKER_ENV.md` と `05_operations/RELEASE.md`
 
 フロントエンドは Professor の OpenAPI 仕様から型・クライアントを自動生成します。
 
+**契約駆動開発の原則**（参照: [`../03_integration/API_GEN.md`](../03_integration/API_GEN.md)）:
+- 手書きの型定義を禁止し、契約ズレを根絶する
+- API 呼び出しの入口を `shared/api` に集約し、実装のばらつきを防ぐ
+
 1. Professor の OpenAPI を取得：
    ```bash
    curl http://localhost:8080/swagger/openapi.yaml > openapi/openapi.yaml
@@ -60,9 +72,11 @@ SSOT：`03_integration/DOCKER_ENV.md` と `05_operations/RELEASE.md`
    → `src/shared/api/generated/` に TypeScript コードが生成される
 
 **重要なエンドポイント**:
-- `/v1/qa/ask` (SSE): 質問 → Librarian推論 → 回答生成のストリーミング
-- `/v1/materials/upload`: ファイルアップロード（拡張機能・curl使用）
+- `/v1/qa/ask` (SSE): 質問 → Librarian推論ループ → 回答生成のストリーミング
+- `/v1/materials/upload`: ファイルアップロード（Chrome拡張機能・curl使用、**Web版UIなし**）
 - `/v1/subjects`: 科目一覧取得
+
+SSOT：[`../03_integration/API_GEN.md`](../03_integration/API_GEN.md)、Professor: [`../../eduanimaR_Professor/docs/03_integration/API_GEN.md`](../../eduanimaR_Professor/docs/03_integration/API_GEN.md)
 
 SSOT：`03_integration/API_GEN.md`
 
