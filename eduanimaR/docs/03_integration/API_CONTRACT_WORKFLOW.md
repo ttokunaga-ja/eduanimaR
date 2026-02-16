@@ -1,4 +1,15 @@
+---
+Title: API Contract Workflow
+Description: eduanimaRのAPI契約管理とOpenAPI運用フロー
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, api, openapi, orval, professor
+---
+
 # API Contract Workflow（OpenAPI / Orval）
+
+Last-updated: 2026-02-15
 
 このドキュメントは、バックエンド（Go Gateway / Microservices）との **API契約（OpenAPI）** を、
 フロントエンド（Next.js + FSD）で **安全に運用するための手順と禁止事項** を固定します。
@@ -153,3 +164,59 @@ Professor の `/qa/stream` エンドポイントは以下のイベント型を�
 - OpenAPI の `version` フィールドを SSOT とする
 - メジャーバージョンアップ（v1 → v2）時は、フロントエンドの API クライアント生成を再実行
 - マイナー・パッチバージョンは後方互換を保証
+
+---
+
+## Professor OpenAPIがSSOT
+
+### 契約の場所
+- **SSOT**: `eduanimaR_Professor/docs/openapi.yaml`
+- **管理**: Professor（Go）リポジトリ
+- **フロントエンド**: 自動生成クライアント（Orval）
+
+### OpenAPI更新フロー
+
+1. **Professor側で更新**
+   - `docs/openapi.yaml` を修正
+   - Breaking Changesを明記（コメント or CHANGELOG）
+
+2. **フロントエンド側で対応**
+   - OpenAPI取得: `curl https://professor.example.com/openapi.yaml > openapi.yaml`
+   - Orval再生成: `npm run api:generate`
+   - 差分確認: `git diff src/shared/api/generated/`
+   - 必要に応じてコード修正
+
+3. **CI/CDで整合性チェック**
+   - Orval再生成を実行
+   - 差分があればCIエラー
+
+### Breaking Changes対応
+
+#### 例: 必須フィールド追加
+```yaml
+# Before
+QuestionRequest:
+  type: object
+  properties:
+    text: string
+
+# After
+QuestionRequest:
+  type: object
+  required:
+    - text
+    - subjectId  # 新規必須
+  properties:
+    text: string
+    subjectId: string
+```
+
+#### 移行計画
+1. Professor側で`subjectId`を任意フィールドとして追加（v1.1）
+2. フロントエンド側で対応（3ヶ月猶予）
+3. Professor側で必須化（v2.0）
+
+### APIバージョニング
+- **形式**: `/v1/`, `/v2/`
+- **移行期間**: 旧バージョンは6ヶ月サポート
+- **廃止通知**: レスポンスヘッダー `X-API-Deprecated: true`

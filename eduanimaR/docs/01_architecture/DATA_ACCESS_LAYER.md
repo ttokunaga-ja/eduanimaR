@@ -1,4 +1,15 @@
+---
+Title: Data Access Layer
+Description: eduanimaRのデータアクセス層ポリシーとProfessor API統合
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, dal, api, professor
+---
+
 # Data Access Layer（DAL）ポリシー
+
+Last-updated: 2026-02-15
 
 このドキュメントは、Next.js App Router（RSC）時代の「データ取得の置き場所」を固定し、
 - 認可漏れ
@@ -84,3 +95,76 @@ DAL の modules は先頭に `import 'server-only'` を置く運用を推奨し�
 - `"use client"` ファイルが server-only module を import していないか
 - Client props の型が過剰に広くないか（バックエンドの型をそのまま使っていないか）
 - DAL が “認可” と “DTO 最小化” を必ずしているか
+
+---
+
+## Professor API統一呼び出し
+
+### Orval生成クライアントの配置
+- **生成先**: `src/shared/api/generated/`
+- **生成コマンド**: `npm run api:generate`
+- **SSOT**: `eduanimaR_Professor/docs/openapi.yaml`
+
+### Phase別の実装切り替え
+
+#### Phase 1: 認証スキップ
+```typescript
+// src/shared/api/client.ts
+export const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, // http://localhost:8080
+  headers: {
+    'X-Dev-User': 'dev-user', // Phase 1のみ
+  },
+});
+```
+
+#### Phase 2: トークン付与
+```typescript
+// src/shared/api/client.ts
+export const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, // https://professor.example.com
+});
+
+apiClient.interceptors.request.use(async (config) => {
+  const session = await getSession();
+  if (session?.accessToken) {
+    config.headers.Authorization = `Bearer ${session.accessToken}`;
+  }
+  return config;
+});
+```
+
+### SSE（Server-Sent Events）の扱い
+
+#### 回答ストリーミング
+```typescript
+// src/shared/api/sse.ts
+export function streamAnswer(questionId: string, onMessage: (chunk: string) => void) {
+  const eventSource = new EventSource(`/v1/qa/stream?questionId=${questionId}`);
+  
+  eventSource.onmessage = (event) => {
+    onMessage(event.data);
+  };
+  
+  eventSource.onerror = () => {
+    eventSource.close();
+  };
+  
+  return () => eventSource.close();
+}
+```
+
+### エラーハンドリング統一
+
+```typescript
+// src/shared/api/error-handler.ts
+import { ERROR_CODES } from './error-codes';
+
+export function handleApiError(error: AxiosError) {
+  const code = error.response?.data?.code;
+  const message = ERROR_CODES[code] || 'エラーが発生しました';
+  
+  // トースト通知、エラーページ表示など
+  showErrorToast(message);
+}
+```

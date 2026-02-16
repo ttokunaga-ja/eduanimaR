@@ -1,3 +1,12 @@
+---
+Title: Project Decisions
+Description: eduanimaRプロジェクトの技術決定事項とSSO設定のSSOT
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, project-decisions, authentication, api
+---
+
 # Project Decisions（SSOT）
 
 Last-updated: 2026-02-15
@@ -61,6 +70,40 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **共有範囲**: Phase 1〜4は個人利用のみ（科目内グループ共有は将来検討）
 - **質問履歴・学習ログ**: 共有しない（プライバシー保護）
 - **CSP**: `SECURITY_CSP.md` に基づく厳格な設定
+
+---
+
+## eduanimaR 固有の前提
+
+### サービスコンセプト
+- **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
+- **Vision**: 必要な情報が、必要なときに、必要な文脈で見つかり、学習者が自律的に学習を設計できる状態
+- **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+
+### 提供形態
+- Chrome拡張機能（LMS利用中の介入）
+- Webアプリケーション（復習用ダッシュボード）
+- **導線統一**: どちらの導線でも同一のログイン体験（SSO/OAuth）と同一の権限境界を維持
+
+### 認証・認可方針
+- **Phase 1（ローカル開発）**: 認証スキップ（固定のdev-user使用）
+- **Phase 2以降**: SSO認証実装（Google / Meta / Microsoft / LINE）
+- **認可**: ユーザー別アクセス制限を厳格に実施（導線（拡張/WEB）に依存しない）
+
+### バックエンド境界
+- **Professor（Go）**: データの守護者、APIのSSOT（OpenAPI）、唯一DBに直接アクセス
+- **Librarian（Python）**: 推論・検索ループ専門サービス（ステートレス、Professorのみが呼ぶ）
+- **フロントエンド**: Professor の OpenAPI（HTTP/JSON + SSE）のみを呼ぶ
+
+### データ境界・プライバシー
+- ユーザー別データ分離がデフォルト
+- 共有範囲: 将来「科目の資料セット」のみ共有、質問履歴や学習ログは共有しない
+
+### ロードマップ（Phase 1〜4）
+- **Phase 1**: ローカル開発、基本的なQ&A機能、資料管理
+- **Phase 2**: SSO認証、本番環境デプロイ
+- **Phase 3**: 推論ループ（Librarian連携）、高度な検索
+- **Phase 4**: 学習計画、進捗管理
 
 ---
 

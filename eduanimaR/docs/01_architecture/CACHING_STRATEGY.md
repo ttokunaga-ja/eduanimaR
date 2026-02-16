@@ -1,4 +1,15 @@
+---
+Title: Caching Strategy
+Description: eduanimaRのキャッシュ・再検証戦略（Next.js App Router）
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, caching, tanstack-query, revalidation
+---
+
 # Caching & Revalidation Strategy（Next.js App Router）
+
+Last-updated: 2026-02-15
 
 このドキュメントは、Next.js（App Router）の複数キャッシュ（Data/Route/Router）を前提に、
 「どこで」「何を」「どの粒度で」キャッシュし、いつ無効化するかを固定するための契約です。
@@ -123,3 +134,63 @@ tag は “人間が意味を読める” ことを優先します。
 - `no-store` / `revalidate: 0` を理由なく乱用する（コスト増）
 - Dynamic API を Root Layout で使って “全ルートを動的化” する（意図せず性能劣化）
 - RSC が Route Handler を呼ぶ（サーバ内で無駄な hop）
+
+---
+
+## eduanimaR 固有のキャッシュ戦略
+
+### TanStack Query設定
+
+#### 資料一覧・科目情報
+```typescript
+const { data } = useQuery({
+  queryKey: ['materials', subjectId],
+  queryFn: () => getMaterials(subjectId),
+  staleTime: 5 * 60 * 1000, // 5分
+  cacheTime: 30 * 60 * 1000, // 30分
+});
+```
+
+#### 質問履歴
+```typescript
+const { data } = useQuery({
+  queryKey: ['qa', 'history', userId],
+  queryFn: () => getQAHistory(userId),
+  staleTime: 1 * 60 * 1000, // 1分（即時性重視）
+  cacheTime: 10 * 60 * 1000, // 10分
+});
+```
+
+#### Q&A回答（キャッシュしない）
+```typescript
+const { data } = useQuery({
+  queryKey: ['qa', 'answer', questionId],
+  queryFn: () => getAnswer(questionId),
+  staleTime: 0, // 常に再取得
+  cacheTime: 0, // キャッシュしない
+  enabled: false, // 手動トリガー
+});
+```
+
+### Optimistic Update
+
+#### 資料お気に入り登録
+```typescript
+const mutation = useMutation({
+  mutationFn: (materialId: string) => toggleFavorite(materialId),
+  onMutate: async (materialId) => {
+    // 楽観的更新
+    await queryClient.cancelQueries(['materials']);
+    const previous = queryClient.getQueryData(['materials']);
+    queryClient.setQueryData(['materials'], (old) => ({
+      ...old,
+      favorites: [...old.favorites, materialId],
+    }));
+    return { previous };
+  },
+  onError: (err, materialId, context) => {
+    // ロールバック
+    queryClient.setQueryData(['materials'], context.previous);
+  },
+});
+```

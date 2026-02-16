@@ -1,6 +1,51 @@
+---
+Title: Tech Stack
+Description: eduanimaRプロジェクトの技術スタック一覧と選定理由
+Owner: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-15
+Tags: frontend, eduanimaR, tech-stack, backend, api
+---
+
 # 確定版：推奨技術スタック（2026年2月10日）
 
 Last-updated: 2026-02-15
+
+## バックエンドスタック概要
+
+フロントエンドが依存するバックエンド（Professor）のスタック:
+
+| 項目 | バージョン | 備考 |
+|------|-----------|------|
+| **Go** | 1.25.7 | Professor（ゲートウェイ） |
+| **PostgreSQL** | 18.1 | pgvector 0.8.1含む |
+| **Echo** | v5.0.1 | HTTP/JSON + SSE |
+| **Google Cloud Run** | - | Professor/Librarian実行基盤 |
+| **Google Cloud Storage** | - | 講義資料ストレージ |
+
+## API契約のバージョン管理
+
+- **OpenAPI SSOT**: `eduanimaR_Professor/docs/openapi.yaml`
+- **フロントエンド生成**: Orvalで型・クライアント自動生成
+- **バージョニング**: `/v1/`, `/v2/` 形式
+- **Breaking Changes**: Professor側で明記、フロントエンド側で移行計画
+
+## Phase別の技術スタック差異
+
+### Phase 1（ローカル開発）
+- 認証: スキップ（固定dev-user）
+- API接続: ローカルProfessor（`http://localhost:8080`）
+
+### Phase 2（本番環境）
+- 認証: SSO（NextAuth.js/Auth.js + Professor OAuth/OIDC）
+- API接続: Cloud Run（`https://professor.example.com`）
+
+### Phase 3（推論ループ）
+- SSE: リアルタイム回答ストリーミング
+- Librarian連携（フロントエンドからは不可視）
+
+### Phase 4（学習計画）
+- カレンダーUI、進捗管理機能
 
 ## eduanimaR 固有の前提（2026-02-15更新）
 
