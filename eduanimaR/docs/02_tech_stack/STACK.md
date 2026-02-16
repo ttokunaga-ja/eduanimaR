@@ -11,17 +11,27 @@ Tags: frontend, eduanimaR, tech-stack, backend, api
 
 Last-updated: 2026-02-16
 
+## サービスミッション（North Star）
+
+**Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
+
+**North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
+
+**参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
 ## バックエンドスタック概要
 
-フロントエンドが依存するバックエンド（Professor）のスタック:
+フロントエンドが依存するバックエンド（Professor/Librarian）のスタック:
 
 | 項目 | バージョン | 備考 |
 |------|-----------|------|
-| **Go** | 1.25.7 | Professor（ゲートウェイ） |
-| **PostgreSQL** | 18.1 | pgvector 0.8.1含む |
-| **Echo** | v5.0.1 | HTTP/JSON + SSE |
+| **Go** | 1.25.7 | Professor（データ守護者/ゲートウェイ） |
+| **Python** | 3.12+ | Librarian（推論エンジン） |
+| **PostgreSQL** | 18.1 | pgvector 0.8.1含む、Professor専有 |
+| **Echo** | v5.0.1 | Professor HTTP/JSON + SSE API |
+| **Litestar** | - | Librarian HTTP/JSON API |
 | **Google Cloud Run** | - | Professor/Librarian実行基盤 |
-| **Google Cloud Storage** | - | 講義資料ストレージ |
+| **Google Cloud Storage** | - | 講義資料ストレージ、Professor専有 |
 
 ## API契約のバージョン管理
 
@@ -30,24 +40,60 @@ Last-updated: 2026-02-16
 - **バージョニング**: `/v1/`, `/v2/` 形式
 - **Breaking Changes**: Professor側で明記、フロントエンド側で移行計画
 
-## バックエンド統合
+## バックエンド統合とProfessor/Librarian責務境界
 
 | 役割 | 技術 | 備考 |
 | --- | --- | --- |
-| 外向きAPI | Professor（Go） | OpenAPI仕様提供 |
+| 外向きAPI | Professor（Go） | OpenAPI仕様提供、HTTP/JSON + SSE |
 | 推論エンジン | Librarian（Python） | LangGraph + Gemini 3 Flash |
-| 内部通信 | gRPC | Professor ↔ Librarian |
+| 内部通信 | **HTTP/JSON** | Professor ↔ Librarian（NOT gRPC） |
 | ストリーミング | SSE (Server-Sent Events) | `/v1/qa/ask` |
 | API生成 | Orval | OpenAPI → TypeScript |
+
+### Professor/Librarian責務境界の徹底明記
+
+#### Professor（Go）の責務
+- **データ守護者（唯一の権限者）**: DB/GCS/Kafka直接アクセス権限を持つ
+- **Phase 2（大戦略）**: タスク分割・停止条件決定
+- **Phase 3（物理実行）**: 
+  - ハイブリッド検索（RRF統合）
+  - 動的k値設定
+  - 権限強制
+- **Phase 4（合成）**: Gemini 3 Proで最終回答生成
+- **外向きAPI提供**: HTTP/JSON + SSEでフロントエンドと通信
+
+#### Librarian（Python）の責務
+- **Phase 3（小戦略）**: LangGraphによる推論ループ（最大5回推奨）
+- **ステートレス推論サービス**: 会話履歴・キャッシュなし
+- **DB直接アクセス禁止**: Professor経由でのみ検索実行
+- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+
+#### Frontend（Next.js）の責務
+- **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
+- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示
+- **会話履歴管理**: Librarianがステートレスのため、クライアント側で保持
 
 ### Gemini モデル役割分担
 - **Gemini 3 Flash**: 
   - Professor: Phase 2（大戦略）、インジェスト（PDF→Markdown）
-  - Librarian: Phase 3（小戦略）、推論ループ
+  - Librarian: Phase 3（小戦略）、Librarian推論ループ
 - **Gemini 3 Pro**: 
   - Professor: Phase 4（最終回答生成）
 
-参照：`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`
+### 検索戦略の詳細（Phase 3物理実行）
+
+Professor が実行するハイブリッド検索戦略:
+
+| 検索手法 | 役割 | 利点 |
+|---------|------|------|
+| **全文検索（基盤）** | PostgreSQL全文検索 | 固有名詞・専門用語に強い |
+| **pgvector併用** | ベクトル類似検索 | 同義語・言い換え対応 |
+| **ハイブリッドRRF統合** | Reciprocal Rank Fusion (k=60) | 両手法の長所を統合 |
+| **動的k値設定** | 件数に応じた調整 | N < 1,000: k=5 / N ≥ 100,000: k=20 |
+
+参照：
+- [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+- [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
 
 ## Professor API通信（契約駆動開発）
 
@@ -70,10 +116,15 @@ Last-updated: 2026-02-16
 ### Phase 2（本番環境）
 - 認証: SSO（NextAuth.js/Auth.js + Professor OAuth/OIDC）
 - API接続: Cloud Run（`https://professor.example.com`）
+- **重要制約**:
+  - **新規ユーザー登録はChrome拡張機能でのみ許可**
+  - **Web版は既存ユーザーのログイン専用**
+  - **未登録ユーザーは拡張機能ダウンロードページへ誘導**
 
-### Phase 3（推論ループ）
+### Phase 3（Librarian推論ループ）
 - SSE: リアルタイム回答ストリーミング
-- Librarian連携（フロントエンドからは不可視）
+- Librarian推論ループ（フロントエンドからは不可視）
+- Professor経由でのみLibrarianと連携
 
 ### Phase 4（学習計画）
 - カレンダーUI、進捗管理機能
@@ -88,11 +139,13 @@ Last-updated: 2026-02-16
 | **Professor（Go）** | 外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成 | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
 | **Librarian（Python）** | LangGraph Agent による検索戦略立案 | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
 
-### データフロー
+### データフローと責務境界
 1. **Frontend → Professor**: OpenAPI（HTTP/JSON）でリクエスト送信
-2. **Professor ↔ Librarian**: gRPC で検索戦略の協調
-3. **Professor → Frontend**: SSE でリアルタイム回答配信
-4. **Professor**: Kafka経由でOCR/Embeddingのバッチ処理
+2. **Professor ↔ Librarian**: **HTTP/JSON**（NOT gRPC）で検索戦略の協調
+   - Professor: Phase 3物理実行（ハイブリッド検索(RRF統合)、動的k値設定）
+   - Librarian: Phase 3小戦略（Librarian推論ループ、最大5回推奨）
+3. **Professor → Frontend**: SSEでリアルタイム回答配信（選定エビデンス含む）
+4. **Professor**: Kafka経由でOCR/Embeddingのバッチ処理（DB/GCS直接アクセス）
 
 ### 認証（Phase 2以降）
 - SSO（OAuth 2.0 / OpenID Connect）
@@ -104,34 +157,40 @@ Last-updated: 2026-02-16
   - **未登録ユーザーは拡張機能ダウンロードページへ誘導**
 
 ### サービスコンセプト（eduanimaRHandbook より）
-- **Mission**: 学習者が「探す」より「理解する」時間を増やす
+- **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
 - **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
 - **主要ペルソナ**: 忙しい学部生（複数科目、資料が散在、探す時間が負担）
 - **提供価値**: 資料の「着眼点」を示し、原典への回帰を促す
 
-### 提供形態（Phase 4同時リリース）
+参照: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
+
+### 提供形態とChrome拡張/Web役割分離（Phase 2以降）
+
 1. **Chrome拡張機能（メインチャネル）**
+   - **Phase 2: ユーザー登録可能な唯一の手段**
    - Moodle資料の完全自動収集（最重要機能）
    - LMS上でのSSO認証・ユーザー登録
    - 履修科目の自動同期
    - その場で質問・参照
 
 2. **Webアプリケーション（補助チャネル）**
+   - **既存ユーザーログイン専用（新規登録不可）**
    - 大画面でのチャット・履歴閲覧
    - 拡張機能で登録したユーザーの再ログイン専用
    - **新規登録・科目登録・ファイルアップロードは無効化**
+   - **未登録ユーザー誘導**: Chrome Web Store/GitHub/導入ガイドへの誘導
 
-### バックエンド構成
-- **Professor（Go）**: データ所有者、外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成
-- **Librarian（Python）**: 推論特化（LangGraph Agent）、Professor経由でのみ検索実行
+### バックエンド構成と責務分担
+- **Professor（Go）**: データ守護者（DB/GCS/Kafka直接アクセス唯一の権限者）、外向きAPI（HTTP/JSON + SSE）、最終回答生成
+- **Librarian（Python）**: 推論特化（LangGraph Agent）、ステートレス、Professor経由でのみ検索実行、DB直接アクセス禁止
 - **Frontend**: Professorの外部APIのみを呼ぶ（Librarianへの直接通信禁止）
 
 ### バックエンド技術スタック（参考）
 | コンポーネント | 技術 |
 |--------------|------|
-| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Gemini 2 Flash |
+| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Gemini 3 Flash/Pro |
 | Librarian | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
-| 通信 | Frontend ↔ Professor: HTTP/JSON + SSE, Professor ↔ Librarian: gRPC |
+| 通信 | Frontend ↔ Professor: HTTP/JSON + SSE, Professor ↔ Librarian: **HTTP/JSON** |
 
 ### 認証方式
 - Phase 1: dev-user固定（ローカル開発のみ）
@@ -207,41 +266,52 @@ Node（公式 index.json、2026-02-11 に取得）：
 | **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
 
 ### Professor ↔ Librarian 通信
-- **プロトコル**: HTTP/JSON
+- **プロトコル**: **HTTP/JSON**（NOT gRPC）
 - **エンドポイント**: `POST /v1/librarian/search-agent`
 - **Librarianの特性**: ステートレス推論サービス（会話履歴・キャッシュなし）
 
-### 責務分担の明確化
+### 責務分担の明確化（Professor/Librarian境界）
 
 #### Professor（Go）の責務
-- **データ所有者**: DB/GCS/Kafka への直接アクセス権限を持つ
+- **データ守護者（唯一の権限者）**: DB/GCS/Kafka への直接アクセス権限を持つ
+- **Phase 2（大戦略）**: タスク分割・停止条件決定
+- **Phase 3（物理実行）**: 
+  - ハイブリッド検索（RRF統合、k=60）
+  - 動的k値設定（N < 1,000: k=5, N ≥ 100,000: k=20）
+  - 権限強制（ユーザー権限に基づくアクセス制御）
+- **Phase 4（合成）**: Gemini 3 Proで最終回答生成
 - **外向き API 提供**: HTTP/JSON + SSE でフロントエンドと通信
-- **検索の物理実行**: Elasticsearch/pgvector を用いた実際の検索クエリ実行
-- **最終回答生成**: ユーザーへ返す回答の組み立てと配信
 - **バッチ処理管理**: OCR/Embedding 等の非同期処理を Kafka 経由で管理
 
 #### Librarian（Python）の責務
-- **推論特化**: LangGraph Agent による複雑な推論ロジック
+- **Phase 3（小戦略）**: LangGraphによるLibrarian推論ループ（最大5回推奨）
 - **検索戦略立案**: どのような検索を行うべきかの判断
 - **終了判定**: 十分な情報が集まったかの評価と停止判断
-- **制約**: DB/GCS/Kafka への直接アクセスなし（Professor 経由のみ）
+- **ステートレス**: 会話履歴・キャッシュなし
+- **制約**: DB/GCS/Kafka への直接アクセス禁止（Professor 経由のみ）
+- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
 
 #### Frontend（Next.js + FSD）の責務
 - **Professor の外部 API のみを呼ぶ**: OpenAPI 契約に基づく通信
 - **Librarian への直接通信は禁止**: すべて Professor 経由
-- **選定エビデンス表示**: 回答に含まれる選定エビデンス（Librarianが選定した根拠箇所）を UI で適切に表示
+- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所を UI で適切に表示
 - **会話履歴管理**: Librarianがステートレスのため、フロントエンドがクライアント側で会話履歴を保持
+
+参照: 
+- [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+- [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
 
 ---
 
 ## バックエンドアーキテクチャとフロントエンドへの影響
 
-### Librarianのステートレス性
+### Librarianのステートレス性とフロントエンドへの影響
 
 #### Librarianの特性
 - **ステートレス推論サービス**: 会話履歴・キャッシュ等の永続化なし
-- **1リクエストで推論完結**: Librarian推論ループは1リクエスト内で完結
+- **1リクエストで推論完結**: Librarian推論ループは1リクエスト内で完結（最大5回推奨）
 - **中断・再開不可**: フロントエンドからの中断・再開は不可
+- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
 
 #### フロントエンドへの影響
 
@@ -262,12 +332,13 @@ interface ConversationHistory {
 ```
 
 ##### 2. Librarian推論ループの扱い
-- **ノンストップ実行**: 推論ループは開始後、完了まで中断できない
+- **ノンストップ実行**: Librarian推論ループは開始後、完了まで中断できない
 - **進行状況のみ表示**: `search_loop_progress`イベントでUI更新
 - **タイムアウト処理**: 推論時間上限超過時は`LIBRARIAN_TIMEOUT`エラーで通知
+- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示
 
 ##### 3. キャッシュ戦略
-- **結果キャッシュ**: TanStack Queryで推論結果をキャッシュ
+- **結果キャッシュ**: TanStack Queryで推論結果（選定エビデンス含む）をキャッシュ
 - **同一質問の再検索**: キャッシュから即座に表示（ユーザー体験向上）
 
 ---
@@ -280,7 +351,7 @@ Professor SSEでは、以下のイベントをリアルタイム配信します�
 | イベントタイプ | 内容 | UI反映 |
 |:---|:---|:---|
 | `answer_chunk` | 回答断片 | リアルタイムにテキスト追加表示 |
-| `evidence_selected` | 選定エビデンス | エビデンスカードを表示 |
+| `evidence_selected` | 選定エビデンス（Librarian推論ループの結果） | 選定エビデンスカードを表示 |
 | `search_loop_progress` | Librarian推論ループの中間状態 | プログレスバー更新 |
 | `error` | エラー通知 | エラートースト表示 |
 | `done` | 完了通知 | SSE接続を閉じる |
@@ -295,14 +366,14 @@ eventSource.addEventListener('search_loop_progress', (event) => {
   // プログレスバーを更新
   updateProgressBar({
     current: data.current_retry,
-    max: data.max_retries,
+    max: data.max_retries, // 最大5回推奨
     status: data.status, // SEARCHING / COMPLETED / ERROR
   });
   
   // ステータスメッセージを表示
   const statusMessage = {
-    SEARCHING: `検索中... (${data.current_retry}/${data.max_retries})`,
-    COMPLETED: '検索完了',
+    SEARCHING: `Librarian推論ループ実行中... (${data.current_retry}/${data.max_retries})`,
+    COMPLETED: '推論完了',
     ERROR: 'エラーが発生しました',
   }[data.status];
   
@@ -320,8 +391,8 @@ export function SearchLoopStatus({ current, max, status }: SearchLoopStatusProps
     <Box>
       <LinearProgress variant="determinate" value={progress} />
       <Typography variant="caption">
-        {status === 'SEARCHING' && `検索中... (${current}/${max})`}
-        {status === 'COMPLETED' && '検索完了'}
+        {status === 'SEARCHING' && `Librarian推論ループ実行中... (${current}/${max})`}
+        {status === 'COMPLETED' && '推論完了'}
         {status === 'ERROR' && 'エラーが発生しました'}
       </Typography>
     </Box>
@@ -333,20 +404,20 @@ export function SearchLoopStatus({ current, max, status }: SearchLoopStatusProps
 
 ## TanStack Queryでの状態管理
 
-### Librarian推論結果のキャッシュ
+### Librarian推論結果（選定エビデンス）のキャッシュ
 
 #### キャッシュキー設計
 ```typescript
-// Librarian推論結果（選定エビデンス）をキャッシュ
+// Librarian推論ループ結果（選定エビデンス）をキャッシュ
 const queryKey = ['evidence', subjectId, query];
 
 export function useEvidence(subjectId: string, query: string) {
   return useQuery({
     queryKey: ['evidence', subjectId, query],
     queryFn: async () => {
-      // Professor API経由でLibrarian推論結果を取得
+      // Professor API経由でLibrarian推論ループ結果を取得
       const response = await api.searchWithEvidence({ subjectId, query });
-      return response.data.evidence;
+      return response.data.evidence; // 選定エビデンス
     },
     staleTime: 5 * 60 * 1000, // 5分
     gcTime: 10 * 60 * 1000, // 10分
@@ -368,7 +439,7 @@ export function SearchResults({ subjectId, query }: SearchResultsProps) {
     return <ErrorMessage />;
   }
   
-  // キャッシュから即座に表示
+  // キャッシュから選定エビデンスを即座に表示
   return <EvidenceList evidence={evidence} />;
 }
 ```
@@ -382,7 +453,7 @@ function handleNewQuestion(newQuery: string) {
   // 前回の質問のキャッシュを無効化
   queryClient.invalidateQueries({ queryKey: ['evidence', subjectId] });
   
-  // 新しい質問を送信
+  // 新しい質問を送信（Librarian推論ループ開始）
   searchWithEvidence(newQuery);
 }
 ```
@@ -399,13 +470,14 @@ export function useSearchStream(subjectId: string, query: string) {
     queryFn: async () => {
       const eventSource = new EventSource(`/v1/search/stream?query=${query}&subject_id=${subjectId}`);
       
+      // Librarian推論ループが選定したエビデンスをキャッシュに反映
       eventSource.addEventListener('evidence_selected', (event) => {
         const data = JSON.parse(event.data);
         
-        // TanStack Queryキャッシュに反映
+        // TanStack Queryキャッシュに選定エビデンスを反映
         queryClient.setQueryData(['evidence', subjectId, query], (old: Evidence[]) => [
           ...(old || []),
-          data.evidence,
+          data.evidence, // 選定エビデンス
         ]);
       });
       
