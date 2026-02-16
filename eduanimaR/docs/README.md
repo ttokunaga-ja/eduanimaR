@@ -15,15 +15,26 @@ Last-updated: 2026-02-16
 - **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
 - **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
 
-### Professor / Librarian の役割
-- **Professor（Go）**: データ所有者、最終回答生成、DB/GCS/Kafka の物理実行を担当
-  - 外向き API（HTTP/JSON + SSE）を提供
-  - Librarian推論ループ結果を受け取り、安定ID（`document_id`）に変換してフロントエンドへ配信
-- **Librarian（Python）**: 検索戦略立案、LangGraph Agent による推論（Professor経由でのみ検索実行）
-  - **推論ループ制御**: LangGraphによるLibrarian推論ループ制御と`max_retries`設定
-  - **停止条件**: 十分な選定エビデンスが集まった時点で推論を終了
-  - **通信プロトコル**: Professor ↔ Librarian間はHTTP/JSON（エンドポイント: `POST /v1/librarian/search-agent`）
-  - **ステートレス**: 会話履歴・キャッシュ等の永続化なし（1リクエスト内で推論完結）
+### Professor / Librarian の役割（詳細）
+- **Professor（Go）**: 
+  - データ所有者（DB/GCS/Kafka）
+  - 外向きAPI提供（OpenAPI）
+  - 検索の物理実行（Postgres+pgvector）
+  - 最終回答生成（Gemini 3 Pro）
+  - Phase 2（大戦略）: タスク分割・停止条件の定義
+  
+- **Librarian（Python）**: 
+  - 検索戦略立案（Gemini 3 Flash）
+  - LangGraphによる推論ループ（最大5回）
+  - 停止条件判定・エビデンス選定
+  - Phase 3（小戦略）: クエリ生成・反省/再試行
+  - **DB/GCSへの直接アクセスなし**（Professor経由のみ）
+
+- **Frontend（Next.js）**: 
+  - UI/UX提供
+  - Professor APIとの統合（OpenAPI/Orval生成）
+  - SSEによる推論状態のリアルタイム表示
+  - Chrome拡張機能による自動アップロード
 
 ### 上流ドキュメントへの参照
 - サービスコンセプト全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
@@ -39,40 +50,30 @@ Last-updated: 2026-02-16
 1. `00_quickstart/PROJECT_DECISIONS.md`（プロジェクト固有の決定事項SSOT）
 
 **重要な前提（Phase構成）**:
-- **Phase 1（開発環境）**: 
+- **Phase 1（開発環境 + Librarian統合）**: 
   - ローカルでの動作確認のみ
   - 認証なし（dev-user固定）
+  - **Librarian推論ループの実装と検証（必須要件）**
+  - Professor → Librarian（gRPC）→ Professor のフロー確認
   - 自動アップロード機能の実装と検証
-  - Web版: curlやPostmanでAPIテスト
+  - Web版: curlやPostmanでAPIテスト + SSE動作確認
   - 拡張機能: Chromeにローカル読み込みで動作確認
   
 - **Phase 2（本番環境・同時リリース）**:
   - SSO認証実装（Google/Meta/Microsoft/LINE）
   - Chrome Web Storeへ公開（非公開配布）
   - Webアプリの本番デプロイ
+  - Librarian連携の本番適用
   - **Web版からの新規登録は禁止、拡張機能でのみユーザー登録可能**
   - **Web版で新規ユーザーのログイン試行を検知した場合、以下へ誘導**：
     1. Chrome Web Store（拡張機能公式ページ）
     2. GitHubリリースページ（代替ダウンロード）
     3. 公式導入ガイド・解説ブログ
   
-- **Phase 3（Librarian推論ループ連携）**:
-  - Librarian推論ループのUI反映
-    - Librarian推論ループ進行状況の表示（現在の試行回数、停止条件達成状況）
-    - 選定エビデンス（Librarianが選定した根拠箇所）の表示
-    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
-  - Professor SSEでのリアルタイム配信
-    - `search_loop_progress` イベント（推論ループの中間状態）
-    - `evidence_selected` イベント（選定エビデンス）
-  
-- **Phase 4（学習計画・進捗管理）**:
-  - 学習計画作成UI
-    - カレンダー形式での計画立案
-    - タスクリスト、進捗グラフ
-  - 進捗管理
-    - 質問履歴の可視化
-    - 学習状況のトラッキング
-    - 復習タイミングのリマインド
+- **Phase 3（学習支援機能強化）**:
+  - 学習ロードマップ生成
+  - 小テストHTML解析（Feedback Loop）
+  - コンテキスト自動認識サポート
   
 - **ファイルアップロード**: 
   - フロントエンドにUIを実装してはならない

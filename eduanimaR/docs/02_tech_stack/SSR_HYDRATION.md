@@ -72,6 +72,64 @@ SSR/Hydration を Must とした上で、ページのレンダリング戦略（
 
 ---
 
+## SSEとHydration
+
+### 問題
+SSE（Server-Sent Events）はサーバーからのストリーミング配信のため、SSRで初期データを埋め込めません。
+
+### 対策
+- **SSE接続はClient Componentで実装**（`'use client'`）
+- 初期表示は「質問を入力してください」等のプレースホルダー
+- SSE接続開始後、リアルタイムでUI更新
+
+### 実装パターン
+```tsx
+// features/qa-chat/ui/ChatWindow.tsx
+'use client';
+
+export function ChatWindow() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  
+  const handleAsk = async (question: string) => {
+    setIsStreaming(true);
+    
+    const response = await fetch('/api/qa/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+      const { done, value } = await reader!.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      const events = parseSSE(chunk);
+      
+      for (const event of events) {
+        if (event.type === 'answer') {
+          setMessages(prev => [...prev, { role: 'assistant', content: event.data }]);
+        }
+      }
+    }
+    
+    setIsStreaming(false);
+  };
+  
+  return (
+    <div>
+      {/* UI implementation */}
+    </div>
+  );
+}
+```
+
+---
+
 ## 6. 関連ドキュメント（本テンプレの契約）
 
 - 取得と DTO/認可の置き場所： [../01_architecture/DATA_ACCESS_LAYER.md](../01_architecture/DATA_ACCESS_LAYER.md)

@@ -30,6 +30,25 @@ Last-updated: 2026-02-16
 - **バージョニング**: `/v1/`, `/v2/` 形式
 - **Breaking Changes**: Professor側で明記、フロントエンド側で移行計画
 
+## バックエンド統合
+
+| 役割 | 技術 | 備考 |
+| --- | --- | --- |
+| 外向きAPI | Professor（Go） | OpenAPI仕様提供 |
+| 推論エンジン | Librarian（Python） | LangGraph + Gemini 3 Flash |
+| 内部通信 | gRPC | Professor ↔ Librarian |
+| ストリーミング | SSE (Server-Sent Events) | `/v1/qa/ask` |
+| API生成 | Orval | OpenAPI → TypeScript |
+
+### Gemini モデル役割分担
+- **Gemini 3 Flash**: 
+  - Professor: Phase 2（大戦略）、インジェスト（PDF→Markdown）
+  - Librarian: Phase 3（小戦略）、推論ループ
+- **Gemini 3 Pro**: 
+  - Professor: Phase 4（最終回答生成）
+
+参照：`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`
+
 ## Phase別の技術スタック差異
 
 ### Phase 1（ローカル開発）

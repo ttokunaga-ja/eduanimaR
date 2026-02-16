@@ -18,7 +18,13 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **プロジェクト名**: eduanimaR
 - **リポジトリ**: ttokunaga-ja/eduanimaR
 - **対象環境**: local / staging / production
-- **サービス概要**: 大学LMS資料の自動収集・検索・学習支援を行うChrome拡張機能 + Webアプリ
+- **サービス概要**: 
+  大学LMS資料の自動収集・検索・学習支援を行うChrome拡張機能 + Webアプリ
+  
+  **アーキテクチャ**:
+  - Frontend（Next.js）: UI/UX、SSE受信
+  - Professor（Go）: 外向きAPI、DB/GCS/Kafka管理、最終回答生成
+  - Librarian（Python）: LangGraphによる推論ループ、検索戦略立案
 
 ## 認証（Must）
 - **方式**: Cookie（SSO/OAuth 2.0による）
@@ -32,13 +38,23 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **OpenAPI の配置パス（このrepo内）**: `openapi/openapi.yaml`
 - **生成物の配置**: `src/shared/api/generated`（固定）
 - **バックエンド構成**:
-  - **Professor（Go）**: 外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成
-  - **Librarian（Python）**: LangGraph Agent による検索戦略立案（ProfessorからHTTP/JSON経由で呼び出し）
-  - **Professor → Librarian 通信プロトコル**: 
-    - プロトコル: HTTP/JSON
-    - エンドポイント: `POST /v1/librarian/search-agent`
-    - Librarianはステートレス推論サービス（会話履歴・キャッシュ等の永続化なし）
-    - Librarianへのフロントエンドからの直接通信は禁止（Professor経由のみ）
+  - **Professor（Go）**: 
+    - 外向きAPI（HTTP/JSON + SSE）
+    - DB（Postgres+pgvector）/GCS/Kafka管理
+    - 検索の物理実行・権限強制
+    - 最終回答生成（Gemini 3 Pro）
+    - Phase 2（大戦略）: タスク分割・停止条件定義
+    
+  - **Librarian（Python）**: 
+    - LangGraph Agent による推論ループ（最大5回）
+    - Gemini 3 Flash を用いた検索戦略立案
+    - 停止条件判定・エビデンス選定
+    - Phase 3（小戦略）: クエリ生成・反省/再試行
+    - **Professor経由でのみ検索実行**（DB/GCS直接アクセスなし）
+    
+  - **通信**:
+    - Frontend ↔ Professor: HTTP/OpenAPI + SSE
+    - Professor ↔ Librarian: gRPC（内部通信）
 
 ## Next.js（Must）
 - **SSR/Hydration**: 原則 Must（学習支援UIの即応性を重視）
@@ -80,6 +96,32 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **共有範囲**: Phase 1〜4は個人利用のみ（科目内グループ共有は将来検討）
 - **質問履歴・学習ログ**: 共有しない（プライバシー保護）
 - **CSP**: `SECURITY_CSP.md` に基づく厳格な設定
+
+---
+
+## 重要な実装フロー（Phase 1）
+
+### Reasoning Loop（検索・回答）
+1. **Frontend → Professor**: ユーザーが質問を送信（SSE接続開始）
+2. **Phase 2（Professor/大戦略）**: 
+   - Gemini 3 Flash で「タスク分割・停止条件・コンテキスト」を生成
+3. **Phase 3（Librarian/小戦略）**: 
+   - Professor が gRPC で Librarian を起動
+   - LangGraph で検索ループ（最大5回）
+   - 各イテレーションで Professor に検索要求（gRPC）
+   - Professor が DB検索を実行し結果を返却
+   - Librarian が停止条件を判定
+4. **Phase 4（Professor/最終回答）**: 
+   - Librarian が選定したエビデンスに基づき、Professor が Gemini 3 Pro で最終回答を生成
+5. **Professor → Frontend**: SSE で回答・引用・進捗をストリーミング配信
+
+### SSEイベント種別
+- `thinking`: Phase 2実行中
+- `searching`: Librarian推論中
+- `evidence`: エビデンス選定完了
+- `answer`: 最終回答生成中（チャンク配信）
+- `done`: 完了
+- `error`: エラー発生（再試行可能）
 
 ---
 
