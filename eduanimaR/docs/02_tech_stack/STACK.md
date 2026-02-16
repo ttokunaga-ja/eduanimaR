@@ -3,13 +3,13 @@ Title: Tech Stack
 Description: eduanimaRプロジェクトの技術スタック一覧と選定理由
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, tech-stack, backend, api
 ---
 
 # 確定版：推奨技術スタック（2026年2月10日）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 ## バックエンドスタック概要
 
@@ -67,6 +67,10 @@ Last-updated: 2026-02-15
 - SSO（OAuth 2.0 / OpenID Connect）
 - 対応プロバイダ: Google / Meta / Microsoft / LINE
 - Phase 1（ローカル開発）: 認証スキップ（固定dev-user）
+- **Phase 2の重要制約**:
+  - **新規ユーザー登録はChrome拡張機能でのみ許可**
+  - **Web版は既存ユーザーのログイン専用**
+  - **未登録ユーザーは拡張機能ダウンロードページへ誘導**
 
 ### サービスコンセプト（eduanimaRHandbook より）
 - **Mission**: 学習者が「探す」より「理解する」時間を増やす
@@ -87,9 +91,16 @@ Last-updated: 2026-02-15
    - **新規登録・科目登録・ファイルアップロードは無効化**
 
 ### バックエンド構成
-- **Professor（Go）**: データ所有者、外向きAPI（HTTP/JSON + SSE）
-- **Librarian（Python）**: 推論特化、Professor経由でのみ検索実行
+- **Professor（Go）**: データ所有者、外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成
+- **Librarian（Python）**: 推論特化（LangGraph Agent）、Professor経由でのみ検索実行
 - **Frontend**: Professorの外部APIのみを呼ぶ（Librarianへの直接通信禁止）
+
+### バックエンド技術スタック（参考）
+| コンポーネント | 技術 |
+|--------------|------|
+| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Gemini 2 Flash |
+| Librarian | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+| 通信 | Frontend ↔ Professor: HTTP/JSON + SSE, Professor ↔ Librarian: gRPC |
 
 ### 認証方式
 - Phase 1: dev-user固定（ローカル開発のみ）

@@ -1,6 +1,6 @@
 # Docs Portal（Frontend / FSD Template）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 この `docs/` 配下は、Next.js（App Router）+ FSD（Feature-Sliced Design）での開発を「契約（運用ルール）」として固定するためのドキュメント集です。
 
@@ -42,7 +42,11 @@ Last-updated: 2026-02-15
   - SSO認証実装（Google/Meta/Microsoft/LINE）
   - Chrome Web Storeへ公開（非公開配布）
   - Webアプリの本番デプロイ
-  - Web版からの新規登録は禁止、拡張機能でのみユーザー登録可能
+  - **Web版からの新規登録は禁止、拡張機能でのみユーザー登録可能**
+  - **Web版で新規ユーザーのログイン試行を検知した場合、以下へ誘導**：
+    1. Chrome Web Store（拡張機能公式ページ）
+    2. GitHubリリースページ（代替ダウンロード）
+    3. 公式導入ガイド・解説ブログ
   
 - **ファイルアップロード**: 
   - フロントエンドにUIを実装してはならない
@@ -52,6 +56,34 @@ Last-updated: 2026-02-15
 ## まず読む（最短ルート）
 1. **プロジェクト固有の前提**: `00_quickstart/PROJECT_DECISIONS.md` ← **最優先**
 2. 技術スタック（SSOT）：`02_tech_stack/STACK.md`
+
+## 認証とユーザー登録の境界（Phase 2）
+
+### ユーザー登録フロー
+- **新規登録**: Chrome拡張機能でのSSO認証のみ許可
+- **既存ユーザーのログイン**: Web版でも可能（拡張機能で登録済みのユーザーのみ）
+
+### Web版での未登録ユーザー対応
+Web版でSSO認証後、未登録ユーザーと判定された場合：
+1. **登録不可の通知**を表示
+2. **拡張機能ダウンロードページへ誘導**（優先順位順に表示）:
+   - Chrome Web Store: `https://chrome.google.com/webstore/detail/[extension-id]`
+   - GitHub Releases: `https://github.com/[org]/[repo]/releases`
+   - 公式導入ガイド: `[ブログURL]` または `[公式ドキュメント]`
+3. **誘導UI**:
+   - タイトル: 「eduanimaRをご利用いただくには、Chrome拡張機能のインストールが必要です」
+   - 説明: 「Web版は既存ユーザーのログイン専用です。新規登録は拡張機能から行ってください。」
+   - ボタン: 「拡張機能をインストール」（Chrome Web Storeへリンク）
+   - 補足リンク: 「GitHubからダウンロード」「導入ガイドを見る」
+
+### バックエンド（Professor）との連携
+- Professor API: `POST /auth/login` が `user_not_found` を返した場合
+- フロントエンド: 拡張機能誘導画面へルーティング
+- エラーコード: `AUTH_USER_NOT_REGISTERED`（`ERROR_CODES.md`に追加）
+
+---
+
+## まず読む（最短ルート）（続き）
 3. FSD 全体像：`01_architecture/FSD_OVERVIEW.md`
 4. レイヤー境界とバックエンド対応：`01_architecture/FSD_LAYERS.md`
 5. Slices とバックエンド境界の対応：`01_architecture/SLICES_MAP.md`
