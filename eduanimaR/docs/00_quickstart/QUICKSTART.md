@@ -21,9 +21,17 @@ Last-updated: 2026-02-16
 - **バックエンド**: 
   - Professor（Go）がローカルまたはCloud Runで稼働
   - Librarian（Python）がローカルまたはCloud Runで稼働
-  - Professor ↔ Librarian 間のHTTP/JSON通信が確立されていること（エンドポイント: `POST /v1/librarian/search-agent`）
+  - Professor ↔ Librarian 間の**gRPC通信**が確立されていること
 
-**重要**: Librarianはステートレスサービス（会話履歴・キャッシュなし）です。1リクエスト内で推論が完結します。
+**重要**: 
+- **Librarian**: ステートレスサービス（会話履歴・キャッシュなし）、Professorが決定した戦略に基づきクエリ生成
+- **Professor**: 検索戦略決定（「検索実行 vs ヒアリング」の判断）、終了条件決定、データ守護者
+- **通信**: Professor ↔ Librarian間は **gRPC** (proto定義: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`)、Frontend ↔ Professor間は HTTP/JSON + SSE
+
+**AI Agent質問システムの柔軟性**:
+- **曖昧な質問**: Professor Phase 2でヒアリング判断 → Phase 4-Aで意図候補3つ提示 → ユーザー選択後にPhase 2再実行
+- **明確な質問**: Phase 2で検索戦略決定 → Phase 3でLibrarian経由検索 → Phase 4-Bで回答生成
+- **意図選択フロー**: Chrome拡張の表示範囲制約により、候補は3つ固定で提示
 
 **バックエンド詳細参照**:
 - Professor: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)

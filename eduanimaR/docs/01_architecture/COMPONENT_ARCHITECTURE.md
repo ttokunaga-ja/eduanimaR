@@ -99,32 +99,101 @@ interface EvidenceCardProps {
 - 「Librarian推論実行中」
 - 「ベクトル検索実行中」
 - 「RRFスコア計算中」
+- 「gRPC通信中」
+- 「Phase 2実行中」
 
 ### ✅ 推奨: ライトユーザー向けの簡潔な表現
-以下のような分かりやすい表現を使用：
-- 「AI Agentが資料を検索中です」
-- 「AI Agentが検索方針を決定しています」
-- 「AI Agentが回答を生成しています」
 
-### 段階的なフィードバック例
+Phase別の推奨表示文言:
 
 ```typescript
-// プログレスフィードバックの段階例
-const progressStages = [
-  'AI Agentが検索方針を決定しています',
-  'AI Agentが資料を検索中です',
-  'AI Agentが回答を生成しています',
-];
+// Professor SSE progressイベントのstageに応じた表示
+const progressMessages = {
+  planning: 'AI Agentが質問を理解しています',      // Phase 2
+  searching: 'AI Agentが資料を検索中です',         // Phase 3
+  finalizing: 'AI Agentが回答を生成しています',    // Phase 4-B
+};
+
+// SSEイベントハンドリング例
+eventSource.addEventListener('progress', (event) => {
+  const { stage } = JSON.parse(event.data);
+  setProgressMessage(progressMessages[stage] || 'AI Agentが処理中です');
+});
 ```
+
+### Phase別の処理内容と表示文言
+
+| Phase | Professor責務 | Librarian責務 | Frontend表示 |
+|-------|--------------|--------------|-------------|
+| **Phase 2** | 検索 vs ヒアリング判断、検索戦略決定 | - | 「AI Agentが質問を理解しています」 |
+| **Phase 4-A** | 意図推測モード: 候補3つ生成 | - | 意図選択UI表示（Phase 3移行せず） |
+| **Phase 2再実行** | 選択された意図をコンテキストに検索戦略再決定 | - | 「AI Agentが質問を理解しています」 |
+| **Phase 3** | Librarian gRPC通信、検索実行 | 戦略に基づくクエリ生成 | 「AI Agentが資料を検索中です」 |
+| **Phase 4-B** | 最終回答モード: 回答生成、SSE配信 | - | 「AI Agentが回答を生成しています」 |
+
+### 意図選択UI（Phase 4-A）
+
+**Phase 2でヒアリング判断された場合のフロー**:
+
+```typescript
+// SSE clarificationイベント受信
+eventSource.addEventListener('clarification', (event) => {
+  const { question, intents } = JSON.parse(event.data);
+  // intents: 厳密に3要素の配列
+  // [
+  //   { id: "intent-1", summary: "〜の資料を探したい" },
+  //   { id: "intent-2", summary: "〜の概念を理解したい" },
+  //   { id: "intent-3", summary: "〜の問題の解き方を知りたい" }
+  // ]
+  
+  showIntentSelectionUI(question, intents);
+});
+```
+
+**UI表示例**:
+```
+┌─────────────────────────────────────────┐
+│ AI Agent                                │
+├─────────────────────────────────────────┤
+│                                         │
+│ どの内容について知りたいですか？          │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ 線形代数の固有値の資料を探したい        │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ 固有値の概念を理解したい              │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ 固有値の計算問題の解き方を知りたい      │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ─────────────────────────────────────  │
+│ 上記にない場合は再度入力してください       │
+│ [                              ] [送信] │
+└─────────────────────────────────────────┘
+```
+
+**ユーザーアクション後のフロー**:
+- **選択肢クリック**: `POST /v1/question/refine` → Phase 2再実行 → Phase 3 → Phase 4-B
+- **テキスト再入力**: `POST /v1/question` → Phase 2から再実行
+
+**重要な設計原則**:
+- **候補数**: 3つ固定（Chrome拡張の表示範囲制約）
+- **confidence表示**: なし（学習者信頼維持、Handbookブランドガイドライン準拠）
+- **会話履歴**: previousRequestID で紐付け保持（追跡可能性、North Star Metric計測）
 
 ### ビジュアルフィードバック
 - プログレスバーまたはスピナーで視覚的にフィードバック
-- 進捗状況を数値で表示（例: 「3/5」）
+- Phase 3の繰り返し（最大5回試行）は「検索中」のまま（進捗数値表示なし）
 - 完了予測時間は表示しない（不正確になりやすい）
 
 **参照元SSOT**:
 - `../../eduanimaRHandbook/04_product/BRAND_GUIDELINES.md` (Voice & Tone)
 - `../../eduanimaRHandbook/04_product/ROADMAP.md` (UI/UXコンセプト)
+- `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md` (Phase責務詳細)
 
 ---
 

@@ -324,28 +324,80 @@ Professor の HTTP/JSON + SSE エラーレスポンス形式とフロントエ�
 ### Professor/Librarian責務境界とエラー処理
 
 #### Professor（Go）のエラー処理責務
+- **Phase 2**: 検索戦略決定時のエラー（質問理解失敗、戦略決定タイムアウト等）
+- **Phase 4-A**: 意図推測モード時のエラー（候補生成失敗等）
+- **Phase 3**: Librarian gRPC通信エラーの受信とフロントエンドへの伝播（SSE経由）
+- **Phase 4-B**: 最終回答生成時のエラー
 - DB/GCS/Kafka直接アクセスエラーの捕捉
-- Librarianエラーの受信とフロントエンドへの伝播（HTTP/JSON経由）
-- SSEでのリアルタイムエラー通知
 - request_id伝播の保証
 
 #### Librarian（Python）のエラー処理責務
-- Librarian推論ループのエラー検出（最大5回試行）
+- **Phase 3**: Professorが決定した戦略に基づくクエリ生成エラー
 - Professor経由でのエラー通知（**gRPC**）
 - DB直接アクセス禁止エラーの検出
+- **注意**: 検索戦略・終了条件の決定は行わない（Professorの責務）
 
 #### Frontend エラー処理責務
 - Professor SSEエラーイベントの受信
 - request_id伝播による追跡可能性確保
-- ユーザー向けエラー表示（説明可能性・透明性）
-- Librarian直接通信禁止の徹底
+- ユーザー向けエラー表示（Phase 2/3/4を区別せず汎用的に表示）
+- **禁止**: Librarian直接通信（Professor経由のみ）
 
 **参照**:
 - **Handbook品質原則**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
 - **Professor エラーコード**: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)
 - **Professor MICROSERVICES_MAP**: [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
-- **Librarian README**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
-- **フロントエンドエラーコード**: `ERROR_CODES.md`
+
+### 意図選択フロー時のエラーハンドリング
+
+**Phase 4-A（意図推測モード）でのエラー例**:
+
+```typescript
+eventSource.addEventListener('error', (event) => {
+  const error = JSON.parse(event.data);
+  
+  // エラーコード例: INTENT_GENERATION_FAILED
+  if (error.code === 'INTENT_GENERATION_FAILED') {
+    // フォールバック: テキスト入力のみ表示
+    showTextInputOnly();
+    showErrorMessage('質問内容を具体的に入力してください');
+  }
+  
+  // request_id伝播
+  logError({
+    request_id: error.request_id,
+    code: error.code,
+    message: error.message,
+    phase: 'phase_4a_intent_generation',
+  });
+});
+```
+
+**Phase 2再実行時のエラー（意図選択後）**:
+
+```typescript
+// POST /v1/question/refine のエラーレスポンス
+fetch('/v1/question/refine', {
+  method: 'POST',
+  body: JSON.stringify({
+    selectedIntentId: 'intent-2',
+    requestId: 'req-124',
+    previousRequestId: 'req-123',
+  }),
+})
+.catch((error) => {
+  // ネットワークエラー等
+  showErrorMessage('接続エラーが発生しました。再度お試しください。');
+  
+  // 会話履歴紐付けでログ
+  logError({
+    request_id: 'req-124',
+    previous_request_id: 'req-123',
+    selected_intent_id: 'intent-2',
+    error: error.message,
+  });
+});
+```
 
 ---
 

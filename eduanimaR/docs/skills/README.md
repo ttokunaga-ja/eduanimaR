@@ -38,36 +38,52 @@
 
 ### Professor（Go）の責務
 - **データ守護者（唯一の権限者）**: DB/GCS/Kafka直接アクセス権限を持つ
-- **Phase 2（大戦略）**: タスク分割・停止条件決定
-- **Phase 3（物理実行）**: ハイブリッド検索(RRF統合)、動的k値設定、権限強制
-- **Phase 4（合成）**: Gemini 3 Proで最終回答生成
-- **外向きAPI提供**: HTTP/JSON + SSEでフロントエンドと通信
+- **Phase 2: 検索戦略決定**: 
+  - 「資料検索を実行すべきか」「ヒアリングすべきか」の判断
+  - ヒアリング判断時: Phase 4-Aへ直接遷移（Phase 3スキップ）
+  - 検索判断時: 検索戦略・終了条件決定、Librarianへ指示
+- **Phase 3 連携**: Librarianへ戦略指示（**gRPC**）、検索実行（Librarian生成クエリ使用）
+- **Phase 4: 回答生成**: 
+  - **4-A) 意図推測モード**: 曖昧質問への候補選択肢3つ生成
+  - **4-B) 最終回答モード**: 検索結果を元に回答生成、SSE配信
+- **外向きAPI**: フロントエンドへHTTP/JSON + SSE提供
 
 ### Librarian（Python）の責務
-- **Phase 3（小戦略）**: LangGraphによるLibrarian推論ループ（最大5回推奨）
-- **ステートレス**: 会話履歴・キャッシュなし
-- **DB直接アクセス禁止**: Professor経由でのみ検索実行
-- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信
+- **Phase 3: クエリ生成のみ**: Professorが決定した戦略・終了条件に基づくクエリ生成
+- **ステートレス**: 会話履歴・キャッシュなし、1リクエスト内で完結（最大5回試行）
+- **禁止事項**: 
+  - 検索戦略決定（Professorの責務）
+  - 「検索 vs ヒアリング」判断（Professorの責務）
+  - DB/GCS直接アクセス
+  - フロントエンドとの直接通信
 
-### Frontend責務
-- **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
-- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示
-- **会話履歴管理**: Librarianがステートレスのため、クライアント側で保持
+### 通信プロトコル
+- **Frontend ↔ Professor**: HTTP/JSON + SSE
+  - エンドポイント例: `POST /v1/question`, `POST /v1/question/refine`
+  - SSEイベント: `progress`, `clarification`, `evidence`, `answer`, `error`
+- **Professor ↔ Librarian**: **gRPC** 双方向ストリーミング
+  - proto定義: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
+  - RPC: `Reason(stream ReasoningInput) returns (stream ReasoningOutput)`
 
-### 検索戦略の詳細（Professor Phase 3物理実行）
-- **全文検索（基盤）**: 固有名詞・専門用語に強い
-- **pgvector併用**: 同義語・言い換え対応
-- **ハイブリッド検索(RRF統合)**: k=60
-- **動的k値設定**: N < 1,000: k=5 / N ≥ 100,000: k=20
+### Phase別の責務詳細
 
-### Chrome拡張/Web役割分離（Phase 2以降）
-- **Phase 2**: 拡張機能のみユーザー登録可能
-- **Web版**: 既存ユーザーログイン専用（新規登録不可）
-- **未登録ユーザー誘導**: Chrome Web Store/GitHub/導入ガイドへ
+| Phase | Professor責務 | Librarian責務 | Frontend責務 |
+|-------|--------------|--------------|-------------|
+| **Phase 2** | 検索 vs ヒアリング判断、検索戦略決定 | - | プログレス表示「質問を理解中」 |
+| **Phase 4-A** | 意図推測、候補3つ生成（Gemini） | - | 意図選択UI表示、ユーザー選択受付 |
+| **Phase 2再実行** | 選択された意図をコンテキストに検索戦略再決定 | - | プログレス表示「質問を理解中」 |
+| **Phase 3** | Librarian gRPC通信、検索実行 | クエリ生成（最大5回試行） | プログレス表示「資料を検索中」 |
+| **Phase 4-B** | 最終回答生成（Gemini）、SSE配信 | - | プログレス表示「回答を生成中」、回答表示 |
 
-参照:
-- [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
-- [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
+**重要な設計原則**:
+- **Phase 2の核心**: 「資料検索を実行すべきか」vs「質問内容をヒアリングすべきか」の判断
+- **意図選択後**: Phase 2を再実行（元の質問 + 選択された意図をコンテキストに戦略決定）
+- **会話履歴**: previousRequestID で紐付け保持、North Star Metric（到達時間）計測に使用
+
+**参照**:
+- **Professor詳細**: [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+- **Librarian詳細**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
+- **gRPC契約**: [`../../eduanimaR_Professor/proto/librarian/v1/librarian.proto`](../../eduanimaR_Professor/proto/librarian/v1/librarian.proto)
 
 ---
 
@@ -78,7 +94,7 @@
 | **Librarian推論ループ** | Librarianが実行する推論ロジック | "推論ループ", "検索ループ" |
 | **選定エビデンス** | Librarian推論ループが選定した根拠箇所 | "エビデンス", "証拠" |
 | **ハイブリッド検索(RRF統合)** | 全文検索+pgvectorのRRF統合 | "ハイブリッド検索", "統合検索" |
-| **HTTP/JSON** | Professor ↔ Librarian通信プロトコル | "gRPC" |
+| **gRPC** | Professor ↔ Librarian通信プロトコル | "HTTP/JSON" |
 | **データ守護者** | Professor（DB/GCS/Kafka直接アクセス唯一の権限者） | "データ所有者" |
 | **動的k値設定** | 件数に応じたk値調整 | "動的k値" |
 
@@ -136,5 +152,5 @@ Node（公式 index.json、2026-02-11に取得）：
 - deep import をしない（Public API）
 - “例外追加” で逃げず、構造（境界/責務）を直す
 - **Professor/Librarian責務境界を厳守**: Librarian直接通信禁止
-- **用語統一**: "Librarian推論ループ", "選定エビデンス", "ハイブリッド検索(RRF統合)", "gRPC双方向ストリーミング"（Professor ↔ Librarian）
+- **用語統一**: "Librarian推論ループ", "選定エビデンス", "ハイブリッド検索(RRF統合)", "gRPC"（Professor ↔ Librarian）
 - **上流ドキュメント参照**: Handbook/Professor/Librarianのドキュメントと整合性を保つ
