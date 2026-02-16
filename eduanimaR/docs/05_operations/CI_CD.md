@@ -44,6 +44,30 @@
 注意：SLO/アラートは CI の対象ではなく運用の契約。
 - SSOT: `SLO_ALERTING.md` と `OBSERVABILITY.md`
 
+### 契約テスト（Must）
+
+- **契約コードチェック**（必須）
+  - Job 名（推奨）: `contract-codegen-check`
+  - 配置（推奨）: `.github/workflows/contract-codegen-check.yml`
+  - 対象: `openapi/openapi.yaml` / `src/shared/api/generated/`
+  - 実行内容: `npm run api:generate` → 差分検出
+
+### セキュリティスキャン（Must）
+
+- **依存関係の脆弱性検査**: `npm audit` または Dependabot
+- **Secret scanning**: 誤ってコミットされたシークレットの検出
+- **SAST**: 静的アプリケーションセキュリティテスト
+
+### CI実行環境の最小権限化（推奨）
+
+- **OIDC**: 短命クレデンシャルを優先
+- **環境変数**: シークレットは環境変数で管理、コードに埋め込まない
+- **読み取り専用トークン**: 可能な限り読み取り専用権限を使用
+
+**参照元SSOT**:
+- `../../eduanimaR_Professor/docs/05_operations/CI_CD.md`
+- `../../eduanimaR_Librarian/docs/05_operations/CI_CD.md`
+
 ---
 
 ## 最低限のパイプライン（テンプレ）
