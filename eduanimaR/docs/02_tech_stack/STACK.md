@@ -46,7 +46,7 @@ Last-updated: 2026-02-16
 | --- | --- | --- |
 | 外向きAPI | Professor（Go） | OpenAPI仕様提供、HTTP/JSON + SSE |
 | 推論エンジン | Librarian（Python） | LangGraph + Gemini 3 Flash |
-| 内部通信 | **HTTP/JSON** | Professor ↔ Librarian（NOT gRPC） |
+| 内部通信 | **gRPC（双方向ストリーミング）** | Professor ↔ Librarian、契約: `proto/librarian/v1/librarian.proto` |
 | ストリーミング | SSE (Server-Sent Events) | `/v1/qa/ask` |
 | API生成 | Orval | OpenAPI → TypeScript |
 
@@ -66,7 +66,7 @@ Last-updated: 2026-02-16
 - **Phase 3（小戦略）**: LangGraphによる推論ループ（最大5回推奨）
 - **ステートレス推論サービス**: 会話履歴・キャッシュなし
 - **DB直接アクセス禁止**: Professor経由でのみ検索実行
-- **通信**: HTTP/JSON（NOT gRPC）でProfessorと通信
+- **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信、契約: `proto/librarian/v1/librarian.proto`
 
 #### Frontend（Next.js）の責務
 - **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
@@ -141,9 +141,10 @@ Professor が実行するハイブリッド検索戦略:
 
 ### データフローと責務境界
 1. **Frontend → Professor**: OpenAPI（HTTP/JSON）でリクエスト送信
-2. **Professor ↔ Librarian**: **HTTP/JSON**（NOT gRPC）で検索戦略の協調
+2. **Professor ↔ Librarian**: **gRPC（双方向ストリーミング）** で検索戦略の協調
    - Professor: Phase 3物理実行（ハイブリッド検索(RRF統合)、動的k値設定）
    - Librarian: Phase 3小戦略（Librarian推論ループ、最大5回推奨）
+   - 契約: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
 3. **Professor → Frontend**: SSEでリアルタイム回答配信（選定エビデンス含む）
 4. **Professor**: Kafka経由でOCR/Embeddingのバッチ処理（DB/GCS直接アクセス）
 

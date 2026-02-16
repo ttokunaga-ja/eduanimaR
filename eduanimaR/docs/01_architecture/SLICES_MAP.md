@@ -69,7 +69,7 @@ Last-updated: 2026-02-16
     - 選定エビデンス（Librarianが選定した根拠箇所）の表示
     - ソース（参照箇所）のクリッカブルリンク
   - **依存**: `shared/api`（Professor の `/v1/search` エンドポイント、SSE）、`entities/evidence`、`entities/file`
-  - **バックエンド境界**: Professor SSE + Librarian推論ループ結果
+  - **バックエンド境界**: Professor SSE + Librarian推論ループ結果（Professor ↔ Librarian間はgRPC）
 
 - **`auth-by-token`**: トークンでの再認証/更新
   - **責務**: リフレッシュトークンによるセッション延長

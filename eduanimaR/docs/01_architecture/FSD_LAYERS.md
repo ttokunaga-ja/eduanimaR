@@ -92,6 +92,10 @@ Public API に公開するもの（目安）：
 
 ## 5) バックエンド（Professor）との責務対応
 
+**通信プロトコル**:
+- **Frontend ↔ Professor**: HTTP/JSON + SSE（OpenAPI契約）
+- **Professor ↔ Librarian（内部）**: gRPC（双方向ストリーミング、フロントエンドからは不可視）
+
 | Frontend (FSD) | Backend (Professor/Clean Arch) | 通信方法 |
 | --- | --- | --- |
 | `app` (routing) | `cmd/` (entry point) | - |

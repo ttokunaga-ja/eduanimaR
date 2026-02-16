@@ -31,7 +31,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 - **認証・認可**: SSO（OAuth/OIDC）トークン検証、ユーザー/科目/資料のアクセス制御
 - **Phase 2（大戦略）**: Gemini 3 Flashで「タスク分割（調査項目：WHAT）」「停止条件」「コンテキスト」を生成
 - **Phase 3（物理実行）**: 
-  - Librarianからの検索依頼（HTTP/JSON）を受け、**ハイブリッド検索（RRF統合）** を物理的に実行
+  - Librarianからの検索依頼（gRPC）を受け、**ハイブリッド検索（RRF統合）** を物理的に実行
   - **動的k値設定**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を調整
   - **除外制御**: `seen_chunk_ids`でDB層で物理的に既読除外
   - **権限強制**: `subject_id`/`user_id`/`is_active` 等の WHERE を SQL 層で必ず強制
@@ -46,7 +46,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 - **Phase 3（小戦略・ループ制御）**: LangGraphによる自律的検索ループ（最大5回推奨）
   - **Plan/Refine**: 検索クエリ生成（`keyword_list` + `semantic_query`）、反省/再試行
-  - **Search Tool**: ProfessorのHTTP/JSONエンドポイント経由で検索実行を依頼
+  - **Search Tool**: ProfessorのgRPCサービス経由で検索実行を依頼
   - **Evaluate**: 検索結果から選定エビデンス（`evidence_snippets`）を抽出、`temp_index`を使用
   - **Route**: 停止条件判定（`COMPLETE` / `CONTINUE` / `ERROR`）
 - **ステートレス設計**: 会話履歴・キャッシュなし（1リクエスト内で推論完結）
@@ -66,7 +66,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 #### 通信プロトコル
 - **Frontend ↔ Professor**: HTTP/JSON（OpenAPI） + SSE（リアルタイム回答配信）
-- **Professor ↔ Librarian**: HTTP/JSON（内部通信、エンドポイント: `POST /v1/librarian/search-agent`）
+- **Professor ↔ Librarian**: **gRPC（双方向ストリーミング、契約: `proto/librarian/v1/librarian.proto`）**
 
 #### ハイブリッド検索（RRF統合）の詳細設計
 
@@ -78,7 +78,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 - **事前OCR**: テキスト化で全文検索の費用対効果を最大化
 
 **実行主体**: Professor（Go）の検索ツール
-**入力**: LibrarianからのHTTP POSTリクエスト
+**入力**: LibrarianからのgRPCリクエスト
 ```json
 {
   "keyword_list": ["決定係数", "定義"],
