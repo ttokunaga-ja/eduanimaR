@@ -15,20 +15,45 @@ Last-updated: 2026-02-16
 - **Mission**: 学習者が「探す時間を減らし、理解に使う時間を増やせる」学習支援ツール
 - **North Star Metric**: 資料から根拠箇所に到達するまでの時間短縮
 
-### Professor / Librarian の役割（詳細）
-- **Professor（Go）**: 
-  - データ所有者（DB/GCS/Kafka）
-  - 外向きAPI提供（OpenAPI）
-  - 検索の物理実行（Postgres+pgvector）
-  - 最終回答生成（Gemini 3 Pro）
-  - Phase 2（大戦略）: タスク分割・停止条件の定義
-  
-- **Librarian（Python）**: 
-  - 検索戦略立案（Gemini 3 Flash）
-  - LangGraphによる推論ループ（最大5回）
-  - 停止条件判定・エビデンス選定
-  - Phase 3（小戦略）: クエリ生成・反省/再試行
-  - **DB/GCSへの直接アクセスなし**（Professor経由のみ）
+### Professor / Librarian の役割
+
+#### Professor（Go）の責務
+- **Phase 1（認証・認可）**: ユーザー認証、科目/資料アクセス制御
+- **Phase 2（大戦略）**: Gemini 3 Flashで「調査項目（WHAT）」「停止条件」を生成
+- **Phase 3（物理実行）**: 
+  - Librarianからの検索依頼を受け、**ハイブリッド検索（RRF統合）** を実行
+  - **動的k値設定**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を調整
+  - **除外制御**: `seen_chunk_ids`でDB層で物理的に既読除外
+- **Phase 4（合成）**: 選定エビデンスをもとにGemini 3 Flashで最終回答生成
+
+#### Librarian（Python）の責務
+- **Phase 3（小戦略・ループ制御）**: LangGraphによる自律的検索ループ
+  - **Plan/Refine**: 検索クエリ生成（`keyword_list` + `semantic_query`）
+  - **Search Tool**: ProfessorのHTTP/JSONエンドポイント`POST /v1/search-tool`呼び出し
+  - **Evaluate**: 検索結果から`evidence_snippets`抽出（`temp_index`使用）
+  - **Route**: 停止条件判定（`COMPLETE` / `CONTINUE`）
+- **LLMには実IDを見せない**: Professorが割り当てた`temp_index`のみ扱う
+
+#### 通信プロトコル
+- **Professor ↔ Librarian**: HTTP/JSON（エンドポイント: `POST /v1/librarian/search-agent`）
+- **Professor → Frontend**: SSE（`/v1/search/stream`）
+
+#### ハイブリッド検索（RRF）の設計
+- **実行主体**: Professor（Go）
+- **入力**: LibrarianからのHTTP POSTリクエスト
+  ```json
+  {
+    "keyword_list": ["決定係数", "定義"],
+    "semantic_query": "決定係数の定義と計算式",
+    "exclude_ids": ["chunk_001", "chunk_005"]
+  }
+  ```
+- **処理フロー**:
+  1. **並列検索**: BM25（全文検索） + pgvector（ベクトル検索）
+  2. **RRF統合**: 順位ベースで統合（スコアの単位差を吸収）
+  3. **動的k値**: `k = f(N, retry_count)`（N: 全チャンク数）
+  4. **除外**: `WHERE id NOT IN (exclude_ids)`をSQL層で強制
+- **返却**: `temp_index`付きチャンクリスト（最大k件）
 
 - **Frontend（Next.js）**: 
   - UI/UX提供

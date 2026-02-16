@@ -19,6 +19,10 @@ Last-updated: 2026-02-16
 
 本テンプレートの前提スタックは [STACK.md](../02_tech_stack/STACK.md) を参照。
 
+関連ドキュメント:
+- API契約: `../03_integration/API_CONTRACT_WORKFLOW.md`
+- 検索パラメータ: `../00_quickstart/PROJECT_DECISIONS.md`（検索パラメータの決定事項）
+
 ---
 
 ## 結論（Must）

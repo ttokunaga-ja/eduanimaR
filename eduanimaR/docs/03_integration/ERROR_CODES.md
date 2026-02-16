@@ -279,3 +279,6 @@ export function getErrorMessage(code: string): string {
 | `AUTH_USER_NOT_REGISTERED` | 403 | 不可 | 「eduanimaRをご利用いただくには、Chrome拡張機能のインストールが必要です」 | 拡張機能誘導画面へ遷移 |
 | `GEMINI_API_ERROR` | 500 | 可 | 「AI処理が一時的に利用できません。しばらく待ってから再試行してください」 | 自動リトライ（指数バックオフ） |
 | `INTERNAL_ERROR` | 500 | 可 | 「予期しないエラーが発生しました。サポートに連絡してください」 | 自動リトライ（最大3回） + エラー報告 |
+| `SEARCH_LOOP_TIMEOUT` | 504 | 可（手動） | 「検索時間が長引いています。もう一度お試しください」 | retry_count削減、質問の簡潔化を促す |
+| `SEARCH_NO_RESULTS` | 404 | 不可 | 「関連する資料が見つかりませんでした」 | 科目ID確認、検索キーワードの見直しを促す |
+| `SEARCH_TOOL_ERROR` | 500 | 可 | 「検索処理でエラーが発生しました」 | リトライ、エラーログ送信 |

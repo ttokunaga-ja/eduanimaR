@@ -260,6 +260,67 @@ Breaking Changesには以下が含まれます：
 
 ---
 
+## Librarian ↔ Professor の契約（HTTP/JSON）
+
+### エンドポイント: `POST /v1/search-tool`
+**責務**: Librarianの検索依頼を受け、ハイブリッド検索（RRF）結果を返す。
+
+#### リクエスト（Librarian → Professor）
+```json
+{
+  "request_id": "req_abc123",
+  "keyword_list": ["決定係数", "定義"],
+  "semantic_query": "決定係数の計算式について",
+  "exclude_ids": ["chunk_001", "chunk_005"],
+  "metadata_filters": {
+    "subject_id": "subj_xyz",
+    "user_id": "user_123"
+  }
+}
+```
+
+**フィールド説明**:
+- `keyword_list`: 全文検索（BM25）用キーワード配列
+- `semantic_query`: ベクトル検索用の自然言語クエリ
+- `exclude_ids`: 既読チャンクID（DB層で`NOT IN`除外）
+- `metadata_filters`: Professor側で認可チェック後に強制適用
+
+#### レスポンス（Professor → Librarian）
+```json
+{
+  "chunks": [
+    {
+      "temp_index": 0,
+      "text": "## 決定係数\n定義: 回帰モデルの説明力を示す指標...",
+      "metadata": {
+        "page": 3,
+        "heading": "回帰分析の評価指標"
+      }
+    }
+  ],
+  "total_searched": 50,
+  "current_retry": 2
+}
+```
+
+**フィールド説明**:
+- `temp_index`: Professorが一時的に割り当てる番号（LLMのハルシネーション防止）
+- `text`: Markdown形式のチャンク本文
+- `total_searched`: ハイブリッド検索で探索した総チャンク数
+- `current_retry`: Librarian推論ループの現在の試行回数
+
+### ハイブリッド検索（RRF）の実行フロー
+1. **並列検索**: `keyword_list`でBM25、`semantic_query`でpgvector検索を同時実行
+2. **RRF統合**: 各検索結果の順位（Rank）から統合スコアを計算
+   - 公式: `Score = 1/(60 + Rank_vector) + 1/(60 + Rank_keyword)`
+   - k定数=60は業界標準値
+3. **動的k値調整**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を決定
+   - 例: N < 1,000 → k=5, N ≥ 100,000 → k=20
+4. **除外処理**: `exclude_ids`をSQL `WHERE id NOT IN (...)`で適用
+5. **返却**: RRFスコア上位k件を`temp_index`付きで返却
+
+---
+
 ## SSE（Server-Sent Events）契約
 
 ### Professor SSEエンドポイント
@@ -308,12 +369,35 @@ Breaking Changesには以下が含まれます：
 {
   "type": "search_loop_progress",
   "request_id": "req_abc123",
+  "node": "Plan",
   "status": "SEARCHING",
   "current_retry": 2,
   "max_retries": 5,
+  "message": "検索クエリ生成中...",
   "timestamp": "2026-02-16T12:34:58Z"
 }
 ```
+
+**フィールド説明**:
+| フィールド | 型 | 説明 |
+|:---|:---|:---|
+| `node` | string | 現在のLangGraphノード（Plan/Search/Evaluate/Route） |
+| `status` | string | ノードの状態（SEARCHING/EVALUATING/COMPLETE） |
+| `current_retry` | number | Librarian推論ループの現在の試行回数 |
+| `max_retries` | number | 推論ループの上限回数（デフォルト: 5） |
+| `message` | string | ユーザー向け進捗メッセージ（例: "検索クエリ生成中..."） |
+
+**LangGraphノードの説明**:
+- **Plan/Refine**: 検索戦略立案、クエリ生成（初回はPlan、2回目以降はRefine）
+- **Search Tool**: Professorの`POST /v1/search-tool`呼び出し
+- **Evaluate**: 検索結果から`evidence_snippets`抽出、充足度評価
+- **Route**: 停止条件判定（`COMPLETE`なら終了、`CONTINUE`ならPlanに戻る）
+
+**フロントエンド実装要件**:
+- `node`フィールドで現在のノード名を表示（例: "検索戦略を立案中..."）
+- `current_retry / max_retries`でプログレスバー更新（例: "2/5 回目の検索"）
+- `status=COMPLETE`で次イベント（`evidence_selected`）を待機
+- `message`をユーザーに表示（UIフィードバック）
 
 ### フロントエンド側の処理
 
