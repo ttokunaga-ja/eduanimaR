@@ -3,13 +3,13 @@ Title: API Contract Workflow
 Description: eduanimaRのAPI契約管理とOpenAPI運用フロー
 Owner: @ttokunaga-ja
 Status: Published
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 Tags: frontend, eduanimaR, api, openapi, orval, professor
 ---
 
 # API Contract Workflow（OpenAPI / Orval）
 
-Last-updated: 2026-02-15
+Last-updated: 2026-02-16
 
 このドキュメントは、バックエンド（Go Gateway / Microservices）との **API契約（OpenAPI）** を、
 フロントエンド（Next.js + FSD）で **安全に運用するための手順と禁止事項** を固定します。
@@ -220,3 +220,167 @@ QuestionRequest:
 - **形式**: `/v1/`, `/v2/`
 - **移行期間**: 旧バージョンは6ヶ月サポート
 - **廃止通知**: レスポンスヘッダー `X-API-Deprecated: true`
+
+---
+
+## Professor OpenAPI更新フロー
+
+### 更新フロー
+1. **Professor側でOpenAPI更新**
+   - Professor側で`openapi.yaml`更新
+   - Breaking Changesを明記（CHANGELOG or コメント）
+   - Git tagでバージョン管理
+
+2. **フロントエンド側で生成物更新**
+   - `npm run api:generate`実行
+   - 生成物の差分確認: `git diff src/shared/api/generated/`
+   - Breaking Changesの場合はフロントエンド修正
+
+3. **更新頻度**
+   - Phase 1: 週次（機能開発が活発なため）
+   - Phase 2以降: 月次（安定運用のため）
+   - 緊急修正（バグ修正、セキュリティパッチ）: 随時
+
+4. **CI/CDで整合性確認**
+   - Orval再生成を実行
+   - 差分があればCIエラー
+   - 差分がある場合の対応: OpenAPIまたは生成設定を修正して再生成
+
+### Breaking Changes対応例
+Breaking Changesには以下が含まれます：
+- 必須フィールド追加
+- 型変更（string → number 等）
+- エンドポイント削除
+- SSE イベント型の変更
+
+**移行計画**:
+1. Professor側で任意フィールドとして追加（v1.1）
+2. フロントエンド側で対応（3ヶ月猶予）
+3. Professor側で必須化（v2.0）
+
+---
+
+## SSE（Server-Sent Events）契約
+
+### Professor SSEエンドポイント
+- **エンドポイント**: `GET /v1/search/stream?query={query}&subject_id={subject_id}`
+- **認証**: Cookie（SSO/OAuth）または`Authorization: Bearer {token}`
+- **Content-Type**: `text/event-stream`
+
+### SSEイベントタイプ
+
+| イベントタイプ | 内容 | Phase | 発信元 |
+|:---|:---|:---|:---|
+| `answer_chunk` | 回答断片（ストリーミング配信） | Phase 2+ | Professor（Gemini 2 Flash） |
+| `evidence_selected` | 選定エビデンス（Librarianが選定した根拠箇所） | Phase 3+ | Professor（Librarian推論結果を変換） |
+| `search_loop_progress` | Librarian推論ループの進行状況 | Phase 3+ | Professor（Librarianの中間状態を中継） |
+| `error` | エラー通知（`ERROR_CODES.md`のcodeを含む） | All | Professor / Librarian |
+| `done` | 完了通知 | All | Professor |
+
+### イベントデータ構造
+
+#### `answer_chunk`
+```json
+{
+  "type": "answer_chunk",
+  "request_id": "req_abc123",
+  "chunk": "回答の断片テキスト",
+  "timestamp": "2026-02-16T12:34:56Z"
+}
+```
+
+#### `evidence_selected`
+```json
+{
+  "type": "evidence_selected",
+  "request_id": "req_abc123",
+  "evidence": {
+    "document_id": "doc_xyz789",
+    "snippets": ["## 見出し\n本文の断片..."],
+    "why_relevant": "この箇所は質問に対する直接的な回答を含むため"
+  },
+  "timestamp": "2026-02-16T12:34:57Z"
+}
+```
+
+#### `search_loop_progress`
+```json
+{
+  "type": "search_loop_progress",
+  "request_id": "req_abc123",
+  "status": "SEARCHING",
+  "current_retry": 2,
+  "max_retries": 5,
+  "timestamp": "2026-02-16T12:34:58Z"
+}
+```
+
+### フロントエンド側の処理
+
+#### EventSourceでの受信
+```typescript
+const eventSource = new EventSource(`/v1/search/stream?query=${query}&subject_id=${subjectId}`);
+
+eventSource.addEventListener('answer_chunk', (event) => {
+  const data = JSON.parse(event.data);
+  appendAnswerChunk(data.chunk);
+});
+
+eventSource.addEventListener('evidence_selected', (event) => {
+  const data = JSON.parse(event.data);
+  displayEvidence(data.evidence);
+});
+
+eventSource.addEventListener('search_loop_progress', (event) => {
+  const data = JSON.parse(event.data);
+  updateProgressBar(data.current_retry, data.max_retries);
+});
+
+eventSource.addEventListener('error', (event) => {
+  const error = JSON.parse(event.data);
+  handleError(error.code);
+});
+
+eventSource.addEventListener('done', () => {
+  eventSource.close();
+});
+```
+
+#### TanStack Queryでの状態管理
+```typescript
+import { useQuery } from '@tanstack/react-query';
+
+export function useSearchStream(query: string, subjectId: string) {
+  return useQuery({
+    queryKey: ['search', 'stream', subjectId, query],
+    queryFn: async () => {
+      // SSE接続を確立し、イベントを購読
+      const stream = await connectSSE(`/v1/search/stream`, { query, subjectId });
+      return stream;
+    },
+    staleTime: 5 * 60 * 1000, // 5分
+  });
+}
+```
+
+---
+
+## Librarian結果の受信
+
+### Professorの変換処理
+1. **LibrarianからProfessorへ**: Librarianは`selected_evidence`（`temp_index`配列）を返す
+2. **ProfessorでID変換**: Professorが`temp_index`を安定ID（`document_id`）に変換
+3. **ProfessorからFrontendへ**: `document_id` + `snippets`を含む`evidence_selected`イベントを配信
+
+### フロントエンドの責務
+- **`temp_index`を意識しない**: フロントエンドは`temp_index`を直接扱わない
+- **`document_id` + `snippets`を表示**: Professorが変換済みのIDと断片を表示
+- **`entities/evidence`で管理**: 選定エビデンスは`entities/evidence`レイヤーで状態管理
+
+### データフロー図
+```
+Librarian → Professor → Frontend
+  ↓            ↓          ↓
+temp_index  変換処理  document_id + snippets
+(一時ID)              (安定ID)
+```

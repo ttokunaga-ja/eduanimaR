@@ -33,7 +33,12 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **生成物の配置**: `src/shared/api/generated`（固定）
 - **バックエンド構成**:
   - **Professor（Go）**: 外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成
-  - **Librarian（Python）**: LangGraph Agent による検索戦略立案（ProfessorからgRPC経由で呼び出し）
+  - **Librarian（Python）**: LangGraph Agent による検索戦略立案（ProfessorからHTTP/JSON経由で呼び出し）
+  - **Professor → Librarian 通信プロトコル**: 
+    - プロトコル: HTTP/JSON
+    - エンドポイント: `POST /v1/librarian/search-agent`
+    - Librarianはステートレス推論サービス（会話履歴・キャッシュ等の永続化なし）
+    - Librarianへのフロントエンドからの直接通信は禁止（Professor経由のみ）
 
 ## Next.js（Must）
 - **SSR/Hydration**: 原則 Must（学習支援UIの即応性を重視）
@@ -64,6 +69,11 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
 - **ログの取り扱い（PII/Secrets）**: 
   - ユーザーID・メールアドレスはハッシュ化
   - 質問内容・資料内容は本番ログに含めない（デバッグ時のみローカル）
+- **request_id管理**:
+  - Professor APIリクエストに`X-Request-ID`ヘッダーを含める
+  - Professor → Librarian推論ループでも`request_id`を伝播
+  - SSEイベント・エラーレスポンスに`request_id`を含めて返却
+  - フロントエンドはエラー報告時に`request_id`を含める
 
 ## プライバシー・セキュリティ（Must）
 - **データ最小化**: Handbook の PRIVACY_POLICY.md に準拠
@@ -93,14 +103,24 @@ AI/人間が推測で埋めないために、まずここを埋めてから実�
   - DB/GCS/検索インデックスへの直接アクセス権限を持つ
   - 外向き API（HTTP/JSON + SSE）を提供
   - バッチ処理（OCR/Embedding）の実行管理
-- **Librarian（Python）**: 検索戦略立案、停止判断、エビデンス選定（DB 直接アクセスなし）
+  - Librarianの`temp_index`を安定ID（`document_id`）に変換してフロントエンドへ返却
+- **Librarian（Python）**: 検索戦略立案、停止判断、選定エビデンス（Librarianが選定した根拠箇所）の抽出（DB 直接アクセスなし）
   - LangGraph Agent による推論特化
   - Professor 経由でのみ検索実行を要求
   - 検索戦略の最適化と終了判定を担当
+  - **Librarian推論ループパラメータ**:
+    - `max_retries`: Librarian推論ループの上限回数（例: 5回）
+    - Professorの物理検索パラメータ（取得件数k等）とは独立して管理
+  - ステートレス設計: 会話履歴・キャッシュなし（1リクエストで推論完結）
 
 ### バックエンドサービス仕様への参照
 - Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
 - Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+
+### 用語の統一
+- **Librarian推論ループ**: Librarianが検索戦略を立案し、Professor経由で検索を実行する反復プロセス
+- **選定エビデンス**: Librarianが選定した根拠箇所（`selected_evidence`）
+- **temp_index**: LLM可視の一時参照ID（Professorが安定ID `document_id` に変換してフロントエンドへ返却）
 
 ### 提供形態
 - Chrome拡張機能（LMS利用中の介入）
@@ -161,8 +181,13 @@ export const EXTENSION_URLS = {
 
 ### バックエンド境界
 - **Professor（Go）**: データの守護者、APIのSSOT（OpenAPI）、唯一DBに直接アクセス
-- **Librarian（Python）**: 推論・検索ループ専門サービス（ステートレス、Professorのみが呼ぶ）
+  - Librarian推論ループを`POST /v1/librarian/search-agent`で呼び出し
+  - Librarianの`selected_evidence`（`temp_index`配列）を受け取り、安定ID（`document_id`）に変換
+- **Librarian（Python）**: Librarian推論ループ専門サービス（ステートレス、Professorのみが呼ぶ）
+  - 会話履歴・キャッシュなし（1リクエスト内で推論完結）
+  - `max_retries`上限で推論ループを制御
 - **フロントエンド**: Professor の OpenAPI（HTTP/JSON + SSE）のみを呼ぶ
+  - Librarianへの直接通信は禁止
 
 ### データ境界・プライバシー
 - ユーザー別データ分離がデフォルト
@@ -171,7 +196,12 @@ export const EXTENSION_URLS = {
 ### ロードマップ（Phase 1〜4）
 - **Phase 1**: ローカル開発、基本的なQ&A機能、資料管理
 - **Phase 2**: SSO認証、本番環境デプロイ
-- **Phase 3**: 推論ループ（Librarian連携）、高度な検索
+- **Phase 3**: Librarian推論ループ連携、高度な検索
+  - **Librarian連携UI要件**:
+    - Librarian推論ループ進行表示（`widgets/search-loop-status`）
+    - 選定エビデンス表示（`entities/evidence`）
+    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
+  - Professor SSEでのリアルタイム配信（`search_loop_progress`、`evidence_selected`イベント）
 - **Phase 4**: 学習計画、進捗管理
 
 ---

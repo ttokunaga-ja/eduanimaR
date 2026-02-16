@@ -17,12 +17,20 @@ Last-updated: 2026-02-16
 
 ### Professor / Librarian の役割
 - **Professor（Go）**: データ所有者、最終回答生成、DB/GCS/Kafka の物理実行を担当
+  - 外向き API（HTTP/JSON + SSE）を提供
+  - Librarian推論ループ結果を受け取り、安定ID（`document_id`）に変換してフロントエンドへ配信
 - **Librarian（Python）**: 検索戦略立案、LangGraph Agent による推論（Professor経由でのみ検索実行）
+  - **推論ループ制御**: LangGraphによるLibrarian推論ループ制御と`max_retries`設定
+  - **停止条件**: 十分な選定エビデンスが集まった時点で推論を終了
+  - **通信プロトコル**: Professor ↔ Librarian間はHTTP/JSON（エンドポイント: `POST /v1/librarian/search-agent`）
+  - **ステートレス**: 会話履歴・キャッシュ等の永続化なし（1リクエスト内で推論完結）
 
 ### 上流ドキュメントへの参照
 - サービスコンセプト全体: [`../../eduanimaRHandbook/README.md`](../../eduanimaRHandbook/README.md)
-- バックエンド Professor: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
-- バックエンド Librarian: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
+- Professor サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+- Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+- バックエンド Professor 実装: [`../../eduanimaR_Professor/docs/README.md`](../../eduanimaR_Professor/docs/README.md)
+- バックエンド Librarian 実装: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
 
 ---
 
@@ -47,6 +55,24 @@ Last-updated: 2026-02-16
     1. Chrome Web Store（拡張機能公式ページ）
     2. GitHubリリースページ（代替ダウンロード）
     3. 公式導入ガイド・解説ブログ
+  
+- **Phase 3（Librarian推論ループ連携）**:
+  - Librarian推論ループのUI反映
+    - Librarian推論ループ進行状況の表示（現在の試行回数、停止条件達成状況）
+    - 選定エビデンス（Librarianが選定した根拠箇所）の表示
+    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
+  - Professor SSEでのリアルタイム配信
+    - `search_loop_progress` イベント（推論ループの中間状態）
+    - `evidence_selected` イベント（選定エビデンス）
+  
+- **Phase 4（学習計画・進捗管理）**:
+  - 学習計画作成UI
+    - カレンダー形式での計画立案
+    - タスクリスト、進捗グラフ
+  - 進捗管理
+    - 質問履歴の可視化
+    - 学習状況のトラッキング
+    - 復習タイミングのリマインド
   
 - **ファイルアップロード**: 
   - フロントエンドにUIを実装してはならない
@@ -101,6 +127,22 @@ Web版でSSO認証後、未登録ユーザーと判定された場合：
     - `05_operations/OBSERVABILITY.md`
     - `05_operations/RELEASE.md`
     - `05_operations/PERFORMANCE.md`
+
+## 観測性とrequest_id追跡
+
+### request_idの伝播
+eduanimaRでは、リクエストの追跡可能性を確保するため、以下の経路で`request_id`を伝播します：
+
+1. **フロントエンド → Professor**: Professor APIリクエストに`X-Request-ID`ヘッダーを含める
+2. **Professor → Librarian**: Librarian推論ループ呼び出し時に`request_id`を渡す
+3. **Professor → フロントエンド**: SSEイベントおよびレスポンスに`request_id`を含める
+
+### トレース方法
+- **ログ検索**: `request_id`でProfessor/Librarianのログを横断検索
+- **エラー追跡**: エラー発生時、`request_id`を含むログで原因調査
+- **パフォーマンス分析**: `request_id`単位でリクエスト処理時間を計測
+
+詳細は `05_operations/OBSERVABILITY.md` を参照。
 
 ---
 

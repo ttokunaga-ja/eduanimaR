@@ -41,6 +41,16 @@ Last-updated: 2026-02-16
   - **依存**: `shared/api`（Professor の `/files` エンドポイント）
   - **バックエンド境界**: Professor の `file` テーブル + GCS
 
+- **`evidence`**: 選定エビデンス（Librarianが選定した根拠箇所）
+  - **責務**: Librarianが選定したエビデンス（根拠箇所）の表示・管理
+  - **属性**: 
+    - `temp_index`: LLM可視の一時参照ID（Professorが`document_id`に変換）
+    - `document_id`: 安定したドキュメント識別子
+    - `snippets`: Markdown形式の断片
+    - `why_relevant`: 選定理由（なぜこのエビデンスが選ばれたか）
+  - **依存**: `shared/api`（Professor経由でLibrarian結果を取得）
+  - **バックエンド境界**: Librarianの`selected_evidence`出力
+
 - **`user`**: ユーザー（SSO/OAuth で取得したプロフィール）
   - **責務**: ユーザー名・アイコン表示
   - **依存**: `shared/api`（Professor の `/me` エンドポイント）
@@ -52,10 +62,14 @@ Last-updated: 2026-02-16
   - **バックエンド境界**: Cookie ベースのセッション（Phase 2以降）
 
 ### features
-- **`qa-chat`**: Q&A（Professor の SSE + Librarian Agent の推論結果）
-  - **責務**: 質問入力、リアルタイム回答表示、ソース（参照箇所）のクリッカブルリンク
-  - **依存**: `shared/api`（Professor の `/qa/stream` SSE）、`entities/file`
-  - **バックエンド境界**: Professor（SSE配信）↔ Librarian（gRPC、検索戦略立案）
+- **`qa-chat`**: Q&A（Professor の SSE + Librarian推論結果）
+  - **責務**: 
+    - 質問入力、リアルタイム回答表示
+    - Professor SSE経由でのリアルタイム回答配信
+    - 選定エビデンス（Librarianが選定した根拠箇所）の表示
+    - ソース（参照箇所）のクリッカブルリンク
+  - **依存**: `shared/api`（Professor の `/v1/search` エンドポイント、SSE）、`entities/evidence`、`entities/file`
+  - **バックエンド境界**: Professor SSE + Librarian推論ループ結果
 
 - **`auth-by-token`**: トークンでの再認証/更新
   - **責務**: リフレッシュトークンによるセッション延長
@@ -71,6 +85,11 @@ Last-updated: 2026-02-16
 - **`file-tree`**: 科目別ファイルツリー表示
   - **責務**: `entities/subject` + `entities/file` の合成、折りたたみ UI
   - **依存**: `entities/subject`, `entities/file`
+
+- **`search-loop-status`**: Librarian推論ループ進行状況表示（Phase 3以降）
+  - **責務**: Librarian推論ループの進行状況表示（現在の試行回数、停止条件達成状況）
+  - **依存**: `features/qa-chat`、`entities/evidence`
+  - **バックエンド境界**: Librarianの`status`フィールド（`SEARCHING` / `COMPLETED` / `ERROR`）
 
 - **`qa-panel`**: Q&A パネル（履歴 + 入力 + 回答表示）
   - **責務**: `features/qa-chat` + 質問履歴の合成
