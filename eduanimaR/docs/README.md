@@ -31,6 +31,37 @@ eduanimaRは以下の4大原則に基づき設計されています：
 
 **参照**: [`../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md`](../../eduanimaRHandbook/01_philosophy/MISSION_VALUES.md)
 
+### AI Agent質問システムの柔軟性（簡潔な汎用パイプライン）
+
+eduanimaRのAI Agent質問システムは、Professor（検索戦略決定）とLibrarian（クエリ生成）の責務分離により、柔軟な学習支援を実現します。
+
+**Phase 2 (Professor: 戦略決定)**:
+- 質問内容から「資料検索を実行すべきか」「ヒアリングすべきか」を判断
+- ヒアリング判断時: 意図を推測し、3つの候補選択肢を生成（Phase 4-A）
+- 検索判断時: 検索戦略・終了条件を決定し、Librarianへ指示（**gRPC通信**）
+
+**Phase 3 (Librarian: クエリ生成)**:
+- Professorが決定した戦略・終了条件に基づきクエリ生成
+- Professor経由で検索実行（Librarianは直接DB/GCS未アクセス）
+- 最大5回試行で最適なエビデンスを収集
+
+**Phase 4 (Professor: 回答生成)**:
+- 2つのモード:
+  - **4-A) 意図推測モード**: 曖昧質問への候補選択肢生成（Phase 3スキップ）
+  - **4-B) 最終回答モード**: 検索結果を元に回答生成、フロントエンドへSSE配信
+
+この汎用パイプラインにより、以下が可能:
+- **曖昧な質問**: Phase 2でヒアリング判断 → Phase 4-Aで意図候補3つ提示 → ユーザー選択 → Phase 2再実行 → 検索
+- **明確な質問**: Phase 2で検索判断 → Phase 3でクエリ生成・検索 → Phase 4-Bでエビデンス提示
+- **小テスト解答検証**: Phase 2で「解答根拠検索」戦略決定 → Phase 3で根拠検索 → Phase 4-Bで解説生成
+- **資料収集依頼**: Phase 2で収集戦略決定 → Phase 3で広範囲検索 → Phase 4-Bで資料一覧提示
+
+**重要**: 
+- **Phase 2の核心**: 「資料検索を実行すべきか」vs「質問内容をヒアリングすべきか」の判断
+- **通信プロトコル**: Frontend ↔ Professor は HTTP/JSON + SSE、Professor ↔ Librarian は **gRPC**
+
+**参照**: Professor Phase 2戦略決定の詳細は [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+
 ### Professor / Librarian の責務境界（SSOT）
 
 本システムは **2サービス構成** です。DB/GCS/検索インデックスへの直接アクセス権限は Professor のみに付与します（最重要不変条件）。
@@ -39,13 +70,15 @@ eduanimaRは以下の4大原則に基づき設計されています：
 **役割**: データの守護者、システムの司令塔、学習支援の最終執筆者
 
 - **認証・認可**: SSO（OAuth/OIDC）トークン検証、ユーザー/科目/資料のアクセス制御
-- **Phase 2（大戦略）**: Gemini 3 Flashで「タスク分割（調査項目：WHAT）」「停止条件」「コンテキスト」を生成
+- **Phase 2（戦略決定）**: 検索 vs ヒアリング判断、検索戦略決定
 - **Phase 3（物理実行）**: 
-  - Librarianからの検索依頼（gRPC）を受け、**ハイブリッド検索（RRF統合）** を物理的に実行
+  - Librarianからの検索依頼（**gRPC**）を受け、**ハイブリッド検索（RRF統合）** を物理的に実行
   - **動的k値設定**: 母数N（全チャンク数）と`retry_count`に基づき取得件数を調整
   - **除外制御**: `seen_chunk_ids`でDB層で物理的に既読除外
   - **権限強制**: `subject_id`/`user_id`/`is_active` 等の WHERE を SQL 層で必ず強制
-- **Phase 4（合成）**: 選定エビデンスをもとにGemini 3 Proで学習支援としての最終回答を生成
+- **Phase 4（回答生成）**: 
+  - **4-A) 意図推測モード**: 曖昧質問への候補選択肢3つ生成（Phase 3スキップ）
+  - **4-B) 最終回答モード**: 検索結果を元に回答生成、フロントエンドへSSE配信
 - **データ管理**: PostgreSQL（pgvector含む）、GCS、Kafka への**唯一の直接アクセス権限**を持つ
 - **バッチ処理**: OCR/Embedding 生成を Gemini Batch API + Kafka で管理
 
