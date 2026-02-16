@@ -123,27 +123,44 @@ npm run build:extension
 **重要**: 本番環境（Phase 2）では、ファイルアップロード・ユーザー登録はChrome拡張機能からのみ実行可能。
 Web版は拡張機能で登録したユーザーの閲覧専用チャネルとして機能。
 
-## 7) Librarian推論ループの動作確認（Phase 1必須）
+## 7) 汎用質問対応の動作確認（Phase 1必須）
 
-Phase 1では、Librarian統合が必須要件です。以下を確認してください：
+Phase 1では、AI Agentによる質問対応パイプラインの動作確認が必須です。
 
-### SSEエンドポイントのテスト
+### SSEエンドポイントのテスト（複数ユースケース）
+
+#### 1. 明確な質問
 ```bash
 curl -N http://localhost:8080/v1/qa/ask \
   -H "Content-Type: application/json" \
-  -d '{"question": "決定係数とは？", "subject_id": "xxx-xxx-xxx"}'
+  -d '{"question": "決定係数の計算式は？", "subject_id": "xxx-xxx-xxx"}'
 ```
 
-**期待されるSSEイベント**:
-- `event: thinking` → Professor が Phase 2（大戦略）を実行中
-- `event: searching` → Librarian が検索戦略を立案中
-- `event: evidence` → Librarian がエビデンスを選定
-- `event: answer` → Professor が最終回答を生成中
+#### 2. 曖昧な質問
+```bash
+curl -N http://localhost:8080/v1/qa/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "決定係数って何？", "subject_id": "xxx-xxx-xxx"}'
+```
+
+#### 3. 資料収集依頼
+```bash
+curl -N http://localhost:8080/v1/qa/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "統計学の資料を集めて", "subject_id": "xxx-xxx-xxx"}'
+```
+
+**期待されるSSEイベント**（すべてのユースケースで共通）:
+- `event: thinking` → Agent が戦略を立案中
+- `event: searching` → 資料を検索中
+- `event: evidence` → 根拠資料を選定完了
+- `event: answer` → 回答を生成中
 - `event: done` → 完了
 
 ### フロントエンドでの確認
-- チャット画面でリアルタイム推論状態が表示されること
+- **単一UI**で すべてのユースケースを処理できること（`features/qa-chat`）
+- 推論状態がリアルタイム表示されること
 - 参照元資料へのリンクがクリッカブルであること
-- 推論失敗時に再試行ボタンが表示されること
+- エラー時に再試行ボタンが表示されること
 
 SSOT：`03_integration/API_CONTRACT_WORKFLOW.md`
