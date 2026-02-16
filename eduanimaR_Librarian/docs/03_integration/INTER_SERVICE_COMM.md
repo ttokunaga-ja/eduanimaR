@@ -6,7 +6,8 @@ Professor（Go）↔ Librarian（Python）の通信規約を定義し、責務�
 ## 通信構成（確定）
 ```
 eduanima-professor (Go)  ↔  eduanima-librarian (Python)
-         HTTP/JSON (OpenAPI: SSOT)
+         gRPC/Proto (双方向ストリーミング)
+         契約SSOT: eduanimaR_Professor/proto/librarian/v1/librarian.proto
 
 eduanima-librarian (Python)  →  Gemini API
                HTTPS
@@ -14,15 +15,16 @@ eduanima-librarian (Python)  →  Gemini API
 
 ## Professor ↔ Librarian
 ### プロトコル
-- HTTP/JSON を正とする（OpenAPI を SSOT）。
-- HTTP/JSON 以外の内部 RPC 方式は本サービスの SSOT では扱わない（Professor 内部の都合は Professor 側 SSOT で管理）。
+- **gRPC/Proto（双方向ストリーミング）** を正とする。
+- 契約の SSOT は Professor 側の `proto/librarian/v1/librarian.proto`。
+- Phase 3 検索ループにおいて、Professor と Librarian 間で複数ターン双方向通信を実現するために gRPC を採用。
 
 ### 認証/認可
 - 原則「内部サービス間通信」。認証方式（mTLS/Workload Identity 等）は運用側 SSOT に従う。
 - Librarian は最終回答文を生成しないため、認可の主戦場は Professor 側（利用者/セッション文脈の管理）。
 
 ### タイムアウト/リトライ
-- timeout は必須。横断ルールは `01_architecture/RESILIENCY.md` を正とする。
+- timeout は必須。gRPC の deadline/cancellation を適切に扱う。横断ルールは `01_architecture/RESILIENCY.md` を正とする。
 - retry はネットワーク起因の一時失敗に限定し、推論ループ（MaxRetry）とは分離する。
 
 ### 検索ツール呼び出し（責務境界）
@@ -38,7 +40,8 @@ eduanima-librarian (Python)  →  Gemini API
 - エラー形式/コードは `ERROR_HANDLING.md`, `ERROR_CODES.md` に従う。
 
 ## 契約（SSOT）
-- OpenAPI 運用: `API_CONTRACT_WORKFLOW.md`
+- gRPC/Proto 運用: `API_CONTRACT_WORKFLOW.md`
+- 契約定義: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
 - 破壊的変更の扱い: `API_VERSIONING_DEPRECATION.md`
 
 ## 明確に「やらない」こと

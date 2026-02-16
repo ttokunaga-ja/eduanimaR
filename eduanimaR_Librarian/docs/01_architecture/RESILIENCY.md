@@ -4,7 +4,7 @@
 分散システムで必ず発生する「遅延・部分失敗・再試行」に対し、サービス横断で一貫した設計基準を定義する。
 
 ## 適用範囲（Librarian）
-- Professor（Go）↔ Librarian（Python）（HTTP/JSON）
+- Professor（Go）↔ Librarian（Python）（**gRPC、双方向ストリーミング**）
 - Librarian ↔ Gemini API（HTTPS）
 
 ## 基本原則（MUST）
@@ -14,13 +14,14 @@
 - **Concurrency を制御**（接続プール、ワーカー数、キュー長、バックプレッシャ）。
 
 ## Timeout / Deadline
-- すべての HTTP クライアントは timeout を必須化する（無限待ち禁止）
-- Professor→Librarian の呼び出しは request timeout を前提に設計し、Librarian は上流の締切内で「最善の結果」を返す
+- すべての gRPC/HTTP クライアントは timeout を必須化する（無限待ち禁止）
+- Professor→Librarian の gRPC 呼び出しは request timeout を前提に設計し、Librarian は上流の締切内で「最善の結果」を返す
+- gRPC の deadline/cancellation を受け取った場合は速やかに処理を中断する
 - Gemini 呼び出しも timeout を設定し、上流キャンセル時は速やかに中断する
 
 ## Retry
 ### Retry してよい（SHOULD）
-- Professor の検索ツール呼び出し（読み取り相当）で、ネットワーク起因の一時失敗のみ
+- Professor の検索ツール呼び出し（gRPC経由、読み取り相当）で、ネットワーク起因の一時失敗のみ
 - Gemini API 呼び出しで 5xx/一時エラーのみ（指数バックオフ + ジッタ）
 
 ### Retry してはいけない（SHOULD NOT）

@@ -2,6 +2,7 @@
 
 この `docs/` は `eduanima-librarian`（Python 推論マイクロサービス）の SSOT。
 本サービスは **DB-less** で、検索の物理実行・DB/インデックス管理・バッチは Go 側（Professor）が担う。
+Professor との通信は **gRPC（双方向ストリーミング）** で行い、契約は `eduanimaR_Professor/proto/librarian/v1/librarian.proto` で定義される。
 
 ## Quickstart
 0. `00_quickstart/QUICKSTART.md`
@@ -16,7 +17,7 @@
 6. レジリエンス: `01_architecture/RESILIENCY.md`
 
 ## 契約・統合
-- OpenAPI（Professor ↔ Librarian）: `03_integration/API_CONTRACT_WORKFLOW.md`
+- gRPC/Proto（Professor ↔ Librarian）: `03_integration/API_CONTRACT_WORKFLOW.md`、契約SSOT: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
 - バージョニング/廃止: `03_integration/API_VERSIONING_DEPRECATION.md`
 - 契約テスト: `03_integration/CONTRACT_TESTING.md`
 - エラー形式/コード: `03_integration/ERROR_HANDLING.md`, `03_integration/ERROR_CODES.md`
