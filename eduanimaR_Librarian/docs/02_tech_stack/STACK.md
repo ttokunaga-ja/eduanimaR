@@ -13,11 +13,11 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 | **Schema/Serialization** | msgspec / Protocol Buffers | Professor ↔ Librarian の契約（DTO）を高速・厳格に扱う。gRPC契約は Protocol Buffers。 |
 | **Agent Orchestration** | LangGraph | 検索ループの状態管理、MaxRetry/停止条件の保証。 |
 | **HTTP Client** | （例: httpx） | Professor の検索ツール呼び出し（gRPC経由）、および Gemini API 呼び出しに使用。 |
-| **LLM** | Gemini 3 Flash | Librarian の標準推論モデル（戦略立案/停止判断/選定）。 |
+| **LLM** | 高速推論モデル | Librarian の標準推論モデル（戦略立案/停止判断/選定）。 |
 | **Observability** | OpenTelemetry（Python） | trace/log correlation を前提にする（request_id/trace_id）。 |
 | **Packaging/Build** | pyproject ベース | 依存は lock して再現性を確保（ツールはプロジェクトで固定）。 |
 
-## Gemini 3 Flash の使い分け（推奨）
+## 高速推論モデルの使い分け（推奨）
 - 戦略立案（Plan）: 思考コストを許容（例: medium 相当）
 - ループ中の微修正（Refine/Evaluate）: 低コスト（例: low 相当）
 
@@ -40,7 +40,7 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 
 1. **検索戦略立案（Plan）**
    - Professorから受け取った指示をもとに検索方針を立案
-   - Gemini 3 Flash使用
+   - 高速推論モデル使用
 
 2. **検索ループ実行（LangGraph）**
    - 最大5回の試行で検索を繰り返し
@@ -48,7 +48,7 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 
 3. **検索結果の評価・停止判断（Evaluate/Decide）**
    - 内容評価と終了条件の判定
-   - Gemini 3 Flash使用
+   - 高速推論モデル使用
 
 4. **エビデンス選定（Rank）**
    - 根拠資料の抽出・評価
@@ -66,7 +66,7 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - **Phase 4**: Librarianに変更なし（閲覧中画面の解説機能のみ）
 - **Phase 5**: 学習計画立案機能（構想段階）
 
-### Gemini 3 Flash の使い分け（Phase 1以降）
+### 高速推論モデルの使い分け（Phase 1以降）
 
 - **戦略立案（Plan）**: 思考コストを許容（例: medium 相当）
 - **ループ中の微修正（Refine/Evaluate）**: 低コスト（例: low 相当）

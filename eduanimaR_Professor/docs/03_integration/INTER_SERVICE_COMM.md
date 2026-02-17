@@ -30,7 +30,7 @@ Frontend ↔ Professor ↔ Librarian
     - Phase 2（大戦略/プランニング）: Professor が「調査項目（WHAT）」と「停止条件（Stop Conditions）」を定義して Librarian に渡す
     - Phase 3（小戦略/タクティクス）: Librarian が「探し方（HOW）」を決め、クエリ生成・ツール選択・反省/再試行・停止条件の満足判定を実行する
     - Professor は Librarian の要求に基づき、SQL を確定して DB検索を **物理的に実行**し、軽量なMarkdown断片（チャンク＋前後等）を返す（制約/権限を必ず強制）
-    - Librarian は選定した資料ID/根拠候補を返し、Professor が全文取得→最終回答（Gemini 3 Pro）を生成する
+    - Librarian は選定した資料ID/根拠候補を返し、Professor が全文取得→最終回答（高精度推論モデル）を生成する
 - 認証: service-to-service 認証を必須（mTLS / workload identity 等）
 
 ### 3) Kafka（非同期）

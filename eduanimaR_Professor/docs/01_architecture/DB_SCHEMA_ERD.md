@@ -321,7 +321,7 @@ sequenceDiagram
     K->>W: Consume IngestJob
     W->>DB: SELECT material (冪等性チェック)
     W->>G: 原本ダウンロード
-    W->>LLM: Vision Reasoning<br/>(Gemini 3 Flash Batch)
+    W->>LLM: Vision Reasoning<br/>(高速OCRモデル バッチ)
     LLM-->>W: Markdown + Structured Outputs
     W->>DB: INSERT material_pages
     W->>DB: INSERT chunks (sequence順)
@@ -348,7 +348,7 @@ sequenceDiagram
     P->>P: 認証: user_id確定
     
     Note over P,LLM: Phase 2: Planning
-    P->>LLM: Plan生成<br/>(Gemini 3 Flash)
+    P->>LLM: Plan生成<br/>(高速推論モデル)
     LLM-->>P: plan_json<br/>(調査項目/停止条件)
     P->>DB: INSERT reasoning_sessions<br/>(plan_json)
     
@@ -356,7 +356,7 @@ sequenceDiagram
     P->>L: gRPC: Reason(Start)<br/>(question + plan_json)
     
     loop 最大5回
-        L->>L: LLM評価 (Gemini 3 Flash)
+        L->>L: LLM評価 (高速推論モデル)
         L->>P: gRPC: SearchRequest<br/>(query + mode)
         P->>DB: 物理制約付き検索<br/>(subject_id + user_id)
         DB-->>P: chunks[] + metadata
@@ -370,7 +370,7 @@ sequenceDiagram
     Note over P,LLM: Phase 4: Answer
     P->>DB: SELECT chunks<br/>(selected_evidence)
     DB-->>P: 全文Markdown
-    P->>LLM: 最終回答生成<br/>(Gemini 3 Pro)
+    P->>LLM: 最終回答生成<br/>(高精度推論モデル)
     LLM-->>P: final_answer_markdown
     P->>DB: INSERT session_evidence
     P->>DB: UPDATE reasoning_sessions<br/>(final_answer, status='completed')
