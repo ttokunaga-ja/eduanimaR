@@ -86,7 +86,7 @@ Last-updated: 2026-02-17
 Phase 1の技術スタック（確定版）:
 - Go 1.25.7
 - PostgreSQL 18.1 + pgvector 0.8.1
-- Gemini 2.0 Flash（OCR/埋め込み）
+- 高速OCRモデル（OCR/埋め込み）
 - Echo v5.0.1（HTTP API）
 - gRPC（Professor ↔ Librarian内部通信）
 

@@ -32,7 +32,7 @@ Phase 1開始時に以下を確定させる:
 
 - `00_quickstart/PROJECT_DECISIONS.md`
 - LangGraph実装方針（検索ループ最大5回試行）
-- Gemini 3 Flash のパラメータ設定（思考コスト・温度等）
+- 高速推論モデル のパラメータ設定（思考コスト・温度等）
 
 ## 3) Phase 1実装完了条件
 
@@ -41,7 +41,7 @@ Phase 1開始時に以下を確定させる:
 - [ ] Professor ↔ Librarian gRPC双方向ストリーミングが動作
 - [ ] 検索ループが最大5回試行で停止
 - [ ] LangGraphで状態管理が正常動作
-- [ ] Gemini 3 Flashでの推論が動作（Plan/Evaluate）
+- [ ] 高速推論モデルでの推論が動作（Plan/Evaluate）
 - [ ] エビデンス選定が正常動作
 - [ ] 検索成功率70%以上（10件の検証質問）
 - [ ] 検索応答時間p95で5秒以内

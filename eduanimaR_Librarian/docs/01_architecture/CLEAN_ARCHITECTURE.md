@@ -6,7 +6,7 @@
 ## 前提（重要）
 - Librarian は **DB-less**（永続化なし）。DB/インデックス/バッチは Go 側（Professor）の責務。
 - Librarian の外部依存は原則として以下のみ:
-  - **Gemini API（Gemini 3 Flash）**
+  - **Gemini API（高速推論モデル）**
   - **Professor が公開する検索ツール（HTTP/JSON）**
 
 ## 推奨レイアウト（Python + Clean Architecture）

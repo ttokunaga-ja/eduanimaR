@@ -382,7 +382,7 @@ Frontend → Professor (HTTP/OpenAPI)
             ↓
          Librarian → 資料ID/根拠候補を返却
             ↓
-         Phase 4: Answer（Professor/Gemini 3 Pro）
+         Phase 4: Answer（Professor/高精度推論モデル）
             ↓
 Frontend ← Professor (SSE: 進捗/引用/回答)
 ```
