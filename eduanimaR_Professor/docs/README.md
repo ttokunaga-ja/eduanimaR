@@ -71,7 +71,7 @@ Professor の外向きAPI契約は、以下の最小セットから開始する�
 
 #### 1. 資料アップロード
 ```
-POST /v1/subjects/{subjectId}/materials
+POST /v1/subjects/{subject_id}/materials
 Content-Type: multipart/form-data
 Authorization: Bearer {token} （Phase 2以降）
 X-Dev-User: dev-user （Phase 1のみ）
@@ -82,13 +82,13 @@ Request:
 Response (202 Accepted):
 {
   "material_id": "uuid",
-  "status": "processing"
+  "status": "pending"
 }
 ```
 
 #### 2. 質問応答（SSEストリーミング）
 ```
-POST /v1/qa/stream
+POST /v1/subjects/{subject_id}/chats
 Content-Type: application/json
 Accept: text/event-stream
 Authorization: Bearer {token} （Phase 2以降）
@@ -96,61 +96,55 @@ X-Dev-User: dev-user （Phase 1のみ）
 
 Request:
 {
-  "subject_id": "uuid",
-  "question": "string"
+  "question": "string",
+  "parent_chat_id": "uuid（optional）"
 }
 
 Response (200 OK, SSE):
-event: thinking
-data: {"message": "検索戦略を立案中..."}
+data: {"type":"thinking","content":"検索戦略を立案中..."}
 
-event: searching
-data: {"message": "資料を検索中...（試行 1/5）"}
+data: {"type":"searching","query":"決定係数 計算式"}
 
-event: evidence
-data: {
-  "material_id": "uuid",
-  "page_number": 12,
-  "excerpt": "...",
-  "why_relevant": "..."
-}
+data: {"type":"evidence","material_id":"uuid","name":"lecture03.pdf","page":12,"excerpt":"..."}
 
-event: answer
-data: {"chunk": "回答の一部..."}
+data: {"type":"chunk","content":"回答の一部..."}
 
-event: complete
-data: {"message": "回答完了"}
+data: {"type":"done","chat_id":"uuid"}
+
+data: {"type":"error","code":"SEARCH_TIMEOUT","request_id":"uuid"}
 ```
 
 #### 3. フィードバック送信
 ```
-POST /v1/qa/feedback
+POST /v1/subjects/{subject_id}/chats/{chat_id}/feedback
 Content-Type: application/json
 Authorization: Bearer {token} （Phase 2以降）
 X-Dev-User: dev-user （Phase 1のみ）
 
 Request:
 {
-  "qa_session_id": "uuid",
-  "feedback": "good" | "bad",
+  "rating": "good" | "bad",
   "comment": "string (optional)"
 }
 
-Response (200 OK):
-{
-  "success": true
-}
+Response (204 No Content)
 ```
 
 #### 4. 処理状態確認
 ```
-GET /v1/materials/{materialId}/status
+GET /v1/subjects/{subject_id}/materials/{material_id}
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
 
 Response (200 OK):
 {
   "material_id": "uuid",
-  "status": "ready" | "processing" | "failed",
-  "progress": integer (0-100)
+  "subject_id": "uuid",
+  "name": "string",
+  "status": "pending" | "processing" | "ready" | "failed",
+  "error_message": "string | null",
+  "uploaded_at": "ISO8601",
+  "processed_at": "ISO8601 | null"
 }
 ```
 
@@ -161,51 +155,55 @@ Authorization: Bearer {token} （Phase 2以降）
 X-Dev-User: dev-user （Phase 1のみ）
 
 Response (200 OK):
-{
-  "subjects": [
-    {
-      "subject_id": "uuid",
-      "name": "科目名",
-      "material_count": integer
-    }
-  ]
-}
+[
+  {
+    "subject_id": "uuid",
+    "name": "科目名",
+    "lms_course_id": "string | null",
+    "created_at": "ISO8601",
+    "updated_at": "ISO8601"
+  }
+]
 ```
 
 #### 6. 資料一覧取得（Web版固有機能）
 ```
-GET /v1/subjects/{subjectId}/materials
+GET /v1/subjects/{subject_id}/materials
 Authorization: Bearer {token} （Phase 2以降）
 X-Dev-User: dev-user （Phase 1のみ）
 
 Response (200 OK):
-{
-  "materials": [
-    {
-      "material_id": "uuid",
-      "title": "資料名",
-      "upload_date": "ISO8601",
-      "page_count": integer
-    }
-  ]
-}
+[
+  {
+    "material_id": "uuid",
+    "subject_id": "uuid",
+    "name": "lecture01.pdf",
+    "status": "pending" | "processing" | "ready" | "failed",
+    "error_message": "string | null",
+    "uploaded_at": "ISO8601",
+    "processed_at": "ISO8601 | null"
+  }
+]
 ```
 
 #### 7. 会話履歴取得（Web版固有機能）
 ```
-GET /v1/subjects/{subjectId}/conversations
+GET /v1/subjects/{subject_id}/chats
 Authorization: Bearer {token} （Phase 2以降）
 X-Dev-User: dev-user （Phase 1のみ）
 
 Response (200 OK):
 {
-  "conversations": [
+  "chats": [
     {
-      "conversation_id": "uuid",
+      "chat_id": "uuid",
+      "subject_id": "uuid",
       "question": "質問文",
+      "answered_at": "ISO8601 | null",
       "created_at": "ISO8601"
     }
-  ]
+  ],
+  "next_cursor": "string | null"
 }
 ```
 

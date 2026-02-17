@@ -1,11 +1,27 @@
 # OpenAPI (Project SSOT)
 
-Place the project contract here as `openapi/openapi.yaml` (or update `orval.config.ts`).
+## ⚠️ 同期ルール（必読）
 
-Minimum workflow:
-- Update/obtain OpenAPI
-- Run `npm run api:generate`
-- Commit generated changes under `src/shared/api/generated`
+`eduanimaR/openapi/openapi.yaml` は **`eduanimaR_Professor/docs/openapi.yaml` と常に同一内容を維持する**。
+
+- **契約の正（SSOT）**: `eduanimaR_Professor/docs/openapi.yaml`（Professor チームが管理）
+- **フロントエンド参照コピー**: `eduanimaR/openapi/openapi.yaml`（Orval がこのパスを読む）
+- **同期タイミング**: Professor 側の openapi.yaml を更新した際は、必ず本ファイルも同一内容で更新すること
+- **差分検出**: CI の `contract-codegen-check` で openapi.yaml → 生成コードの差分を検出する
+
+```
+SSOT: eduanimaR_Professor/docs/openapi.yaml
+  ↓ 手動コピー（変更時に同期）
+  eduanimaR/openapi/openapi.yaml
+  ↓ npm run api:generate（Orval）
+  eduanimaR/src/shared/api/generated/
+```
+
+## 最短ワークフロー
+1. Professor 側で `eduanimaR_Professor/docs/openapi.yaml` を更新
+2. 本ファイル（`eduanimaR/openapi/openapi.yaml`）を同一内容で更新
+3. `npm run api:generate` を実行
+4. 生成変更（`src/shared/api/generated`）をコミット
 
 ---
 
@@ -13,7 +29,9 @@ Minimum workflow:
 
 ### 契約の配置場所
 - **SSOT**: `eduanimaR_Professor/docs/openapi.yaml`
-  - Professor が管理する外向きAPI定義
+  - Professor が管理する外向きAPI定義（変更はここに加える）
+- **フロントエンドコピー**: `eduanimaR/openapi/openapi.yaml`
+  - SSOT と常に同一内容。Orval の入力ファイル
 - **生成先**: `eduanimaR/src/shared/api/generated/`
   - Orval で自動生成されるクライアントコード
 
