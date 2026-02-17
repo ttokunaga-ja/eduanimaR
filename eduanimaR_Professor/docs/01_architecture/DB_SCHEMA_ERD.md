@@ -13,10 +13,12 @@ eduanima-professor のデータベーススキーマを視覚的に理解する�
 erDiagram
     users ||--o{ subjects : "owns"
     users ||--o{ materials : "uploads"
-    users ||--o{ reasoning_sessions : "creates"
+    users ||--o{ chats : "creates"
     
     subjects ||--o{ materials : "contains"
-    subjects ||--o{ reasoning_sessions : "scopes"
+    subjects ||--o{ chats : "scopes"
+    
+    chats ||--o{ chats : "parent of"
     
     materials ||--o{ material_pages : "has"
     materials ||--o{ chunks : "contains"
@@ -31,12 +33,12 @@ erDiagram
     
     chunk_embeddings }o--|| chunks : "represents"
     
-    reasoning_sessions ||--o{ search_steps : "executes"
-    reasoning_sessions ||--o{ session_evidence : "collects"
+    chats ||--o{ search_steps : "executes"
+    chats ||--o{ session_evidence : "collects"
     
-    search_steps }o--|| reasoning_sessions : "belongs to"
+    search_steps }o--|| chats : "belongs to"
     
-    session_evidence }o--|| reasoning_sessions : "belongs to"
+    session_evidence }o--|| chats : "belongs to"
     session_evidence }o--|| chunks : "references"
     session_evidence }o--|| materials : "references"
     
@@ -166,11 +168,12 @@ erDiagram
 
 ```mermaid
 erDiagram
-    reasoning_sessions {
+    chats {
         uuid id PK
         text nanoid UK
         uuid user_id FK "物理制約"
         uuid subject_id FK "物理制約"
+        uuid parent_chat_id FK "会話の親子関係"
         text question "ユーザー質問"
         jsonb plan_json "Phase2: Plan結果"
         text final_answer_markdown "Phase4: Answer結果"
@@ -210,8 +213,8 @@ erDiagram
         timestamptz created_at
     }
     
-    reasoning_sessions ||--o{ search_steps : "session_id"
-    reasoning_sessions ||--o{ session_evidence : "session_id"
+    chats ||--o{ search_steps : "session_id"
+    chats ||--o{ session_evidence : "session_id"
     session_evidence }o--|| chunks : "chunk_id"
     session_evidence }o--|| materials : "material_id"
 ```
