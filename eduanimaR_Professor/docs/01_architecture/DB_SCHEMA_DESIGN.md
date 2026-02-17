@@ -221,7 +221,37 @@ CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions(subject_id);
   3. 上記6テーブルを作成
   4. 固定ユーザーを INSERT
 
-- **Phase 1→Phase 2 移行時の変更点**:
+## Phase 1→Phase 2 移行時のDB変更
+
+### users テーブルの拡張
+
+Phase 1では固定のdev-userを使用しますが、Phase 2でSSO認証を導入するため、以下のカラムを追加します。
+
+```sql
+ALTER TABLE users 
+ADD COLUMN provider TEXT, -- 'google' | 'meta' | 'microsoft' | 'line'
+ADD COLUMN provider_user_id TEXT, -- SSOプロバイダーのユーザーID
+ADD CONSTRAINT users_provider_unique UNIQUE (provider, provider_user_id);
+```
+
+### マイグレーション方針
+
+1. Phase 1の固定ユーザー（`dev@example.com`）は削除
+2. 既存の `subjects`, `files`, `qa_sessions` は保持（user_idの再紐付けは不要）
+3. `status` カラムをTEXTからENUMに変更（型安全性向上）
+
+### Phase 2以降のSSO認証フロー
+
+1. ユーザーがSSOプロバイダーで認証
+2. `provider` と `provider_user_id` でユーザーを検索
+3. 存在しなければ新規ユーザーを作成（拡張機能のみ）
+4. 存在すればセッション発行（Web版・拡張機能両方）
+
+**注**: Web版からの新規登録は全Phase禁止。拡張機能でのみユーザー登録可能。
+
+---
+
+- **Phase 1→Phase 2 移行時の変更点（詳細実装）**:
   - `users` テーブルに `provider`, `provider_user_id` カラムを追加（SSO対応）
     ```sql
     ALTER TABLE users ADD COLUMN provider TEXT; -- 'google', 'meta', 'microsoft', 'line'

@@ -32,53 +32,78 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - DB/インデックス/バッチ処理（Professor の責務）
 - gRPC 以外の内部 RPC 方式の独自採用（Professor との契約は gRPC/Proto が正）
 
-## Phase 1-5での取り扱い
+## Phase別のLibrarian実装スケジュール
 
-### Phase 1: バックエンド完成（ローカル開発）
+### Phase 1: Librarian未実装
 
-**Librarian責務**:
-- Phase 3の小戦略実行: クエリ生成（最大5回試行）
-- 停止条件の満足判定
-- Professor経由での検索実行（DB/GCS直接アクセス禁止）
-- LangGraphによる検索ループの状態管理
+**Phase 1では本サービス（Librarian）は未実装です。**
 
-**統合方法**:
-- gRPC契約（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）は既に定義済み
-- Professorは「Librarian未起動でも動作する」設計（Phase 1での後方互換）
+- Phase 1（ローカル開発・認証スキップ）では、Professorが直接Gemini 2.0 Flashを呼び出す
+- Librarian推論ループは実装しない
+- Professor単体で以下を実現:
+  - OCR + 構造化処理（Gemini 2.0 Flash）
+  - 単純な検索（pgvector HNSW）
+  - 回答生成（Gemini 2.0 Flash）
 
-**実装状態**: Phase 1で実装・統合完了（ローカル開発で動作確認）
+### Phase 2: Librarian未実装（継続）
 
----
+**Phase 2でもLibrarianは不要です。**
 
-### Phase 2: SSO認証 + 本番環境デプロイ
+- SSO認証実装
+- 拡張機能版ZIPファイル配布
+- 本番環境デプロイ（Professor単体）
+- Librarian推論ループは実装しない
 
-**Librarian責務**: Phase 1と同じ
+### Phase 3: Librarian実装・統合
 
-**統合方法**: Phase 1と同じ（本番環境でもgRPC通信）
+**Phase 3で初めてLibrarianを実装・統合します。**
 
-**実装状態**: Phase 1で実装済み、Phase 2で本番環境デプロイ
+#### Phase 3での責務
 
----
+- **検索戦略立案（Plan）**: Professorから受け取った指示をもとに検索方針を立案
+- **検索結果の評価・停止判断（Evaluate/Decide）**: 内容評価と終了条件の判定
+- **エビデンス選定（Rank）**: 根拠資料の抽出・評価
 
-### Phase 3: Chrome Web Store公開
+#### Phase 3での統合準備
 
-**Librarian責務**: Phase 1と同じ
+1. **gRPC契約の実装**
+   - 契約SSOT: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
+   - Professor側: gRPCクライアント実装
+   - Librarian側: gRPCサーバー実装
 
-**統合方法**: Phase 1と同じ
+2. **Professorの後方互換性**
+   - Librarian未起動でも動作する設計（Phase 1/2との互換性）
+   - Librarian接続失敗時はProfessor単体で検索を実行
 
-**実装状態**: Phase 1で実装済み、Phase 3では変更なし
+3. **LangGraph導入**
+   - 検索ループの状態管理
+   - MaxRetry/停止条件の保証
+   - Gemini 3 Flash での推論実行
+
+#### Phase 3での検証項目
+
+- Librarian推論ループの動作確認（最大5回試行）
+- Professor ↔ Librarian gRPC双方向ストリーミング検証
+- 検索精度の向上確認（Phase 1/2 vs Phase 3）
+
+### Gemini 3 Flash の使い分け（Phase 3以降）
+
+- **戦略立案（Plan）**: 思考コストを許容（例: medium 相当）
+- **ループ中の微修正（Refine/Evaluate）**: 低コスト（例: low 相当）
+
+**注**: 具体のパラメータ名/SDKは採用SDKに依存するため、実装側でSSOT化する。
 
 ---
 
 ### Phase 4: 閲覧中画面の解説機能追加
 
-**Librarian責務**: Phase 1と同じ
+**Librarian責務**: Phase 3と同じ
 
 **追加考慮点**:
 - 画面HTML・画像解析は Professor側で実施（Gemini Vision API）
 - Librarianは従来通りテキストベースの検索クエリ生成のみ
 
-**実装状態**: Phase 1で実装済み、Phase 4では変更なし
+**実装状態**: Phase 3で実装済み、Phase 4では変更なし
 
 ---
 
@@ -89,16 +114,4 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - 小テスト結果分析のための推論ループ実装（可能性あり）
 
 **実装状態**: 構想段階、Phase 1-4完了後に詳細を検討
-
----
-
-## Phase別の統合準備状況
-
-| Phase | Librarian実装 | Professor統合 | 本番環境 | 備考 |
-|-------|-------------|-------------|---------|------|
-| **Phase 1** | ✅ 完了 | ✅ gRPC統合完了 | ❌ ローカルのみ | 推論ループ実装・検証完了 |
-| **Phase 2** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま本番適用 |
-| **Phase 3** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま維持 |
-| **Phase 4** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま維持 |
-| **Phase 5** | ❌ 構想段階 | ❌ 構想段階 | ❌ 未定 | Phase 1-4完了後に検討 |
 
