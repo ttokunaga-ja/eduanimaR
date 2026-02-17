@@ -27,7 +27,7 @@ Last-updated: 2026-02-17
 
 | フェーズ | タスク | 使用モデル |
 | :--- | :--- | :--- |
-| Ingestion（Professor / 前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力）を **バッチ処理** で実行 | **高速OCRモデル（バッチモード）** |
+| Ingestion（Professor / 前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力）を **バッチ処理** で実行 | **高速推論モデル** |
 | Phase 2（Plan / Professor） | タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト定義（大戦略: WHAT） | **高速推論モデル** |
 | Phase 3（Search / Librarian） | クエリ生成・ツール選択・反省/再試行・停止条件の満足判定（小戦略: HOW） | **高速推論モデル** |
 | Phase 4（Answer / Professor） | 選定資料の全文Markdownを読み込み最終回答生成 | **高精度推論モデル** |
@@ -46,12 +46,13 @@ Last-updated: 2026-02-17
 - Phase 3: `Low`（速度優先。最終回のみ `Medium` に上げて再検討してよい）
 
 ### モデル設定（環境変数）
-モデルは環境変数で切り替え可能（値は Gemini API に渡す **モデルID文字列**）。
+2モデル戦略を採用:
 
-- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: 高速OCRモデル）
-- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: 高速推論モデル）
-- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: 高速推論モデル）
-- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: 高精度推論モデル）
+- `PROFESSOR_MODEL_FAST`（default: 高速推論モデル） - Ingestion/Planning用
+- `LIBRARIAN_MODEL_FAST`（default: 高速推論モデル） - Search用
+- `PROFESSOR_MODEL_ACCURATE`（default: 高精度推論モデル） - Answer用
+
+**注意:** Gemini 2.0 Flash提供終了により、OCR/構造化処理も高速推論モデルで実行します。
 
 ## 通信スタック（SSOT）
 - Frontend ↔ Professor: **HTTP/JSON（OpenAPI）** + **SSE**
@@ -86,7 +87,7 @@ Last-updated: 2026-02-17
 Phase 1の技術スタック（確定版）:
 - Go 1.25.7
 - PostgreSQL 18.1 + pgvector 0.8.1
-- 高速OCRモデル（OCR/埋め込み）
+- 高速推論モデル（OCR/埋め込み）
 - Echo v5.0.1（HTTP API）
 - gRPC（Professor ↔ Librarian内部通信）
 

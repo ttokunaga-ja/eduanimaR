@@ -67,7 +67,7 @@ Professor（Go）を「インフラ・実行部隊・最終回答者（実務）
   - Professor APIが完全に動作（OpenAPI定義完備）
   - Librarian推論ループとの統合完了（gRPC双方向ストリーミング）
   - 認証不要でcurlリクエストによる資料アップロードが可能（開発用エンドポイント）
-  - OCR + 構造化処理（高速OCRモデル）
+  - OCR + 構造化処理（高速推論モデル）
   - pgvector埋め込み生成・保存（HNSW検索）
   - **Web版固有機能のAPI提供**: 科目一覧・資料一覧・会話履歴取得
   - **QA機能のSSEストリーミング**: thinking/searching/evidence/answer/completeイベント配信

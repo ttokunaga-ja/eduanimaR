@@ -150,10 +150,8 @@ Professor OpenAPI契約に基づく、エビデンスカードの必須表示要
 **参照**: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)、[`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
 
 ### 推論モデル役割分担
-- **高速OCRモデル**: 
-  - Professor: インジェスト（PDF→Markdown）
 - **高速推論モデル**: 
-  - Professor: Phase 2（大戦略）
+  - Professor: インジェスト（PDF→Markdown）、Phase 2（大戦略）
   - Librarian: Phase 3（小戦略）、Librarian推論ループ
 - **高精度推論モデル**: 
   - Professor: Phase 4（最終回答生成）
@@ -267,7 +265,7 @@ Professor が実行するハイブリッド検索戦略:
 ### バックエンド技術スタック（参考）
 | コンポーネント | 技術 |
 |--------------|------|
-| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, 高速OCRモデル/高速推論モデル/高精度推論モデル |
+| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, 高速推論モデル/高精度推論モデル |
 | Librarian | Python 3.12+, Litestar, LangGraph, 高速推論モデル |
 | 通信 | Frontend ↔ Professor: HTTP/JSON + SSE, Professor ↔ Librarian: **HTTP/JSON** |
 

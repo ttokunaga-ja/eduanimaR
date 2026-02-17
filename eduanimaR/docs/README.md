@@ -34,7 +34,7 @@ eduanimaRは、**LLMを活用した学習支援の研究プロジェクト**で�
    - Professor APIが完全に動作（OpenAPI定義完備）
    - Librarian推論ループとの統合完了（gRPC双方向ストリーミング）
    - **認証不要でcurlリクエストによる資料アップロードが可能**（開発用エンドポイント）
-   - OCR + 構造化処理（高速OCRモデル）
+   - OCR + 構造化処理（高速推論モデル）
    - pgvector埋め込み生成・保存（HNSW検索）
 
 2. **Web版固有機能すべてが使用可能**
@@ -343,7 +343,7 @@ eduanimaRは、フロントエンド(Next.js) + Professor(Go) + Librarian(Python
 ### 4フェーズ構成（Reasoning Loop）
 
 **Phase 1: 資料の構造化（Ingestion / Professor）**
-- 高速OCRモデル（バッチモード）でPDF/画像をMarkdown化・意味単位チャンク分割
+- 高速推論モデル（バッチモード）でPDF/画像をMarkdown化・意味単位チャンク分割
 - PostgreSQL（pgvector）へ永続化
 
 **Phase 2: 大戦略の立案（Planning / Professor）**

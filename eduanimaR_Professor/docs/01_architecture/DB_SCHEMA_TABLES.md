@@ -316,7 +316,7 @@ CREATE INDEX idx_materials_embedding_vector ON materials
 ```
 
 **設計メモ**:
-- **意味単位のチャンク**（高速OCRモデルで分割）
+- **意味単位のチャンク**（高速推論モデルで分割）
 - `sequence_in_file` でファイル内の順序を保持（前後文脈の取得に使用）
 - `embedding_version` を削除（モデル固定のため）
 - `generation` を削除（シンプル化）
