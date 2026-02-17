@@ -22,15 +22,64 @@ Last-updated: 2026-02-16
 
 ## 結論（Must）
 
-- OpenAPI は **外部API契約（Frontend ↔ Professor）のSSOT**（フロントで推測実装しない）
-- **内部RPC（Professor ↔ Librarian）はgRPC/Protoが正**（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）
-- 固定値（enum）は **API契約（OpenAPI）で定義した enum を SSOT とし、生成物（Orval等）でフロントに取り込む**
-  - バックエンドでは可能な箇所で **DB の ENUM（PostgreSQL ENUM）を採用**し、API / DB / アプリケーション間で enum の意味とマッピングを明確に保つ
-  - フロントで TypeScript の `enum` を使用するかどうかは、変更頻度・互換性（未知値の扱い）・運用性を考慮して判断する
-  - **独自に固定値を定義することは原則禁止**
-- クライアントは **Orval生成物のみ** を入口にする（手書き `fetch/axios` 禁止）
-- 破壊的変更は **バージョニング/廃止手順** に従う（`API_VERSIONING_DEPRECATION.md`）
-- 生成物は **CIで差分検知** し、契約ズレを早期に止める
+### 3層契約の整理
+
+**1. OpenAPI（外部契約: Frontend ↔ Professor）**
+- 場所: `eduanimaR_Professor/docs/openapi.yaml`
+- 責務: HTTPエンドポイント、リクエスト/レスポンス型、enum定義
+- フロントエンド: Orvalで生成されたクライアント/型のみ使用（手書きfetch/axios禁止）
+
+**2. gRPC/Proto（内部契約: Professor ↔ Librarian）**
+- 場所: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
+- 責務: 探索開始/評価ループ/検索要求/探索完了通知
+- フロントエンド: 直接関与しない（Professorが仲介）
+
+**3. DB ENUM（データ層契約: PostgreSQL）**
+- 場所: PostgreSQL ENUM型
+- 責務: API/DB/アプリケーション間でenumの意味を一致（SSOT）
+- フロントエンド: OpenAPI経由で取得した値のみ使用（独自定義禁止）
+
+### enum運用方針（SSOT）
+
+**バックエンド（Professor）の責務**:
+1. PostgreSQL ENUM型で定義（例: `CREATE TYPE search_strategy AS ENUM ('keyword', 'semantic', 'hybrid')`）
+2. OpenAPI定義で公開（`components.schemas` に enum として記載）
+3. API/DB/アプリケーション間で意味を一致させる
+
+**フロントエンドの責務**:
+1. Orvalで生成された型のみ使用（`type SearchStrategy = 'keyword' | 'semantic' | 'hybrid'`）
+2. **未知値への対応**: switch文で必ずdefault句を用意（exhaustive checkは禁止）
+3. **独自enum定義の禁止**: バックエンドで未定義のenum値をフロントで追加しない
+
+**悪い例**（❌ 禁止）:
+```typescript
+// フロントで独自にenum値を追加
+type SearchStrategy = 'keyword' | 'semantic' | 'hybrid' | 'custom'; // ❌ 'custom'はDB/APIに存在しない
+
+// exhaustive check（未知値でエラー）
+switch (strategy) {
+  case 'keyword': return ...;
+  case 'semantic': return ...;
+  case 'hybrid': return ...;
+  // default句なし → 将来のenum追加で破壊
+}
+```
+
+**良い例**（✅ 推奨）:
+```typescript
+// Orval生成型のみ使用
+type SearchStrategy = 'keyword' | 'semantic' | 'hybrid'; // OpenAPIから生成
+
+// default句で未知値を許容
+switch (strategy) {
+  case 'keyword': return ...;
+  case 'semantic': return ...;
+  case 'hybrid': return ...;
+  default:
+    console.warn(`Unknown strategy: ${strategy}`);
+    return fallbackBehavior(); // フォールバック動作
+}
+```
 
 ---
 
@@ -50,6 +99,27 @@ Librarian は LangGraph による自律的な推論ループを実行し、最�
 - 十分なエビデンスが収集された（COMPLETE）
 - 最大試行回数（5回）に到達（MAX_RETRIES_REACHED）
 - エラー発生（ERROR）
+
+### フェーズごとのモデル選定（環境変数）
+
+| フェーズ | 責務 | モデル | 環境変数 |
+|:---|:---|:---|:---|
+| Phase 1 | Ingestion（構造化） | Gemini 3 Flash（Batch） | `PROFESSOR_GEMINI_MODEL_INGESTION` |
+| Phase 2 | Planning（大戦略） | Gemini 3 Flash | `PROFESSOR_GEMINI_MODEL_PLANNING` |
+| Phase 3 | Search（小戦略） | Gemini 3 Flash | `LIBRARIAN_GEMINI_MODEL_SEARCH` |
+| Phase 4 | Answer（最終回答） | Gemini 3 Pro | `PROFESSOR_GEMINI_MODEL_ANSWER` |
+
+### Phase 3の停止条件（Definition of Done）
+
+Librarianが探索を終了する条件（Phase 2で定義、Phase 3で判定）:
+
+1. **充足性（Sufficiency）**: 必須項目（式/定義/ケース等）が根拠と紐付いて揃っている
+2. **明確性（Unambiguity）**: 近似概念（相関係数など）と混同していない
+3. **視覚情報の言語化（Visual Check）**: 図表の凡例/線種/注記など"指しているもの"が確保できている
+
+または：
+- MaxRetry（5回）到達
+- タイムアウト（60秒）
 
 **参照**: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)、[`../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md)
 
