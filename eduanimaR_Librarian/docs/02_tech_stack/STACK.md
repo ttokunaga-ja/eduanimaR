@@ -32,78 +32,56 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - DB/インデックス/バッチ処理（Professor の責務）
 - gRPC 以外の内部 RPC 方式の独自採用（Professor との契約は gRPC/Proto が正）
 
-## Phase別のLibrarian実装スケジュール
+## Phase 1での実装範囲
 
-### Phase 1: Librarian未実装
+**Phase 1でLibrarianのすべての機能を完全に実装します。**
 
-**Phase 1では本サービス（Librarian）は未実装です。**
+### Phase 1で実装する機能
 
-- Phase 1（ローカル開発・認証スキップ）では、Professorが直接Gemini 2.0 Flashを呼び出す
-- Librarian推論ループは実装しない
-- Professor単体で以下を実現:
-  - OCR + 構造化処理（Gemini 2.0 Flash）
-  - 単純な検索（pgvector HNSW）
-  - 回答生成（Gemini 2.0 Flash）
+1. **検索戦略立案（Plan）**
+   - Professorから受け取った指示をもとに検索方針を立案
+   - Gemini 3 Flash使用
 
-### Phase 2: Librarian未実装（継続）
+2. **検索ループ実行（LangGraph）**
+   - 最大5回の試行で検索を繰り返し
+   - 状態管理、MaxRetry/停止条件の保証
 
-**Phase 2でもLibrarianは不要です。**
+3. **検索結果の評価・停止判断（Evaluate/Decide）**
+   - 内容評価と終了条件の判定
+   - Gemini 3 Flash使用
 
-- SSO認証実装
-- 拡張機能版ZIPファイル配布
-- 本番環境デプロイ（Professor単体）
-- Librarian推論ループは実装しない
+4. **エビデンス選定（Rank）**
+   - 根拠資料の抽出・評価
+   - `keyword_list` / `semantic_query` の生成
+   - `evidence_snippets` の抽出・評価
 
-### Phase 3: Librarian実装・統合
-
-**Phase 3で初めてLibrarianを実装・統合します。**
-
-#### Phase 3での責務
-
-- **検索戦略立案（Plan）**: Professorから受け取った指示をもとに検索方針を立案
-- **検索結果の評価・停止判断（Evaluate/Decide）**: 内容評価と終了条件の判定
-- **エビデンス選定（Rank）**: 根拠資料の抽出・評価
-
-#### Phase 3での統合準備
-
-1. **gRPC契約の実装**
+5. **Professor ↔ Librarian gRPC通信**
    - 契約SSOT: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
-   - Professor側: gRPCクライアント実装
-   - Librarian側: gRPCサーバー実装
+   - 双方向ストリーミング実装
 
-2. **Professorの後方互換性**
-   - Librarian未起動でも動作する設計（Phase 1/2との互換性）
-   - Librarian接続失敗時はProfessor単体で検索を実行
+### Phase 2以降
 
-3. **LangGraph導入**
-   - 検索ループの状態管理
-   - MaxRetry/停止条件の保証
-   - Gemini 3 Flash での推論実行
+- **Phase 2**: Librarianに変更なし（SSO認証・拡張機能版配布のみ）
+- **Phase 3**: Librarianに変更なし（Chrome Web Store公開のみ）
+- **Phase 4**: Librarianに変更なし（閲覧中画面の解説機能のみ）
+- **Phase 5**: 学習計画立案機能（構想段階）
 
-#### Phase 3での検証項目
-
-- Librarian推論ループの動作確認（最大5回試行）
-- Professor ↔ Librarian gRPC双方向ストリーミング検証
-- 検索精度の向上確認（Phase 1/2 vs Phase 3）
-
-### Gemini 3 Flash の使い分け（Phase 3以降）
+### Gemini 3 Flash の使い分け（Phase 1以降）
 
 - **戦略立案（Plan）**: 思考コストを許容（例: medium 相当）
 - **ループ中の微修正（Refine/Evaluate）**: 低コスト（例: low 相当）
 
 **注**: 具体のパラメータ名/SDKは採用SDKに依存するため、実装側でSSOT化する。
 
----
-
 ### Phase 4: 閲覧中画面の解説機能追加
 
-**Librarian責務**: Phase 3と同じ
+**Librarian責務**: Phase 1と同じ
 
 **追加考慮点**:
 - 画面HTML・画像解析は Professor側で実施（Gemini Vision API）
 - Librarianは従来通りテキストベースの検索クエリ生成のみ
 
-**実装状態**: Phase 3で実装済み、Phase 4では変更なし
+**実装状態**: Phase 1で実装済み、Phase 4では変更なし
 
 ---
 
