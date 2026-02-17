@@ -236,13 +236,13 @@ eventSource.addEventListener('progress', (event) => {
 
 ### Phase別の処理内容と表示文言
 
-| Phase | Professor責務 | Librarian責務 | Frontend表示 |
-|-------|--------------|--------------|-------------|
-| **Phase 2** | 検索 vs ヒアリング判断、検索戦略決定 | - | 「AI Agentが質問を理解しています」 |
-| **Phase 4-A** | 意図推測モード: 候補3つ生成 | - | 意図選択UI表示（Phase 3移行せず） |
-| **Phase 2再実行** | 選択された意図をコンテキストに検索戦略再決定 | - | 「AI Agentが質問を理解しています」 |
-| **Phase 3** | Librarian gRPC通信、検索実行 | 戦略に基づくクエリ生成 | 「AI Agentが資料を検索中です」 |
-| **Phase 4-B** | 最終回答モード: 回答生成、SSE配信 | - | 「AI Agentが回答を生成しています」 |
+| Phase | Professor責務 | Librarian責務 | Frontend表示 | SSOT参照 |
+|-------|--------------|--------------|-------------|----------|
+| **Phase 2** | 検索 vs ヒアリング判断<br>検索戦略決定 | - | 「AI Agentが質問を理解しています」 | `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md` |
+| **Phase 4-A** | 意図推測モード<br>候補3つ生成 | - | 意図選択UI表示<br>（Phase 3移行せず） | `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md` |
+| **Phase 2再実行** | 選択意図をコンテキストに<br>検索戦略再決定 | - | 「AI Agentが質問を理解しています」 | `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md` |
+| **Phase 3** | Librarian gRPC通信<br>権限強制<br>ハイブリッド検索（RRF統合） | 戦略に基づくクエリ生成<br>推論ループ（最大5回） | 「AI Agentが資料を検索中です」 | `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`<br>`../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md` |
+| **Phase 4-B** | 最終回答モード<br>回答生成<br>SSE配信 | - | 「AI Agentが回答を生成しています」 | `../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md` |
 
 ### 意図選択UI（Phase 4-A）
 

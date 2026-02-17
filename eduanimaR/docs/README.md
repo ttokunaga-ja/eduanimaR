@@ -37,29 +37,29 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 3. 画面右端からサイドパネルがスライドイン表示
 
 #### サイドパネル仕様
-- **配置**: 画面右端固定（position: fixed）
-- **幅**: 400px（デフォルト）、将来的にリサイズ可能
-- **高さ**: 画面全体（top: 0, bottom: 0）
-- **z-index**: 999999（最前面）
-- **開閉アニメーション**: transform: translateX(100%) ↔ translateX(0)、0.3秒（ease）
 
-#### 閉じる方法
-- サイドパネル左端の「>」ボタンをクリック（主要）
-- FABメニューから「AI質問」を再クリック（トグル動作）
+**表示方式**:
+- 画面右端に固定パネル（幅400px、高さ100vh）
+- スライドインアニメーション（transform: translateX）
+- Shadow DOM隔離戦略でLMS CSSとの衝突を回避
 
-#### 状態永続化
-- **sessionStorage**で以下を保存
-  - パネル開閉状態（isOpen）
-  - パネル幅（width、将来のリサイズ対応）
-  - スクロール位置（scrollPosition）
-  - 会話履歴（conversationHistory）
-- ページ遷移後も状態を復元（通常遷移・SPAナビゲーション両対応）
+**状態永続化**:
+- `sessionStorage`で状態を保持（ページ遷移対応）
+- 会話履歴・パネル開閉状態・スクロール位置を復元
 
-#### 利点
-- ✅ 画面遷移に耐える（sessionStorage永続化）
-- ✅ Moodleを見ながらチャット可能（サイドパネル方式）
-- ✅ シンプルなUI（Moodleの既存メニューに統合）
-- ✅ 独立ボタン不要（FABメニューをトリガーとして活用）
+**開閉方法**:
+- **開く**: FABメニュー → 「AI質問」クリック
+- **閉じる（主要）**: サイドパネル左端の「>」ボタンをクリック
+- **閉じる（トグル）**: FABメニュー → 「AI質問」再クリック
+
+**技術実装の詳細**: [`02_tech_stack/STACK.md`](./02_tech_stack/STACK.md#chrome拡張機能のui統合戦略phase-1確定方式) L282-436 を参照
+
+**Phase 1スコープ**:
+- ✅ **FABメニュー統合 + サイドパネル方式のみ**を実装
+- ❌ フォールバック（独立ボタン等）は実装しない
+- ❌ Popup/新規タブ方式は採用しない
+
+**参照**: [`../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md`](../../eduanimaRHandbook/02_strategy/TECHNICAL_STRATEGY.md) L128-144
 
 ### Mission & North Star（詳細は Handbook 参照）
 - **Mission**: 学習者が、配布資料や講義情報の中から「今見るべき場所」と「次に取るべき行動」を素早く特定できるようにし、理解と継続を支援する
