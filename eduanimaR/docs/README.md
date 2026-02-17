@@ -25,12 +25,15 @@ eduanimaRは、**LLMを活用した学習支援の研究プロジェクト**で�
 ## Phase 1のスコープ
 
 ### 提供する機能
-- Web UIからの資料アップロード（PDF/PowerPoint）
+- 資料アップロード（開発環境: curl/Postman等でProfessor API直接呼び出し、PDF/PowerPoint対応）
+- Chrome拡張機能の実装と検証（LMS資料自動検知・自動アップロード機能、ローカル読み込みで動作確認）
 - OCR + 構造化処理（Gemini 2.0 Flash）
 - Q&A（単一科目内検索 + 根拠提示）
 
 ### スコープ外
-- Chrome拡張機能（Phase 2以降）
+- Chrome Web Storeへの公開（Phase 2で実施）
+- Web版からのファイルアップロードUI（全Phase禁止）
+- Web版からのユーザー登録（全Phase禁止、拡張機能のみ）
 - SSO認証（Phase 1はdev-user固定）
 - 複数ユーザー対応（Phase 1は単一ユーザー想定）
 
