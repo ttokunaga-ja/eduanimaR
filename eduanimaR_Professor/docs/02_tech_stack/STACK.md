@@ -27,10 +27,10 @@ Last-updated: 2026-02-17
 
 | フェーズ | タスク | 使用モデル |
 | :--- | :--- | :--- |
-| Ingestion（Professor / 前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力）を **Gemini Batch** で実行 | **Gemini 3 Flash（Batch Mode）** |
-| Phase 2（Plan / Professor） | タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト定義（大戦略: WHAT） | **Gemini 3 Flash** |
-| Phase 3（Search / Librarian） | クエリ生成・ツール選択・反省/再試行・停止条件の満足判定（小戦略: HOW） | **Gemini 3 Flash** |
-| Phase 4（Answer / Professor） | 選定資料の全文Markdownを読み込み最終回答生成 | **Gemini 3 Pro** |
+| Ingestion（Professor / 前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力）を **バッチ処理** で実行 | **高速OCRモデル（バッチモード）** |
+| Phase 2（Plan / Professor） | タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト定義（大戦略: WHAT） | **高速推論モデル** |
+| Phase 3（Search / Librarian） | クエリ生成・ツール選択・反省/再試行・停止条件の満足判定（小戦略: HOW） | **高速推論モデル** |
+| Phase 4（Answer / Professor） | 選定資料の全文Markdownを読み込み最終回答生成 | **高精度推論モデル** |
 
 ### 要件（運用ポリシー）
 - Summary（要約）は **原則生成しない**（検索精度は詳細Chunkを正とする）。大量ファイルからの高速選別が必要になった場合のみ「ファイル単位Summary」を追加する。
@@ -48,10 +48,10 @@ Last-updated: 2026-02-17
 ### モデル設定（環境変数）
 モデルは環境変数で切り替え可能（値は Gemini API に渡す **モデルID文字列**）。
 
-- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: Gemini 3 Flash）
-- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: Gemini 3 Flash）
-- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: Gemini 3 Flash）
-- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: Gemini 3 Pro）
+- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: 高速OCRモデル）
+- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: 高速推論モデル）
+- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: 高速推論モデル）
+- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: 高精度推論モデル）
 
 ## 通信スタック（SSOT）
 - Frontend ↔ Professor: **HTTP/JSON（OpenAPI）** + **SSE**
@@ -86,7 +86,7 @@ Last-updated: 2026-02-17
 Phase 1の技術スタック（確定版）:
 - Go 1.25.7
 - PostgreSQL 18.1 + pgvector 0.8.1
-- Gemini 2.0 Flash（OCR/埋め込み）
+- 高速OCRモデル（OCR/埋め込み）
 - Echo v5.0.1（HTTP API）
 - gRPC（Professor ↔ Librarian内部通信）
 

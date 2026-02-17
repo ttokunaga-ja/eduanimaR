@@ -104,10 +104,10 @@ Librarian は LangGraph による自律的な推論ループを実行し、最�
 
 | フェーズ | 責務 | モデル | 環境変数 |
 |:---|:---|:---|:---|
-| Phase 1 | Ingestion（構造化） | Gemini 3 Flash（Batch） | `PROFESSOR_GEMINI_MODEL_INGESTION` |
-| Phase 2 | Planning（大戦略） | Gemini 3 Flash | `PROFESSOR_GEMINI_MODEL_PLANNING` |
-| Phase 3 | Search（小戦略） | Gemini 3 Flash | `LIBRARIAN_GEMINI_MODEL_SEARCH` |
-| Phase 4 | Answer（最終回答） | Gemini 3 Pro | `PROFESSOR_GEMINI_MODEL_ANSWER` |
+| Phase 1 | Ingestion（構造化） | 高速OCRモデル（バッチ） | `PROFESSOR_GEMINI_MODEL_INGESTION` |
+| Phase 2 | Planning（大戦略） | 高速推論モデル | `PROFESSOR_GEMINI_MODEL_PLANNING` |
+| Phase 3 | Search（小戦略） | 高速推論モデル | `LIBRARIAN_GEMINI_MODEL_SEARCH` |
+| Phase 4 | Answer（最終回答） | 高精度推論モデル | `PROFESSOR_GEMINI_MODEL_ANSWER` |
 
 ### Phase 3の停止条件（Definition of Done）
 
@@ -288,7 +288,7 @@ Professor の `/qa/stream` エンドポイントは以下のイベント型を�
 |:---|:---|:---|
 | `plan` | 調査項目・停止条件 | Professor（Phase 2: Plan生成） |
 | `search` | 検索結果（クエリ、ヒット件数） | Librarian Agent（検索戦略実行） |
-| `answer` | 最終回答（本文 + ソース） | Professor（Phase 2: Gemini 3 Flash） |
+| `answer` | 最終回答（本文 + ソース） | Professor（Phase 4: 高精度推論モデル） |
 | `error` | エラー通知（`ERROR_CODES.md` の code を含む） | Professor / Librarian |
 | `done` | 完了通知 | Professor |
 

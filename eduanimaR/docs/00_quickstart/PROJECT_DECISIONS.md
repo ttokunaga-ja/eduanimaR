@@ -150,14 +150,14 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
     - 外向きAPI（HTTP/JSON + SSE）
     - DB（Postgres+pgvector）/GCS/Kafka管理
     - 検索の物理実行・権限強制
-    - 最終回答生成（Gemini 3 Pro）
+    - 最終回答生成（高精度推論モデル）
     - Phase 2（大戦略）: タスク分割・停止条件定義
     - **責務境界**: HTTP/JSONのみを提供（Librarianとの内部通信はgRPC）
     - **参照**: [`../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md)
     
   - **Librarian（Python）**: 
     - LangGraph Agent によるLibrarian推論ループ（最大5回）
-    - Gemini 3 Flash を用いた検索戦略立案
+    - 高速推論モデル を用いた検索戦略立案
     - 停止条件判定・選定エビデンス選定
     - Phase 3（小戦略）: クエリ生成・反省/再試行
     - **Professor経由でのみ検索実行**（DB/GCS直接アクセスなし）

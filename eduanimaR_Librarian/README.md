@@ -1,7 +1,7 @@
 # eduanima-librarian（Python 推論マイクロサービス）
 
 本フォルダは eduanima+R における `eduanima-librarian`（知能的専門司書）の **SSOT ドキュメント**。
-Gemini 3 Flash を用いて検索戦略と停止判断を行い、Go サーバー（Professor）へ **最小のエビデンス集合**を返す。
+高速推論モデル を用いて検索戦略と停止判断を行い、Go サーバー（Professor）へ **最小のエビデンス集合**を返す。
 
 ## まず読む（最短ルート）
 - Docs Portal: [docs/README.md](docs/README.md)

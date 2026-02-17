@@ -19,7 +19,7 @@ eduanimaR_Professor（Go バックエンド）は、**学習効果検証のた�
 
 ### 提供する機能
 - 資料アップロード（PDF/PowerPoint → GCS保存）
-- OCR + 構造化（Gemini 2.0 Flash使用）
+- OCR + 構造化（高速OCRモデル使用）
 - pgvector埋め込み生成・保存
 - Q&A API（単一科目内検索 + 根拠提示）
 
@@ -40,7 +40,7 @@ eduanimaR_Professor（Go バックエンド）は、**学習効果検証のた�
 - ドライバ: pgx v5.8.0
 
 ### 外部API
-- OCR/構造化: Gemini 2.0 Flash
+- OCR/構造化: 高速OCRモデル
 - 埋め込み生成: Gemini Embedding（768次元）
 
 ### デプロイ

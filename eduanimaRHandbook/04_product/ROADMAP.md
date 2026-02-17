@@ -37,7 +37,7 @@ LLMによる資料ベース学習支援の**技術的実現可能性**と**学�
 ### 提供する機能（スコープ固定）
 - ✅ 資料アップロード（開発環境: curl/Postman等でProfessor API直接呼び出し、PDF/PowerPoint対応）
 - ✅ Chrome拡張機能の実装と検証（LMS資料自動検知・自動アップロード機能、ローカル読み込みで動作確認）
-- ✅ OCR + 構造化（Gemini 2.0 Flash使用）
+- ✅ OCR + 構造化（高速OCRモデル使用）
 - ✅ pgvector埋め込み生成・保存（HNSW検索）
 - ✅ Q&A（単一科目内検索 + 根拠提示）
 - ✅ 根拠箇所へのページ番号リンク
@@ -50,7 +50,7 @@ LLMによる資料ベース学習支援の**技術的実現可能性**と**学�
    - 認証不要でcurlリクエストによる資料アップロード可能
 2. **Librarian推論ループ完全完成**
    - LangGraph導入（最大5回試行）
-   - Gemini 3 Flash使用（Plan/Evaluate）
+   - 高速推論モデル使用（Plan/Evaluate）
    - Professor ↔ Librarian gRPC双方向ストリーミング完全動作
 3. **資料検索機能完全実装**（Librarian経由）
 4. **QA機能完全動作**（Librarian推論ループ統合）

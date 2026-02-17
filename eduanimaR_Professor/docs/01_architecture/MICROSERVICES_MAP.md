@@ -41,7 +41,7 @@
 
 ### 4) 最終回答の生成（Answer Synthesis / Professor Role）
 - Librarian が選定した資料ID/ページ等に基づき、DBから全文Markdownを取得する
-- Gemini 3 Pro を呼び出し、教育的配慮を含む最終回答を生成する
+- 高精度推論モデル を呼び出し、教育的配慮を含む最終回答を生成する
 - 回答と引用元情報を SSE/HTTP でユーザーへ返す
 
 ## 責務の分離まとめ（Go vs Python）
@@ -49,8 +49,8 @@
 | 機能 | Go サーバー (Professor/System) | Python サーバー (Librarian) |
 | :--- | :--- | :--- |
 | **データ保持** | PostgreSQL/GCS/Kafka 等を直接操作（データの守護者） | DB接続を持たない（ステートレス） |
-| **資料の前処理** | **Gemini Batch**で構造化・永続化・Embedding生成 | 関与しない |
-| **推論の目的** | **Phase 2（大戦略）**の作成 + 最終回答の生成（Gemini 3 Flash / 3 Pro） | **Phase 3（小戦略）**の実行（クエリ生成・反省/再試行・停止条件の満足判定）（Gemini 3 Flash） |
+| **資料の前処理** | **高速OCRモデル（バッチ）**で構造化・永続化・Embedding生成 | 関与しない |
+| **推論の目的** | **Phase 2（大戦略）**の作成 + 最終回答の生成（高速推論モデル / 高精度推論モデル） | **Phase 3（小戦略）**の実行（クエリ生成・反省/再試行・停止条件の満足判定）（高速推論モデル） |
 | **検索実行** | **SQLの発行・検索の物理実行**（制約強制） | クエリの「言葉」を作り、再検索を指揮する |
 | **セッション管理** | 会話履歴の保存・ユーザー認証/認可 | Goから渡された履歴を一時利用するだけ |
 
@@ -68,19 +68,19 @@
 2. **Upload**: Professor が原本を GCS に保存
 3. **Produce**: Professor が Kafka に `IngestJob` を publish（冪等キーを含む）
 4. **Consume**: Professor ワーカーがジョブを consume
-5. **Ingestion（Vision→Chunks）**: **Gemini 3 Flash（Batch Mode）** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
+5. **Ingestion（Vision→Chunks）**: **高速OCRモデル（バッチモード）** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
 6. **Store**: Professor が Postgres（pgvector）へ永続化（UUIDv7、subject_id/user_id による物理制約を前提）
 
 > 注: 要約（Summary）は **原則生成しない**。大量ファイルからの高速な候補絞り込みが必要になった場合のみ「ファイル単位の短いSummary」を追加で生成する。
 
 ### Reasoning Loop（検索・回答）
 1. **Start**: Frontend が質問を Professor に送信
-2. **Phase 2（Plan / 大戦略）**: Professor が **Gemini 3 Flash** で「タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト」を生成し、Librarian に渡す
+2. **Phase 2（Plan / 大戦略）**: Professor が **高速推論モデル** で「タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト」を生成し、Librarian に渡す
 3. **Phase 3（Search / 小戦略: Python/LangGraph）**: Professor が gRPC で Librarian を起動（質問 + Plan + user_id + subject_id + 制約）
 4. **Execute Search（Professor）**: Professor が DB を検索し、**subject_id/user_id/is_active 等の WHERE を強制**して結果（Chunk＋前後）を返却
-5. **Loop（Librarian）**: Librarian が **Gemini 3 Flash** で結果を評価し、停止条件を満たすまで再検索要求（MaxRetry/時間は Professor が制御。推奨: 最大5回 = 3回 + 2回リカバリ）
+5. **Loop（Librarian）**: Librarian が **高速推論モデル** で結果を評価し、停止条件を満たすまで再検索要求（MaxRetry/時間は Professor が制御。推奨: 最大5回 = 3回 + 2回リカバリ）
 6. **Finalize**: Librarian が「収集完了」または「不足を宣言して終了」として資料ID/根拠候補を返す
-7. **Phase 4（Answer / Professor）**: Professor が **選定された資料のみ全文Markdown** をDBから取得し、**Gemini 3 Pro** で最終回答を生成
+7. **Phase 4（Answer / Professor）**: Professor が **選定された資料のみ全文Markdown** をDBから取得し、**高精度推論モデル** で最終回答を生成
 8. **Stream**: Professor が SSE で回答・引用・進捗をFrontendへストリーミング
 
 ## Phase 3（検索ループ: Librarian / LangGraph）の設定指針（SSOT）
@@ -114,10 +114,10 @@ Phase 2 は Phase 3（Librarian）のための **合格基準（Definition of Do
 ## モデル設定（環境変数）（SSOT）
 モデルID（例: `gemini-3-flash` / `gemini-3-pro`）は環境変数で上書きできる。
 
-- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: Gemini 3 Flash）
-- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: Gemini 3 Flash）
-- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: Gemini 3 Flash）
-- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: Gemini 3 Pro）
+- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: 高速OCRモデル）
+- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: 高速推論モデル）
+- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: 高速推論モデル）
+- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: 高精度推論モデル）
 
 ## 不変条件（MUST）
 - Librarian は DB/GCS に直接アクセスしない（資格情報を持たない）
