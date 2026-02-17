@@ -50,7 +50,7 @@ LLMによる資料ベース学習支援の**技術的実現可能性**と**学�
    - 認証不要でcurlリクエストによる資料アップロード可能
 2. **Librarian推論ループ完全完成**
    - LangGraph導入（最大5回試行）
-   - Gemini 3 Flash使用（Plan/Evaluate）
+   - 高速推論モデル使用（Plan/Evaluate）
    - Professor ↔ Librarian gRPC双方向ストリーミング完全動作
 3. **資料検索機能完全実装**（Librarian経由）
 4. **QA機能完全動作**（Librarian推論ループ統合）

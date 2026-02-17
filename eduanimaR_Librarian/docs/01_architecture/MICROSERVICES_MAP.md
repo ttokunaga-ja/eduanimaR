@@ -23,7 +23,7 @@ eduanima-professor (Go)
 	└←(HTTP/JSON)─ eduanima-librarian (Python)  # 検索ツール実行結果の受け渡し
 
 eduanima-librarian (Python)
-	└─(HTTPS)→ Gemini API (Gemini 3 Flash)
+	└─(HTTPS)→ 高速推論モデル API
 ```
 
 ## 境界の判定ルール（どっちに置く？）

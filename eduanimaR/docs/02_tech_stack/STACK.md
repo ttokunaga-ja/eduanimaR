@@ -77,7 +77,7 @@ eduanimaRは「資料の着眼点を示し、原典への回帰を促す」学�
 | 役割 | 技術 | 備考 |
 | --- | --- | --- |
 | 外向きAPI | Professor（Go） | OpenAPI仕様提供、HTTP/JSON + SSE |
-| 推論エンジン | Librarian（Python） | LangGraph + Gemini 3 Flash |
+| 推論エンジン | Librarian（Python） | LangGraph + 高速推論モデル |
 | 内部通信 | **gRPC（双方向ストリーミング）** | Professor ↔ Librarian、契約: `proto/librarian/v1/librarian.proto` |
 | ストリーミング | SSE (Server-Sent Events) | `/v1/qa/ask` |
 | API生成 | Orval | OpenAPI → TypeScript |
@@ -128,7 +128,7 @@ Professor の `/v1/qa/stream` エンドポイントは、以下のSSEイベン�
 | `thinking` | Phase 2実行中（タスク分割・停止条件生成） | プログレス表示「AI Agentが検索方針を決定しています」 |
 | `searching` | Librarian推論ループ実行中（最大5回） | プログレスバー更新（例：「2/5回目の検索」） |
 | `evidence` | 選定エビデンス提示 | エビデンスカード表示（クリッカブルURL、why_relevant、snippets） |
-| `answer` | 最終回答生成中（Gemini 3 Pro） | リアルタイムにテキスト追加表示 |
+| `answer` | 最終回答生成中（高精度推論モデル） | リアルタイムにテキスト追加表示 |
 | `done` | 完了通知 | SSE接続を閉じる |
 | `error` | エラー通知 | エラートースト表示 |
 
@@ -149,12 +149,14 @@ Professor OpenAPI契約に基づく、エビデンスカードの必須表示要
 
 **参照**: [`../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md`](../../eduanimaR_Professor/docs/03_integration/ERROR_CODES.md)、[`../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md`](../../eduanimaRHandbook/04_product/VISUAL_IDENTITY.md)
 
-### Gemini モデル役割分担
-- **Gemini 3 Flash**: 
-  - Professor: Phase 2（大戦略）、インジェスト（PDF→Markdown）
-  - Librarian: Phase 3（小戦略）、Librarian推論ループ
-- **Gemini 3 Pro**: 
-  - Professor: Phase 4（最終回答生成）
+### モデル役割分担（2モデル戦略）
+- **高速推論モデル**: 
+  - Professor: Phase 1（Ingestion: PDF→Markdown）、Phase 2（Planning: 大戦略）
+  - Librarian: Phase 3（Search: 小戦略、Librarian推論ループ）
+- **高精度推論モデル**: 
+  - Professor: Phase 4（Answer: 最終回答生成）
+
+**注意**: Gemini 2.0 Flash提供終了により、OCR/構造化処理も高速推論モデルで実行します。
 
 ### 検索戦略の詳細（Phase 3物理実行）
 
@@ -213,7 +215,7 @@ Professor が実行するハイブリッド検索戦略:
 |:---|:---|:---|
 | **Frontend** | Chrome拡張機能 + Webアプリ | Next.js 15 (App Router) + FSD + MUI v6 + Pigment CSS |
 | **Professor（Go）** | 外向きAPI（HTTP/JSON + SSE）、DB/GCS/Kafka管理、最終回答生成 | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
-| **Librarian（Python）** | LangGraph Agent による検索戦略立案 | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+| **Librarian（Python）** | LangGraph Agent による検索戦略立案 | Python 3.12+, Litestar, LangGraph, 高速推論モデル |
 
 ### データフローと責務境界
 1. **Frontend → Professor**: OpenAPI（HTTP/JSON）でリクエスト送信
@@ -265,8 +267,8 @@ Professor が実行するハイブリッド検索戦略:
 ### バックエンド技術スタック（参考）
 | コンポーネント | 技術 |
 |--------------|------|
-| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, Gemini 3 Flash/Pro |
-| Librarian | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+| Professor | Go 1.25.7, Echo v5, PostgreSQL 18.1 + pgvector 0.8.1, 高速推論モデル/高精度推論モデル |
+| Librarian | Python 3.12+, Litestar, LangGraph, 高速推論モデル |
 | 通信 | Frontend ↔ Professor: HTTP/JSON + SSE, Professor ↔ Librarian: **HTTP/JSON** |
 
 ### 認証方式
@@ -608,7 +610,7 @@ Node（公式 index.json、2026-02-11 に取得）：
 | サービス | 役割 | 技術スタック |
 |:---|:---|:---|
 | **Professor** | データ所有者、DB/GCS/Kafka 直接アクセス、検索の物理実行、最終回答生成 | Go 1.25.7, Echo v5.0.1, PostgreSQL 18.1 + pgvector 0.8.1, Google Cloud Run |
-| **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, Gemini 3 Flash |
+| **Librarian** | 推論特化、検索戦略立案（Professor 経由でのみ検索実行） | Python 3.12+, Litestar, LangGraph, 高速推論モデル |
 
 ### Professor ↔ Librarian 通信
 - **プロトコル**: **gRPC（双方向ストリーミング）**
