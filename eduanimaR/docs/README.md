@@ -34,7 +34,7 @@ eduanimaRは、**LLMを活用した学習支援の研究プロジェクト**で�
    - Professor APIが完全に動作（OpenAPI定義完備）
    - Librarian推論ループとの統合完了（gRPC双方向ストリーミング）
    - **認証不要でcurlリクエストによる資料アップロードが可能**（開発用エンドポイント）
-   - OCR + 構造化処理（Gemini 2.0 Flash）
+   - OCR + 構造化処理（高速推論モデル）
    - pgvector埋め込み生成・保存（HNSW検索）
 
 2. **Web版固有機能すべてが使用可能**
@@ -343,23 +343,23 @@ eduanimaRは、フロントエンド(Next.js) + Professor(Go) + Librarian(Python
 ### 4フェーズ構成（Reasoning Loop）
 
 **Phase 1: 資料の構造化（Ingestion / Professor）**
-- Gemini 3 Flash（Batch Mode）でPDF/画像をMarkdown化・意味単位チャンク分割
+- 高速推論モデル（Batch Mode）でPDF/画像をMarkdown化・意味単位チャンク分割
 - PostgreSQL（pgvector）へ永続化
 
 **Phase 2: 大戦略の立案（Planning / Professor）**
 - 責務: タスク分割（調査項目のリスト）と停止条件（Stop Conditions）の定義
-- モデル: Gemini 3 Flash
+- モデル: 高速推論モデル
 - 成果物: Librarianへの初期パラメータ（調査項目・停止条件・コンテキスト）
 
 **Phase 3: 小戦略の実行（Search / Librarian）**
 - 責務: 検索クエリ生成・ツール選択・反省/再試行・停止条件の満足判定
-- モデル: Gemini 3 Flash
+- モデル: 高速推論モデル
 - 制約: 最大5回の再検索（3回 + 2回リカバリ）、DB/GCS直接アクセス禁止
 - ツール: Professorが提供する検索ツール（全文/ベクトル）
 
 **Phase 4: 最終回答の生成（Answer Synthesis / Professor）**
 - 責務: 選定された資料の全文Markdown取得 + 教育的配慮を含む回答生成
-- モデル: Gemini 3 Pro
+- モデル: 高精度推論モデル
 - 出力: SSEで回答・引用・進捗をフロントエンドへストリーミング
 
 ### フロントエンドの責務（Phase別）

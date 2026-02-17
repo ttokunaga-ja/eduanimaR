@@ -31,13 +31,13 @@ Professor（OpenAPI + SSE / Kafka Worker / DB/GCS）と Librarian（gRPC）か�
 ### DB/GCS/Kafka/Gemini
 - DB: クエリは常に deadline 付き（subject_id/user_id の物理絞り込み前提）
 - Kafka: consume は graceful shutdown を実装し、in-flight の扱い（ack/commit）を定義する
-- Gemini: **フェーズ別**に timeout と並列数を分ける（bulkhead）
-	- Ingestion（3 Flash）: 重い入力（PDF/画像）を想定し timeout を長め、並列数は控えめ
-	- Phase 2（3 Flash / Professor）: 短時間でPlan（調査項目/停止条件）生成。並列は上げても良いが rate limit を尊重
-	- Phase 3（3 Flash / Librarian）: ループ回数が増えるため 1回あたりのtimeoutを短め＋MaxRetryで上限を固定
-	- Phase 4（3 Pro / Professor）: 最終生成は高コストなので並列を強く絞る
+- 推論API: **フェーズ別**に timeout と並列数を分ける（bulkhead）
+	- Ingestion（高速推論モデル）: 重い入力（PDF/画像）を想定し timeout を長め、並列数は控えめ
+	- Phase 2（高速推論モデル / Professor）: 短時間でPlan（調査項目/停止条件）生成。並列は上げても良いが rate limit を尊重
+	- Phase 3（高速推論モデル / Librarian）: ループ回数が増えるため 1回あたりのtimeoutを短め＋MaxRetryで上限を固定
+	- Phase 4（高精度推論モデル / Professor）: 最終生成は高コストなので並列を強く絞る
 
-> 注: Phase 1〜3 は同一モデル（Gemini 3 Flash）でも、**用途別にキュー/並列数/timeout を分離**して連鎖障害を防ぐ。モデルIDは環境変数で上書き可能。
+> 注: Phase 1〜3 は同一モデル（高速推論モデル）でも、**用途別にキュー/並列数/timeout を分離**して連鎖障害を防ぐ。モデルIDは環境変数で上書き可能。
 
 ## Retry / 再処理
 ### HTTP
