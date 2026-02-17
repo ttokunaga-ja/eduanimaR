@@ -223,6 +223,42 @@ CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions(subject_id);
 
 - **Phase 1→Phase 2 移行時の変更点**:
   - `users` テーブルに `provider`, `provider_user_id` カラムを追加（SSO対応）
+    ```sql
+    ALTER TABLE users ADD COLUMN provider TEXT; -- 'google', 'meta', 'microsoft', 'line'
+    ALTER TABLE users ADD COLUMN provider_user_id TEXT; -- SSO プロバイダーのユーザーID
+    CREATE UNIQUE INDEX idx_users_provider_user_id ON users(provider, provider_user_id);
+    ```
   - 固定ユーザー（`dev@example.com`）を削除
+    ```sql
+    DELETE FROM users WHERE user_id = '00000000-0000-0000-0000-000000000001';
+    ```
   - 既存の `subjects`, `files` は保持（user_id の再紐付けは不要）
   - `status` カラムを TEXT から ENUM に変更（型安全性向上）
+    ```sql
+    CREATE TYPE file_status AS ENUM ('processing', 'ready', 'failed');
+    ALTER TABLE files ALTER COLUMN status TYPE file_status USING status::file_status;
+    ```
+
+- **Phase 2→Phase 3 移行時の変更点**:
+  - 変更なし（拡張機能のChrome Web Store公開のみ）
+
+- **Phase 3→Phase 4 移行時の変更点**:
+  - 画面解説機能用のテーブル追加（未確定）
+    ```sql
+    CREATE TABLE screen_analyses (
+      analysis_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+      user_id UUID NOT NULL REFERENCES users(user_id),
+      subject_id UUID NOT NULL REFERENCES subjects(subject_id),
+      screen_html TEXT NOT NULL,
+      screen_images JSONB, -- [{ image_id, url, description }]
+      analysis TEXT, -- LLMによる解析結果
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    ```
+  - **重要**: 画面データは短期保存のみ（プライバシー配慮）
+    - `created_at` から7日後に自動削除するトリガーまたはバッチ処理を設定
+
+- **Phase 4→Phase 5 移行時の変更点**（構想段階）:
+  - 学習計画機能用のテーブル追加（未確定）
+  - 小テスト結果の保存テーブル追加（未確定）
+  - プライバシー配慮のための匿名化処理を実装

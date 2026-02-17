@@ -67,23 +67,38 @@
 
 ### Phase別の責務詳細
 
+#### 推論ループのPhase（Professor ↔ Librarian ↔ Frontend）
+
 | Phase | Professor責務 | Librarian責務 | Frontend責務 |
 |-------|--------------|--------------|-------------|
-| **Phase 2** | 検索 vs ヒアリング判断、検索戦略決定 | - | プログレス表示「質問を理解中」 |
+| **Phase 2** | 検索 vs ヒアリング判断、検索戦略決定 | - | プログレス表示「質問を理解中」（プログレスバー） |
 | **Phase 4-A** | 意図推測、候補3つ生成（Gemini） | - | 意図選択UI表示、ユーザー選択受付 |
-| **Phase 2再実行** | 選択された意図をコンテキストに検索戦略再決定 | - | プログレス表示「質問を理解中」 |
-| **Phase 3** | Librarian gRPC通信、検索実行 | クエリ生成（最大5回試行） | プログレス表示「資料を検索中」 |
-| **Phase 4-B** | 最終回答生成（Gemini）、SSE配信 | - | プログレス表示「回答を生成中」、回答表示 |
+| **Phase 2再実行** | 選択された意図をコンテキストに検索戦略再決定 | - | プログレス表示「質問を理解中」（プログレスバー） |
+| **Phase 3** | Librarian gRPC通信、検索実行 | クエリ生成（最大5回試行） | プログレス表示「資料を検索中」（プログレスバー） |
+| **Phase 4-B** | 最終回答生成（Gemini）、SSE配信 | - | プログレス表示「回答を生成中」、回答表示、Good/Badフィードバックボタン表示 |
+
+#### リリースPhase（Phase 1-5）
+
+| Phase | 目的 | 実装範囲 | リリース先 | 重要な制約 |
+|-------|------|---------|----------|-----------|
+| **Phase 1** | バックエンド完成 + Web版完全動作 | Professor完成、Librarian推論ループ統合、Web版固有機能（資料一覧・会話履歴・科目選択UI）、拡張機能実装 | ローカル環境のみ | dev-user固定認証、Web版アップロードUI禁止 |
+| **Phase 2** | 拡張機能版作成 + 本番環境デプロイ | SSO認証（Google/Meta/Microsoft/LINE）、拡張機能ZIP配布、Web版未登録ユーザー誘導UI | 本番環境 + ZIP配布 | Web版新規登録禁止、拡張機能のみ登録可能 |
+| **Phase 3** | Chrome Web Store公開 | ストア審査対応、プライバシーポリシー | Chrome Web Store | Phase 2から変更なし |
+| **Phase 4** | 閲覧中画面の解説機能追加 | HTML・画像取得、Gemini Vision API統合 | 拡張機能・バックエンド | 取得データは短期保存のみ |
+| **Phase 5** | 学習計画立案機能 | 小テスト結果分析、学習計画生成 | 未定（構想段階） | プライバシー配慮、匿名化 |
 
 **重要な設計原則**:
 - **Phase 2の核心**: 「資料検索を実行すべきか」vs「質問内容をヒアリングすべきか」の判断
 - **意図選択後**: Phase 2を再実行（元の質問 + 選択された意図をコンテキストに戦略決定）
 - **会話履歴**: previousRequestID で紐付け保持、North Star Metric（到達時間）計測に使用
+- **Web版固有機能**: 資料一覧閲覧・会話履歴確認・科目選択UI（すべてPhase 1から提供）
+- **拡張機能固有機能**: 自動アップロード・SSO登録・コース判別・画面解説（Phase別に段階実装）
 
 **参照**:
 - **Professor詳細**: [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
 - **Librarian詳細**: [`../../eduanimaR_Librarian/docs/README.md`](../../eduanimaR_Librarian/docs/README.md)
 - **gRPC契約**: [`../../eduanimaR_Professor/proto/librarian/v1/librarian.proto`](../../eduanimaR_Professor/proto/librarian/v1/librarian.proto)
+- **Phase 1-5詳細**: [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
 
 ---
 

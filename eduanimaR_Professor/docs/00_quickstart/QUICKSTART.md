@@ -22,12 +22,20 @@
 
 ### 3.1 OpenAPI定義の初期化（MUST）
 1. `docs/openapi.yaml`が以下のエンドポイントを定義していることを確認:
-   - `POST /v1/auth/dev-login` (Phase 1専用・開発認証)
+   - `POST /v1/subjects/{subjectId}/materials` (資料アップロード)
    - `POST /v1/qa/stream` (SSE応答)
-   - `GET /v1/subjects`
-   - `GET /v1/subjects/{subject_id}/materials`
+   - `POST /v1/qa/feedback` (フィードバック送信)
+   - `GET /v1/subjects` (科目一覧、Web版固有)
+   - `GET /v1/subjects/{subject_id}/materials` (資料一覧、Web版固有)
+   - `GET /v1/subjects/{subject_id}/conversations` (会話履歴、Web版固有)
+   - `GET /v1/materials/{materialId}/status` (処理状態確認)
 
 2. 定義が不足している場合は、`docs/openapi.yaml`を上記仕様に従って作成する
+
+3. **Web版固有機能の必須実装**:
+   - 科目一覧取得API（トップメニューバーのプルダウン用）
+   - 資料一覧取得API（選択科目の資料一覧表示用）
+   - 会話履歴取得API（選択科目の会話履歴表示用）
 
 ### 3.2 契約テストの準備（MUST）
 1. `internal/contracttest/ssot_test.go`で以下を検証:
@@ -43,3 +51,7 @@
    ```bash
    atlas schema apply --env local --auto-approve
    ```
+
+3. **Phase 1→Phase 2移行時のDB変更準備**:
+   - `users`テーブルへ `provider`, `provider_user_id` カラム追加準備
+   - SSO認証用のセッションテーブル追加準備

@@ -25,7 +25,7 @@ Last-updated: 2026-02-16
 
 | Slice | 責務 | 主要エクスポート | 備考 |
 |-------|------|--------------|------|
-| `qa-chat` | **汎用質問対応**（すべてのユースケースを単一UIで実現） | `QAChatPanel`, `useQAStream` | **SSEイベント処理**:<br>- `thinking`: 「検索戦略を立案中...」表示<br>- `searching`: 「資料を検索中...（試行 X/5）」プログレスバー<br>- `evidence`: 資料カード表示（資料名・ページ・抜粋・why_relevant）<br>- `answer`: 回答ストリーミング表示（Markdown形式）<br>- `error`: エラーコード別UI表示（`ERROR_CODES.md`参照）<br><br>**対応ユースケース**:<br>- 資料収集依頼<br>- 質問内容の明確化<br>- 小テスト解説<br>- 明確な質問への直接回答<br><br>**提供チャネル**:<br>- **Chrome拡張**: MoodleのFABメニューから起動 → サイドパネル表示（画面右端、幅400px、リサイズ可能、状態永続化）<br>- **Webアプリ**: ページ内に常時表示（Phase 2以降）<br><br>**重要**: 個別のFeature（`search-materials`、`clarify-question`など）は作らない。すべて`qa-chat`の責務。 |
+| `qa-chat` | **汎用質問対応**（すべてのユースケースを単一UIで実現） | `QAChatPanel`, `useQAStream` | **SSEイベント処理**:<br>- `thinking`: 「検索戦略を立案中...」プログレスバー<br>- `searching`: 「資料を検索中...（試行 X/5）」プログレスバー<br>- `evidence`: 資料カード表示（資料名・ページ・抜粋・why_relevant）<br>- `answer`: 回答ストリーミング表示（Markdown形式）<br>- `complete`: Good/Badフィードバックボタン表示<br>- `error`: エラーコード別UI表示（`ERROR_CODES.md`参照）<br><br>**フィードバック機能**（Phase 1）:<br>- 回答完了後、Good/Badボタンを表示<br>- フィードバック送信後、お問い合わせフォーム（Googleフォーム）へのリンクを表示<br><br>**対応ユースケース**:<br>- 資料収集依頼<br>- 質問内容の明確化<br>- 小テスト解説<br>- 明確な質問への直接回答<br><br>**提供チャネル**:<br>- **Chrome拡張**: MoodleのFABメニューから起動 → サイドパネル表示（画面右端、幅400px、リサイズ可能、状態永続化）<br>- **Webアプリ**: ページ内に常時表示（Phase 2以降）<br><br>**重要**: 個別のFeature（`search-materials`、`clarify-question`など）は作らない。すべて`qa-chat`の責務。 |
 | `auth-sso` | SSO認証（Google/Meta/Microsoft/LINE） | `SSOLoginButton` | Phase 2 |
 
 ---

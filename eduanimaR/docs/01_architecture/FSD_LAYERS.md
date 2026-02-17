@@ -69,13 +69,16 @@ eduanimaRでは、以下の3層構成でシステムを構成します：
 
 | イベント | 意味 | フロントエンドのUI表示 |
 |:---|:---|:---|
-| `thinking` | Phase 2（大戦略）実行中 | 「検索戦略を立案中...」 |
-| `searching` | Phase 3（小戦略）実行中 | 「資料を検索中...（試行 X/5）」 |
+| `thinking` | Phase 2（大戦略）実行中 | 「検索戦略を立案中...」プログレスバー |
+| `searching` | Phase 3（小戦略）実行中 | 「資料を検索中...（試行 X/5）」プログレスバー |
 | `evidence` | エビデンス発見 | 資料カード表示（資料名・ページ・抜粋・why_relevant） |
 | `answer` | Phase 4（最終回答）生成中 | 回答ストリーミング表示 |
+| `complete` | 回答完了 | Good/Badフィードバックボタン表示 |
 | `error` | エラー発生 | エラーコード別UI表示（`ERROR_CODES.md`参照） |
 
-**重要**: `error` イベントで `reason: insufficient_evidence` を受信した場合、自動リトライしない（ユーザー判断）。
+**重要**: 
+- `error` イベントで `reason: insufficient_evidence` を受信した場合、自動リトライしない（ユーザー判断）。
+- `complete` イベント受信後、回答の最後にGood/Badのフィードバックボタンを表示する。
 
 ### Professor/Librarianから受け取るデータ形式
 

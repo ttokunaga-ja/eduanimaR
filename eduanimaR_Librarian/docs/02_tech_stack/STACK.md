@@ -32,20 +32,73 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - DB/インデックス/バッチ処理（Professor の責務）
 - gRPC 以外の内部 RPC 方式の独自採用（Professor との契約は gRPC/Proto が正）
 
-## Phase 1での取り扱い
+## Phase 1-5での取り扱い
 
-**Phase 1では本サービス（Librarian）は未実装**
+### Phase 1: バックエンド完成（ローカル開発）
 
-- Phase 1（ローカル開発・認証スキップ）では、Professorが直接Gemini 2.0 Flashを呼び出す
-- Phase 2（SSO認証実装）でもLibrarianは不要
-- **Phase 3（推論ループ連携）で初めてLibrarianを実装・統合する**
+**Librarian責務**:
+- Phase 3の小戦略実行: クエリ生成（最大5回試行）
+- 停止条件の満足判定
+- Professor経由での検索実行（DB/GCS直接アクセス禁止）
+- LangGraphによる検索ループの状態管理
 
-### Phase 3での責務
-- 検索戦略立案（Plan）
-- 検索結果の評価・停止判断（Evaluate/Decide）
-- エビデンス選定（Rank）
-
-### Phase 3での統合準備
+**統合方法**:
 - gRPC契約（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）は既に定義済み
-- Professorは「Librarian未起動でも動作する」設計（Phase 1/2での後方互換）
+- Professorは「Librarian未起動でも動作する」設計（Phase 1での後方互換）
+
+**実装状態**: Phase 1で実装・統合完了（ローカル開発で動作確認）
+
+---
+
+### Phase 2: SSO認証 + 本番環境デプロイ
+
+**Librarian責務**: Phase 1と同じ
+
+**統合方法**: Phase 1と同じ（本番環境でもgRPC通信）
+
+**実装状態**: Phase 1で実装済み、Phase 2で本番環境デプロイ
+
+---
+
+### Phase 3: Chrome Web Store公開
+
+**Librarian責務**: Phase 1と同じ
+
+**統合方法**: Phase 1と同じ
+
+**実装状態**: Phase 1で実装済み、Phase 3では変更なし
+
+---
+
+### Phase 4: 閲覧中画面の解説機能追加
+
+**Librarian責務**: Phase 1と同じ
+
+**追加考慮点**:
+- 画面HTML・画像解析は Professor側で実施（Gemini Vision API）
+- Librarianは従来通りテキストベースの検索クエリ生成のみ
+
+**実装状態**: Phase 1で実装済み、Phase 4では変更なし
+
+---
+
+### Phase 5: 学習計画立案機能（構想段階）
+
+**Librarian責務**（未確定）:
+- 学習計画生成のための推論ループ実装（可能性あり）
+- 小テスト結果分析のための推論ループ実装（可能性あり）
+
+**実装状態**: 構想段階、Phase 1-4完了後に詳細を検討
+
+---
+
+## Phase別の統合準備状況
+
+| Phase | Librarian実装 | Professor統合 | 本番環境 | 備考 |
+|-------|-------------|-------------|---------|------|
+| **Phase 1** | ✅ 完了 | ✅ gRPC統合完了 | ❌ ローカルのみ | 推論ループ実装・検証完了 |
+| **Phase 2** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま本番適用 |
+| **Phase 3** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま維持 |
+| **Phase 4** | ✅ 完了 | ✅ 完了 | ✅ デプロイ | Phase 1実装をそのまま維持 |
+| **Phase 5** | ❌ 構想段階 | ❌ 構想段階 | ❌ 未定 | Phase 1-4完了後に検討 |
 
