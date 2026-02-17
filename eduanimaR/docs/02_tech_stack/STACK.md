@@ -94,16 +94,28 @@ eduanimaRは「資料の着眼点を示し、原典への回帰を促す」学�
 - **Phase 4（合成）**: Gemini 3 Proで最終回答生成
 - **外向きAPI提供**: HTTP/JSON + SSEでフロントエンドと通信
 
+**SSOT参照**:
+- [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
+- [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)
+
 #### Librarian（Python）の責務
 - **Phase 3（小戦略）**: LangGraphによる推論ループ（最大5回推奨）
 - **ステートレス推論サービス**: 会話履歴・キャッシュなし
 - **DB直接アクセス禁止**: Professor経由でのみ検索実行
 - **通信**: **gRPC（双方向ストリーミング）** でProfessorと通信、契約: `proto/librarian/v1/librarian.proto`
 
+**SSOT参照**:
+- [`../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md)
+- [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
+
 #### Frontend（Next.js）の責務
 - **ProfessorのHTTP/JSON+SSEのみ**: Librarian直接通信禁止
-- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示
+- **選定エビデンス表示**: Librarian推論ループが選定した根拠箇所をUI表示（情報階層: Evidence-forward）
 - **会話履歴管理**: Librarianがステートレスのため、クライアント側で保持
+
+**実装要件**:
+- エビデンスカードは「主役」として画面上部に配置（[`01_architecture/COMPONENT_ARCHITECTURE.md`](../01_architecture/COMPONENT_ARCHITECTURE.md) L86-115参照）
+- Professor OpenAPI契約（`../../eduanimaR_Professor/docs/openapi.yaml`）に基づく型安全な通信
 
 ### Professor OpenAPI契約の詳細（SSEストリーミング・エビデンス表示）
 
