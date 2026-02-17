@@ -28,11 +28,11 @@ Professor（OpenAPI + SSE / Kafka Worker / DB/GCS）と Librarian（gRPC）か�
 - gRPC クライアントは必ず deadline を設定し、Librarianへ伝播する
 - Librarian側も context cancel に追随し、探索を停止できるようにする
 
-### DB/GCS/Kafka/Gemini
+### DB/GCS/Kafka/推論API
 - DB: クエリは常に deadline 付き（subject_id/user_id の物理絞り込み前提）
 - Kafka: consume は graceful shutdown を実装し、in-flight の扱い（ack/commit）を定義する
-- Gemini: **フェーズ別**に timeout と並列数を分ける（bulkhead）
-	- Ingestion（高速OCRモデル）: 重い入力（PDF/画像）を想定し timeout を長め、並列数は控えめ
+- 推論API: **フェーズ別**に timeout と並列数を分ける（bulkhead）
+	- Ingestion（高速推論モデル）: 重い入力（PDF/画像）を想定し timeout を長め、並列数は控えめ
 	- Phase 2（高速推論モデル / Professor）: 短時間でPlan（調査項目/停止条件）生成。並列は上げても良いが rate limit を尊重
 	- Phase 3（高速推論モデル / Librarian）: ループ回数が増えるため 1回あたりのtimeoutを短め＋MaxRetryで上限を固定
 	- Phase 4（高精度推論モデル / Professor）: 最終生成は高コストなので並列を強く絞る

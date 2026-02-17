@@ -321,7 +321,7 @@ sequenceDiagram
     K->>W: Consume IngestJob
     W->>DB: SELECT material (冪等性チェック)
     W->>G: 原本ダウンロード
-    W->>LLM: Vision Reasoning<br/>(高速OCRモデル バッチ)
+    W->>LLM: Vision Reasoning<br/>(高速推論モデル)
     LLM-->>W: Markdown + Structured Outputs
     W->>DB: INSERT material_pages
     W->>DB: INSERT chunks (sequence順)

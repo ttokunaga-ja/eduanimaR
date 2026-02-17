@@ -49,7 +49,7 @@
 | 機能 | Go サーバー (Professor/System) | Python サーバー (Librarian) |
 | :--- | :--- | :--- |
 | **データ保持** | PostgreSQL/GCS/Kafka 等を直接操作（データの守護者） | DB接続を持たない（ステートレス） |
-| **資料の前処理** | **高速OCRモデル（バッチ）**で構造化・永続化・Embedding生成 | 関与しない |
+| **資料の前処理** | **高速推論モデル（バッチ）**で構造化・永続化・Embedding生成 | 関与しない |
 | **推論の目的** | **Phase 2（大戦略）**の作成 + 最終回答の生成（高速推論モデル / 高精度推論モデル） | **Phase 3（小戦略）**の実行（クエリ生成・反省/再試行・停止条件の満足判定）（高速推論モデル） |
 | **検索実行** | **SQLの発行・検索の物理実行**（制約強制） | クエリの「言葉」を作り、再検索を指揮する |
 | **セッション管理** | 会話履歴の保存・ユーザー認証/認可 | Goから渡された履歴を一時利用するだけ |
@@ -68,7 +68,7 @@
 2. **Upload**: Professor が原本を GCS に保存
 3. **Produce**: Professor が Kafka に `IngestJob` を publish（冪等キーを含む）
 4. **Consume**: Professor ワーカーがジョブを consume
-5. **Ingestion（Vision→Chunks）**: **高速OCRモデル（バッチモード）** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
+5. **Ingestion（Vision→Chunks）**: **高速推論モデル（バッチモード）** で原本（PDF/画像）を **Markdown化/意味単位チャンク分割**し、Structured Outputs（JSON）で `chunks[]` のみを生成
 6. **Store**: Professor が Postgres（pgvector）へ永続化（UUIDv7、subject_id/user_id による物理制約を前提）
 
 > 注: 要約（Summary）は **原則生成しない**。大量ファイルからの高速な候補絞り込みが必要になった場合のみ「ファイル単位の短いSummary」を追加で生成する。
@@ -112,12 +112,17 @@ Phase 2 は Phase 3（Librarian）のための **合格基準（Definition of Do
 - Phase 3: `Low`（ただし最終回のみ `Medium` に上げて再検討してよい）
 
 ## モデル設定（環境変数）（SSOT）
-モデルID（例: `gemini-3-flash` / `gemini-3-pro`）は環境変数で上書きできる。
 
-- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: 高速OCRモデル）
-- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: 高速推論モデル）
-- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: 高速推論モデル）
-- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: 高精度推論モデル）
+2モデル戦略を採用:
+1. **高速推論モデル** (Phase 1/2/3: Ingestion/Planning/Search)
+2. **高精度推論モデル** (Phase 4: Answer)
+
+環境変数:
+- `PROFESSOR_MODEL_FAST`（default: 高速推論モデル） - Ingestion/Planning用
+- `LIBRARIAN_MODEL_FAST`（default: 高速推論モデル） - Search用
+- `PROFESSOR_MODEL_ACCURATE`（default: 高精度推論モデル） - Answer用
+
+**注意:** Gemini 2.0 Flash提供終了により、OCR/構造化処理も高速推論モデルで実行します。
 
 ## 不変条件（MUST）
 - Librarian は DB/GCS に直接アクセスしない（資格情報を持たない）
