@@ -112,12 +112,17 @@ Phase 2 は Phase 3（Librarian）のための **合格基準（Definition of Do
 - Phase 3: `Low`（ただし最終回のみ `Medium` に上げて再検討してよい）
 
 ## モデル設定（環境変数）（SSOT）
-モデルID（例: `gemini-3-flash` / `gemini-3-pro`）は環境変数で上書きできる。
 
-- `PROFESSOR_GEMINI_MODEL_INGESTION`（default: 高速OCRモデル）
-- `PROFESSOR_GEMINI_MODEL_PLANNING`（default: 高速推論モデル）
-- `LIBRARIAN_GEMINI_MODEL_SEARCH`（default: 高速推論モデル）
-- `PROFESSOR_GEMINI_MODEL_ANSWER`（default: 高精度推論モデル）
+2モデル戦略を採用:
+1. **高速推論モデル** (Phase 1/2/3: Ingestion/Planning/Search)
+2. **高精度推論モデル** (Phase 4: Answer)
+
+環境変数:
+- `PROFESSOR_MODEL_FAST`（default: 高速推論モデル） - Ingestion/Planning用
+- `LIBRARIAN_MODEL_FAST`（default: 高速推論モデル） - Search用
+- `PROFESSOR_MODEL_ACCURATE`（default: 高精度推論モデル） - Answer用
+
+**注意:** Gemini 2.0 Flash提供終了により、OCR/構造化処理も高速推論モデルで実行します。
 
 ## 不変条件（MUST）
 - Librarian は DB/GCS に直接アクセスしない（資格情報を持たない）

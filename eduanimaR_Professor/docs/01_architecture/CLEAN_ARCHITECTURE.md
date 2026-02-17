@@ -36,7 +36,7 @@ Professor（Go）を「インフラ・実行部隊・最終回答者（実務）
   - `gcs/`
   - `kafka/`（producer/consumer）
   - `librariangrpc/`（gRPC client）
-  - `gemini/`（3 Flash / 3 Pro の呼び出し実装。モデルは環境変数で切替）
+  - `gemini/`（高速推論モデル / 高精度推論モデル の呼び出し実装。モデルは環境変数で切替）
 - `pkg/`
   - 横断共有してよい（かつ安定）なライブラリのみ（乱用禁止）
 

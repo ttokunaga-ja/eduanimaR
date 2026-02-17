@@ -49,7 +49,7 @@
 ### Librarian
 - [ ] `eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`の責務境界が明確
 - [ ] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み
-- [ ] Professor ↔ Librarian gRPC通信の実装準備が整っている
+- [ ] Professor ↔ Librarian gRPC双方向ストリーミングの完全実装が完了している
 
 ### 開発開始の判断
 上記のうち、**契約・定義** と **バックエンド（Professor）** の項目が全て満たされた時点で、Phase 1の実装を開始できます。

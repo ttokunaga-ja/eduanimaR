@@ -104,10 +104,15 @@ Librarian は LangGraph による自律的な推論ループを実行し、最�
 
 | フェーズ | 責務 | モデル | 環境変数 |
 |:---|:---|:---|:---|
-| Phase 1 | Ingestion（構造化） | 高速OCRモデル（バッチ） | `PROFESSOR_GEMINI_MODEL_INGESTION` |
-| Phase 2 | Planning（大戦略） | 高速推論モデル | `PROFESSOR_GEMINI_MODEL_PLANNING` |
-| Phase 3 | Search（小戦略） | 高速推論モデル | `LIBRARIAN_GEMINI_MODEL_SEARCH` |
-| Phase 4 | Answer（最終回答） | 高精度推論モデル | `PROFESSOR_GEMINI_MODEL_ANSWER` |
+| Phase 1 | Ingestion（構造化） | 高速推論モデル | `PROFESSOR_MODEL_FAST` |
+| Phase 2 | Planning（大戦略） | 高速推論モデル | `PROFESSOR_MODEL_FAST` |
+| Phase 3 | Search（小戦略） | 高速推論モデル | `LIBRARIAN_MODEL_FAST` |
+| Phase 4 | Answer（最終回答） | 高精度推論モデル | `PROFESSOR_MODEL_ACCURATE` |
+
+**2モデル戦略:**
+- Gemini 2.0 Flash提供終了により、OCR/構造化処理（Phase 1）も高速推論モデルで実行
+- Phase 1-3は高速推論モデル、Phase 4のみ高精度推論モデルを使用
+- thinking_levelの調整は実装側で制御（ドキュメントでは2モデルの役割のみを定義）
 
 ### Phase 3の停止条件（Definition of Done）
 

@@ -22,7 +22,7 @@
 2. Upload: GCSへ保存（gcs_uri と checksum を確定）
 3. Produce: Kafkaへ `IngestJob` を publish
 4. Consume: ワーカーが consume
-5. Ingestion（Vision→Chunks）: 高速OCRモデル（Structured Outputsで `chunks[]` を生成。Summaryは原則なし）
+5. Ingestion（Vision→Chunks）: 高速推論モデル（Structured Outputsで `chunks[]` を生成。Summaryは原則なし）
 6. Store: Postgresへ永続化
 
 ## 冪等（Idempotency）（MUST）
