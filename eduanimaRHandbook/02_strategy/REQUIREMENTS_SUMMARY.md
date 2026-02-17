@@ -1,12 +1,110 @@
-Title: Requirements & Answers Summary
-Description: これまでの要求と、戦略レベルでの回答（決定事項/未決事項）を簡潔に整理
-Owner: @OWNER
+Title: Requirements Summary
+Description: eduanimaR 全体の機能要件・非機能要件のサマリ
+Owner: @ttokunaga-ja
 Reviewers: @reviewer1
-Status: Draft
-Last-updated: 2026-02-14
+Status: Published
+Last-updated: 2026-02-17
 Tags: strategy, requirements
 
-# Requirements & Answers Summary
+# Requirements Summary
+
+## Phase別機能要件
+
+### Phase 1: ローカル開発・認証スキップ(2026 Q1)
+**ゴール**: Professor+Librarian基本動作確認
+
+✅ **実装する機能**:
+- ファイルアップロード(PDF/画像)
+- 自動OCR/Embedding生成(Kafka非同期)
+- 科目別資料管理(users/subjects/files/chunks)
+- 質問応答(SSE)
+- ベクトル検索(pgvector 0.8.1 HNSW)
+- 固定ユーザー認証(`dev@example.com`)
+
+❌ **実装しない機能**:
+- SSO認証(Phase 2)
+- Chrome拡張(Phase 3)
+- gRPC双方向ストリーミング(Phase 3で実装、Phase 1はHTTP REST暫定)
+
+---
+
+### Phase 2: SSO認証・Web版公開(2026 Q2)
+**ゴール**: 一般ユーザー向けサービス公開
+
+✅ **追加機能**:
+- OAuth認証(Google/Meta/Microsoft/LINE)
+- Web版デプロイ(Cloud Run)
+- プライバシーポリシー/利用規約の法務確認
+
+DB変更:
+- `users`テーブルに`provider`, `provider_user_id`追加
+- 固定ユーザー削除
+- `status`カラムをTEXT→ENUMに変更
+
+---
+
+### Phase 3: Chrome拡張公開(2026 Q3)
+**ゴール**: LMS上での利用体験向上
+
+✅ **追加機能**:
+- Chrome拡張機能(Manifest V3)
+- gRPC双方向ストリーミング(Professor ↔ Librarian)
+- LMS資料の自動検知
+
+---
+
+### Phase 4: 画面解説機能(2026 Q4)
+**ゴール**: 小テスト復習支援
+
+✅ **追加機能**:
+- LMS画面HTML解析
+- 画面スクリーンショット解析(Vision Reasoning)
+- 短期保存(7日後自動削除)
+
+DB変更:
+- `screen_analyses`テーブル追加
+
+---
+
+### Phase 5: 学習計画機能(2027 Q1)
+**ゴール**: 個別最適化された学習ロードマップ
+
+✅ **追加機能**:
+- 学習計画生成
+- 小テスト結果分析
+- プライバシー配慮の匿名化処理
+
+---
+
+## 非機能要件(全Phase共通)
+
+### セキュリティ
+- **認証**: Phase 1=固定dev-user、Phase 2以降=OAuth/OIDC
+- **認可**: user_id/subject_idによる物理分離(DB層で強制)
+- **監査**: request_idでログ/トレース相関
+- **データ境界**: Professor独占(Librarian/フロントエンドはDB直接アクセス禁止)
+
+### パフォーマンス
+- ベクトル検索: < 1秒(pgvector HNSW)
+- SSEストリーミング: 初回チャンク < 3秒
+- ファイル処理: 非同期(Kafka)
+
+### 可用性
+- Cloud Run水平スケール
+- Kafka DLQ(Dead Letter Queue)でリトライ制御
+
+### 観測性
+- OpenTelemetry(Phase 2以降)
+- SLO/アラート(Phase 2以降)
+
+---
+
+## スコープ外(全Phase)
+- 評価・採点の自動化
+- 他者の資料への無断アクセス
+- Web版からの新規ユーザー登録(拡張機能のみ)
+
+---
 
 ## 1. 要求（整理）
 ### プロダクト形態
