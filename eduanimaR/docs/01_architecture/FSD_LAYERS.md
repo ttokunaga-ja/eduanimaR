@@ -29,9 +29,19 @@ eduanimaRでは、以下の3層構成でシステムを構成します：
 
 以下はバックエンドの責務であり、フロントエンドで実装してはなりません：
 
+- ❌ **Phase 2（大戦略/Planning）の実装**（Professor/Goの責務）
+  - タスク分割（調査項目のリスト）の生成
+  - 停止条件（Stop Conditions）の定義
+  - Librarianへの初期パラメータの整理
+
 - ❌ **検索戦略の判断ロジック**（Professor Phase 2の責務）
   - 「検索すべきか」「ヒアリングすべきか」の判断
   - 検索戦略（広範囲/精密/根拠探索）の決定
+
+- ❌ **Phase 3（小戦略）の再試行制御**（Librarian/Pythonの責務）
+  - 最大5回の再検索ループ（1回目: 直球、2回目: 補完、3回目: 類義語、4〜5回目: フォールバック）
+  - 停止条件の満足判定（充足性・明確性・視覚情報の言語化）
+  - 「収集完了」または「不足を宣言して終了」の判断
   
 - ❌ **LibrarianとのgRPC通信**（Professorが仲介）
   - Librarianへのクエリリクエスト送信
@@ -54,6 +64,66 @@ eduanimaRでは、以下の3層構成でシステムを構成します：
   - クリッカブルなGCS署名付きURL + ページ番号
   - `why_relevant`（なぜこの箇所が選ばれたか）を明示
 - ✅ **Chrome拡張機能の自動アップロード**: LMS資料の自動検知・アップロード（Phase 1で実装、Phase 2で本番適用）
+
+### SSEイベントの種類と表示対応
+
+| イベント | 意味 | フロントエンドのUI表示 |
+|:---|:---|:---|
+| `thinking` | Phase 2（大戦略）実行中 | 「検索戦略を立案中...」 |
+| `searching` | Phase 3（小戦略）実行中 | 「資料を検索中...（試行 X/5）」 |
+| `evidence` | エビデンス発見 | 資料カード表示（資料名・ページ・抜粋・why_relevant） |
+| `answer` | Phase 4（最終回答）生成中 | 回答ストリーミング表示 |
+| `error` | エラー発生 | エラーコード別UI表示（`ERROR_CODES.md`参照） |
+
+**重要**: `error` イベントで `reason: insufficient_evidence` を受信した場合、自動リトライしない（ユーザー判断）。
+
+### Professor/Librarianから受け取るデータ形式
+
+**SSE `evidence` イベント**:
+```json
+{
+  "event": "evidence",
+  "data": {
+    "file_id": "uuid",
+    "subject_id": "uuid",
+    "title": "資料名",
+    "page_number": 12,
+    "section": "第3章 統計的推定",
+    "excerpt": "信頼区間の定義は...",
+    "why_relevant": "なぜこの箇所が選ばれたか",
+    "url": "gs://bucket/path/to/file.pdf"
+  }
+}
+```
+
+**SSE `answer` イベント**:
+```json
+{
+  "event": "answer",
+  "data": {
+    "content": "回答本文（Markdown形式）",
+    "citations": [
+      {
+        "file_id": "uuid",
+        "page_number": 12,
+        "excerpt": "引用箇所"
+      }
+    ]
+  }
+}
+```
+
+**SSE `error` イベント**:
+```json
+{
+  "event": "error",
+  "data": {
+    "code": "4004",
+    "reason": "insufficient_evidence",
+    "message": "情報が不足しています。質問を具体化するか、資料を追加してください"
+  }
+}
+```
 
 **参照**: 
 - [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_PROFESSOR.md)

@@ -122,6 +122,73 @@ eduanimaRは、**単一の汎用パイプライン**で多様なニーズに対�
 
 **参照**: Professor Phase 2戦略決定の詳細は [`../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/01_architecture/MICROSERVICES_MAP.md)
 
+---
+
+## システム全体のアーキテクチャ
+
+eduanimaRは、フロントエンド(Next.js) + Professor(Go) + Librarian(Python)の3層構成で、以下の4フェーズで学習支援を実現します:
+
+### 4フェーズ構成（Reasoning Loop）
+
+**Phase 1: 資料の構造化（Ingestion / Professor）**
+- Gemini 3 Flash（Batch Mode）でPDF/画像をMarkdown化・意味単位チャンク分割
+- PostgreSQL（pgvector）へ永続化
+
+**Phase 2: 大戦略の立案（Planning / Professor）**
+- 責務: タスク分割（調査項目のリスト）と停止条件（Stop Conditions）の定義
+- モデル: Gemini 3 Flash
+- 成果物: Librarianへの初期パラメータ（調査項目・停止条件・コンテキスト）
+
+**Phase 3: 小戦略の実行（Search / Librarian）**
+- 責務: 検索クエリ生成・ツール選択・反省/再試行・停止条件の満足判定
+- モデル: Gemini 3 Flash
+- 制約: 最大5回の再検索（3回 + 2回リカバリ）、DB/GCS直接アクセス禁止
+- ツール: Professorが提供する検索ツール（全文/ベクトル）
+
+**Phase 4: 最終回答の生成（Answer Synthesis / Professor）**
+- 責務: 選定された資料の全文Markdown取得 + 教育的配慮を含む回答生成
+- モデル: Gemini 3 Pro
+- 出力: SSEで回答・引用・進捗をフロントエンドへストリーミング
+
+### フロントエンドの責務（Phase別）
+- Phase 1: ファイルアップロード（Chrome拡張機能）、アップロード状態表示
+- Phase 2: 質問送信
+- Phase 3: SSEイベント受信（`thinking`, `searching`, `evidence`）、進捗表示
+- Phase 4: 回答・エビデンス表示（資料名・ページ番号・抜粋・クリッカブルURL）
+
+### データフロー（Reasoning Loop）
+```
+Frontend → Professor (HTTP/OpenAPI)
+            ↓
+         Phase 2: Plan（大戦略）
+            ↓
+         Professor ↔ Librarian (gRPC)
+            ↓
+         Phase 3: Search（小戦略、MaxRetry=5）
+            ↓
+         Professor → DB (検索の物理実行 + 制約強制)
+            ↓
+         Librarian → 資料ID/根拠候補を返却
+            ↓
+         Phase 4: Answer（Professor/Gemini 3 Pro）
+            ↓
+Frontend ← Professor (SSE: 進捗/引用/回答)
+```
+
+### API契約
+
+#### 外部契約（Frontend ↔ Professor）
+- **HTTP/OpenAPI**: `eduanimaR_Professor/docs/openapi.yaml`
+- **通信方式**: HTTP/JSON + SSE（Server-Sent Events）
+- **フロントエンド**: Orvalで生成されたクライアント/型のみ使用
+
+#### 内部契約（Professor ↔ Librarian）
+- **gRPC/Proto**: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
+- **通信方式**: 双方向ストリーミング（探索開始/評価ループ/検索要求/探索完了通知）
+- **フロントエンド関与**: なし（Professorが仲介）
+
+---
+
 ### Professor / Librarian の責務境界（SSOT）
 
 本システムは **2サービス構成** です。DB/GCS/検索インデックスへの直接アクセス権限は Professor のみに付与します（最重要不変条件）。
