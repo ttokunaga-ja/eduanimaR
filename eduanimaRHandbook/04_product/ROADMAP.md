@@ -42,6 +42,19 @@ LLMによる資料ベース学習支援の**技術的実現可能性**と**学�
 - ✅ Q&A（単一科目内検索 + 根拠提示）
 - ✅ 根拠箇所へのページ番号リンク
 
+### Phase 1のバックエンド実装範囲
+**Phase 1でProfessor、Librarianのすべての機能が完全に完成します。**
+
+1. **Professor API完全完成**
+   - OpenAPI定義完備
+   - 認証不要でcurlリクエストによる資料アップロード可能
+2. **Librarian推論ループ完全完成**
+   - LangGraph導入（最大5回試行）
+   - Gemini 3 Flash使用（Plan/Evaluate）
+   - Professor ↔ Librarian gRPC双方向ストリーミング完全動作
+3. **資料検索機能完全実装**（Librarian経由）
+4. **QA機能完全動作**（Librarian推論ループ統合）
+
 ### 明示的なスコープ外（Phase 2以降に延期）
 - ❌ SSO認証（Phase 1は固定のdev-userを使用）
 - ❌ Chrome Web Storeへの公開（Phase 2で実施）
