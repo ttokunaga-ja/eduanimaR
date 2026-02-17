@@ -12,6 +12,57 @@
 
 ---
 
+## Phase 1-5の役割（完全版定義）
+
+### Phase 1: バックエンド完成 + Web版完全動作（ローカル開発）
+
+**目的**: バックエンド機能を完全に完成させ、Web版で全機能を検証可能にする。
+
+**実装完了条件**:
+- Professor APIが完全に動作（OpenAPI定義完備）
+- Librarian推論ループとの統合完了（gRPC双方向ストリーミング）
+- **認証不要でcurlリクエストによる資料アップロードが可能**（開発用エンドポイント）
+- OCR + 構造化処理（Gemini 2.0 Flash）
+- pgvector埋め込み生成・保存（HNSW検索）
+
+**デプロイ**: ローカル環境のみ
+
+---
+
+### Phase 2: 拡張機能版作成 + 本番環境デプロイ
+
+**目的**: 拡張機能版をZIPファイルで配布可能な状態にし、SSO認証を実装する。
+
+**実装完了条件**:
+- SSO認証基盤（OAuth/OIDC）
+- 本番環境デプロイ（Google Cloud Run）
+- 拡張機能からの資料自動アップロード本番適用
+
+---
+
+### Phase 3: Chrome Web Store公開
+
+**目的**: Phase 2から変更なし（拡張機能のストア公開のみ）
+
+---
+
+### Phase 4: 閲覧中画面の解説機能追加
+
+**目的**: 小テストなどで間違った場合に、間違った原因を資料をもとに考える支援機能を追加する。
+
+**実装完了条件**:
+- HTML・画像を受け取るエンドポイント追加
+- Gemini Vision APIでの画像解析
+- 資料との関連付けロジック追加
+
+---
+
+### Phase 5: 学習計画立案機能（構想段階）
+
+**目的**: 過去の小テストや学習履歴をもとに、既存資料のどこを確認すべきかを提案する（構想段階）。
+
+---
+
 ## Phase 1 OpenAPI仕様（最小版）
 
 Professor の外向きAPI契約は、以下の最小セットから開始する。
@@ -20,8 +71,10 @@ Professor の外向きAPI契約は、以下の最小セットから開始する�
 
 #### 1. 資料アップロード
 ```
-POST /subjects/{subjectId}/materials
+POST /v1/subjects/{subjectId}/materials
 Content-Type: multipart/form-data
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
 
 Request:
   - file: binary（PDF/PowerPoint）
@@ -33,10 +86,13 @@ Response (202 Accepted):
 }
 ```
 
-#### 2. 質問応答
+#### 2. 質問応答（SSEストリーミング）
 ```
-POST /qa
+POST /v1/qa/stream
 Content-Type: application/json
+Accept: text/event-stream
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
 
 Request:
 {
@@ -44,29 +100,112 @@ Request:
   "question": "string"
 }
 
+Response (200 OK, SSE):
+event: thinking
+data: {"message": "検索戦略を立案中..."}
+
+event: searching
+data: {"message": "資料を検索中...（試行 1/5）"}
+
+event: evidence
+data: {
+  "material_id": "uuid",
+  "page_number": 12,
+  "excerpt": "...",
+  "why_relevant": "..."
+}
+
+event: answer
+data: {"chunk": "回答の一部..."}
+
+event: complete
+data: {"message": "回答完了"}
+```
+
+#### 3. フィードバック送信
+```
+POST /v1/qa/feedback
+Content-Type: application/json
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
+
+Request:
+{
+  "qa_session_id": "uuid",
+  "feedback": "good" | "bad",
+  "comment": "string (optional)"
+}
+
 Response (200 OK):
 {
-  "answer": "string",
-  "evidences": [
-    {
-      "material_id": "uuid",
-      "page_start": integer,
-      "page_end": integer,
-      "snippet_markdown": "string"
-    }
-  ]
+  "success": true
 }
 ```
 
-#### 3. 処理状態確認
+#### 4. 処理状態確認
 ```
-GET /materials/{materialId}/status
+GET /v1/materials/{materialId}/status
 
 Response (200 OK):
 {
   "material_id": "uuid",
   "status": "ready" | "processing" | "failed",
   "progress": integer (0-100)
+}
+```
+
+#### 5. 科目一覧取得（Web版固有機能）
+```
+GET /v1/subjects
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
+
+Response (200 OK):
+{
+  "subjects": [
+    {
+      "subject_id": "uuid",
+      "name": "科目名",
+      "material_count": integer
+    }
+  ]
+}
+```
+
+#### 6. 資料一覧取得（Web版固有機能）
+```
+GET /v1/subjects/{subjectId}/materials
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
+
+Response (200 OK):
+{
+  "materials": [
+    {
+      "material_id": "uuid",
+      "title": "資料名",
+      "upload_date": "ISO8601",
+      "page_count": integer
+    }
+  ]
+}
+```
+
+#### 7. 会話履歴取得（Web版固有機能）
+```
+GET /v1/subjects/{subjectId}/conversations
+Authorization: Bearer {token} （Phase 2以降）
+X-Dev-User: dev-user （Phase 1のみ）
+
+Response (200 OK):
+{
+  "conversations": [
+    {
+      "conversation_id": "uuid",
+      "question": "質問文",
+      "created_at": "ISO8601"
+    }
+  ]
 }
 ```
 

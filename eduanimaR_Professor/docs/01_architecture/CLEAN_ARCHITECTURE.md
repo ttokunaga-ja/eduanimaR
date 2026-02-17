@@ -46,6 +46,7 @@ Professor（Go）を「インフラ・実行部隊・最終回答者（実務）
 - `usecase` は `ports`（interface）にのみ依存し、`adapters` の実装に依存しない
 
 ## Professor 固有の不変条件（MUST）
+
 ### 1) DB/GCS への直接アクセスの独占
 - Postgres/GCS の認証情報は Professor のみに付与する
 - Librarian は DB/GCS の認証情報を持たない（ネットワーク的にも閉じる）
@@ -59,7 +60,51 @@ Professor（Go）を「インフラ・実行部隊・最終回答者（実務）
 - OpenAPI（`docs/openapi.yaml`）と Proto（`proto/`）が契約の正
 - sqlc / OpenAPI / Proto などの生成物を手で編集しない
 
+### 4) Phase別の責務分担
+
+#### Phase 1: バックエンド完成（ローカル開発）
+- **Professor責務**:
+  - Professor APIが完全に動作（OpenAPI定義完備）
+  - Librarian推論ループとの統合完了（gRPC双方向ストリーミング）
+  - 認証不要でcurlリクエストによる資料アップロードが可能（開発用エンドポイント）
+  - OCR + 構造化処理（Gemini 2.0 Flash）
+  - pgvector埋め込み生成・保存（HNSW検索）
+  - **Web版固有機能のAPI提供**: 科目一覧・資料一覧・会話履歴取得
+  - **QA機能のSSEストリーミング**: thinking/searching/evidence/answer/completeイベント配信
+  - **フィードバック受信**: Good/Badフィードバックの保存
+- **Librarian責務**:
+  - Phase 3の小戦略実行: クエリ生成（最大5回試行）
+  - 停止条件の満足判定
+  - Professor経由での検索実行（DB/GCS直接アクセス禁止）
+
+#### Phase 2: SSO認証 + 本番環境デプロイ
+- **Professor責務追加**:
+  - SSO認証基盤（OAuth/OIDC）実装
+  - 本番環境デプロイ（Google Cloud Run）
+  - 拡張機能からの資料自動アップロード本番適用
+  - 未登録ユーザーへの適切なエラーレスポンス（`AUTH_USER_NOT_REGISTERED`）
+- **Librarian責務**: Phase 1と同じ
+
+#### Phase 3: Chrome Web Store公開
+- **Professor責務**: Phase 2から変更なし
+- **Librarian責務**: Phase 1と同じ
+
+#### Phase 4: 閲覧中画面の解説機能追加
+- **Professor責務追加**:
+  - HTML・画像を受け取るエンドポイント追加
+  - Gemini Vision APIでの画像解析
+  - 資料との関連付けロジック追加
+- **Librarian責務**: Phase 1と同じ
+
+#### Phase 5: 学習計画立案機能（構想段階）
+- **Professor責務追加**（未確定）:
+  - 小テスト結果の保存・分析
+  - 学習計画生成API
+- **Librarian責務**: Phase 1と同じ
+
 ## 禁止事項
 - transport から直接DBクエリを実行しない
 - domain が pgx/sqlc/transport/SDK に依存しない
 - Librarian へ DB/GCS 直接アクセス経路を作らない
+- **Web版からのファイルアップロードUIを持つエンドポイントを作らない**（拡張機能の自動アップロードのみ）
+- **Web版からの新規ユーザー登録エンドポイントを作らない**（拡張機能のSSO登録のみ）
