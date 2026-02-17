@@ -293,7 +293,7 @@ Professor の `/qa/stream` エンドポイントは以下のイベント型を�
 |:---|:---|:---|
 | `plan` | 調査項目・停止条件 | Professor（Phase 2: Plan生成） |
 | `search` | 検索結果（クエリ、ヒット件数） | Librarian Agent（検索戦略実行） |
-| `answer` | 最終回答（本文 + ソース） | Professor（Phase 4: 高精度推論モデル） |
+| `answer` | 最終回答（本文 + ソース） | Professor（Phase 4: Answer生成） |
 | `error` | エラー通知（`ERROR_CODES.md` の code を含む） | Professor / Librarian |
 | `done` | 完了通知 | Professor |
 

@@ -112,7 +112,6 @@ Phase 2 は Phase 3（Librarian）のための **合格基準（Definition of Do
 - Phase 3: `Low`（ただし最終回のみ `Medium` に上げて再検討してよい）
 
 ## モデル設定（環境変数）（SSOT）
-## モデル設定（環境変数）（SSOT）
 
 2モデル戦略を採用:
 1. **高速推論モデル** (Phase 1/2/3: Ingestion/Planning/Search)
