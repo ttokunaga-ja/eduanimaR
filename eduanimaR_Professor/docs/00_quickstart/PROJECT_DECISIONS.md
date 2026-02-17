@@ -106,21 +106,30 @@ Owner: @ttokunaga-ja
 
 ### API契約（Professor: OpenAPI）
 
+#### 契約SSOT
+`eduanimaR_Professor/docs/openapi.yaml`
+
 #### 最小エンドポイント（Phase 1）
 
-1. **POST /v1/ingest**
+1. **POST /v1/materials**
    - 目的: ファイルアップロード（Chrome拡張機能→Professor）
    - Request: `multipart/form-data` (file, subject_id)
-   - Response: `{ job_id: string, status: "pending" }`
+   - Response: `{ material_id: string, job_id: string, status: "pending" }`
 
-2. **POST /v1/ask**
-   - 目的: 質問送信（拡張機能/Web→Professor）
+2. **POST /v1/questions** + **GET /v1/questions/{request_id}/events**
+   - 目的: 質問送信と応答受信（拡張機能/Web→Professor）
    - Request: `{ subject_id: string, question: string }`
-   - Response (SSE): `data: { type: "answer"|"source", content: string, source_url?: string }`
+   - Response (202): `{ request_id: string }`
+   - SSE Stream: `event: progress|answer|done, data: { type, content, ... }`
 
-3. **GET /v1/subjects/{subject_id}/files**
+3. **GET /v1/subjects/{subject_id}/materials**
    - 目的: 科目に紐づくファイル一覧取得
-   - Response: `{ files: [{ file_id, name, status, uploaded_at }] }`
+   - Response: `[{ id, filename, uploaded_at }]`
+
+4. **POST /v1/auth/dev-login** (Phase 1専用)
+   - 目的: 開発用固定ユーザー認証
+   - Response: `{ user_id: "dev-user", authenticated: true }`
+   - 注意: Phase 2でSSO実装時に削除
 
 ### gRPC契約（Professor ↔ Librarian）
 
@@ -161,10 +170,10 @@ message ReasoningOutput {
 ### データフロー（Phase 1）
 
 1. **ファイルアップロード**:
-   Chrome拡張 → Professor (POST /v1/ingest) → GCS → Kafka (IngestJob) → Worker (OCR/Chunk/Embed) → PostgreSQL (chunks)
+   Chrome拡張 → Professor (POST /v1/materials) → GCS → Kafka (IngestJob) → Worker (OCR/Chunk/Embed) → PostgreSQL (chunks)
 
 2. **質問応答**:
-   拡張/Web → Professor (POST /v1/ask) → Librarian (gRPC Reason) → Professor (Vector Search) → Librarian (Plan/Evaluate) → Professor (SSE) → 拡張/Web
+   拡張/Web → Professor (POST /v1/questions) → Librarian (gRPC Reason) → Professor (Vector Search) → Librarian (Plan/Evaluate) → Professor (SSE via /v1/questions/{request_id}/events) → 拡張/Web
 
 ### エラーハンドリング方針
 

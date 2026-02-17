@@ -56,10 +56,13 @@ Owner: @ttokunaga-ja
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable message",
-    "details": { /* optional */ }
+    "details": { /* optional */ },
+    "request_id": "abc-123-def"
   }
 }
 ```
+
+**注意**: `request_id` は必須フィールドです（OpenAPIスキーマで定義）。
 
 ### エラーコード一覧（Phase 1）
 
@@ -178,17 +181,19 @@ const (
 
 type ErrorResponse struct {
     Error struct {
-        Code    ErrorCode              `json:"code"`
-        Message string                 `json:"message"`
-        Details map[string]interface{} `json:"details,omitempty"`
+        Code      ErrorCode              `json:"code"`
+        Message   string                 `json:"message"`
+        Details   map[string]interface{} `json:"details,omitempty"`
+        RequestID string                 `json:"request_id"`
     } `json:"error"`
 }
 
 // エラー生成ヘルパー
-func NewErrorResponse(code ErrorCode, message string, details map[string]interface{}) *ErrorResponse {
+func NewErrorResponse(code ErrorCode, message string, requestID string, details map[string]interface{}) *ErrorResponse {
     resp := &ErrorResponse{}
     resp.Error.Code = code
     resp.Error.Message = message
+    resp.Error.RequestID = requestID
     resp.Error.Details = details
     return resp
 }
@@ -209,9 +214,11 @@ components:
           required:
             - code
             - message
+            - request_id
           properties:
             code:
               type: string
+              description: Stable application error code (see docs/03_integration/ERROR_CODES.md)
               enum:
                 - FILE_TOO_LARGE
                 - INVALID_FILE_TYPE
@@ -224,9 +231,12 @@ components:
                 - RATE_LIMIT_EXCEEDED
             message:
               type: string
+              description: User-facing message (no secrets / no internal details)
             details:
               type: object
               additionalProperties: true
+            request_id:
+              type: string
 
   responses:
     FileTooLarge:
@@ -242,4 +252,5 @@ components:
               details:
                 max_size_mb: 10
                 actual_size_mb: 15.2
+              request_id: req_abc123def456
 ```
