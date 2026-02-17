@@ -1,12 +1,15 @@
 openapi: 3.1.0
 info:
   title: eduanimaR Professor API
-  version: 0.1.0
+  version: 1.0.0
   description: |
-    Frontend ↔ Professor（Go）の外向きAPI。
-    このファイルが SSOT（契約の正）であり、HTTP/JSON エンドポイントと SSE ストリームを含む。
+    Professor API (HTTP/JSON + SSE)
+    - Phase 1: dev-user自動認証、基本Q&A
+    - Phase 2: SSO認証、資料管理
+
 servers:
-  - url: /
+  - url: http://localhost:8080
+    description: Local development
 tags:
   - name: Questions
     description: Q&A and SSE streaming
@@ -15,6 +18,124 @@ tags:
   - name: Health
     description: Health endpoints
 paths:
+  /v1/auth/dev-login:
+    post:
+      summary: Phase 1専用 開発認証
+      description: |
+        Phase 1のみ有効。固定のdev-userを発行する。
+        本番環境では無効化必須（Phase 2でSSO実装）。
+      responses:
+        '200':
+          description: 認証成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - user_id
+                  - authenticated
+                properties:
+                  user_id:
+                    type: string
+                    example: "dev-user"
+                  authenticated:
+                    type: boolean
+                    example: true
+
+  /v1/qa/stream:
+    post:
+      summary: Q&A応答（SSE）
+      description: |
+        質問を送信し、SSEでエビデンス付き応答を受信する。
+        Phase 1: user_id="dev-user"固定
+        Phase 2以降: SSO認証必須
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - question
+                - subject_id
+              properties:
+                question:
+                  type: string
+                  example: "次回の試験範囲は？"
+                subject_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: SSEストリーム
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: string
+                    enum: [evidence, answer, done]
+                  data:
+                    type: object
+
+  /v1/subjects:
+    get:
+      summary: 科目一覧取得
+      responses:
+        '200':
+          description: 科目リスト
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                      example: "データ構造とアルゴリズム"
+
+  /v1/subjects/{subject_id}/materials:
+    get:
+      summary: 科目の資料一覧取得
+      parameters:
+        - name: subject_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 資料リスト
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - filename
+                    - uploaded_at
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    filename:
+                      type: string
+                      example: "lecture01.pdf"
+                    uploaded_at:
+                      type: string
+                      format: date-time
+
   /healthz:
     get:
       tags: [Health]

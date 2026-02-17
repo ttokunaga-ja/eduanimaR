@@ -103,6 +103,42 @@ eduanimaRは段階的リリースを前提とし、Phase 1〜4で機能を積み
 
 ---
 
+## Phase 1開発開始前の必須作業
+
+### 1. OpenAPI契約の確認（MUST）
+1. `eduanimaR_Professor/docs/openapi.yaml`が存在することを確認
+2. 以下のエンドポイントが定義されていることを確認:
+   - `POST /v1/auth/dev-login`
+   - `POST /v1/qa/stream`
+   - `GET /v1/subjects`
+   - `GET /v1/subjects/{subject_id}/materials`
+
+### 2. Orval設定の確認（MUST）
+1. `orval.config.ts`が`eduanimaR_Professor/docs/openapi.yaml`を参照していることを確認
+2. 生成コマンドを実行:
+   ```bash
+   npm run api:generate
+   ```
+3. `src/shared/api/generated/`に型定義・クライアントが生成されることを確認
+
+### 3. 開発サーバー起動（Phase 1）
+1. バックエンド（Professor）を起動:
+   ```bash
+   cd eduanimaR_Professor
+   docker compose up -d
+   ```
+
+2. フロントエンドを起動:
+   ```bash
+   cd eduanimaR
+   npm install
+   npm run dev
+   ```
+
+3. `http://localhost:3000`にアクセスし、`dev-user`で自動認証されることを確認
+
+---
+
 ## 0) 前提
 
 - **Node.js**: LTS 推奨（v20以上、最新は v24.13.1）

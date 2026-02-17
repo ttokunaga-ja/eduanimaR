@@ -49,7 +49,35 @@ Last-updated: 2026-02-16
 
 ---
 
-## 1) ワークフロー（固定）
+## 1) 契約の配置場所（SSOT）
+
+### バックエンド（Professor）側
+- **OpenAPI定義**: `eduanimaR_Professor/docs/openapi.yaml`
+  - Phase 1必須エンドポイント:
+    - `POST /v1/auth/dev-login` (開発認証)
+    - `POST /v1/qa/stream` (SSE応答)
+    - `GET /v1/subjects` (科目一覧)
+    - `GET /v1/subjects/{subject_id}/materials` (資料一覧)
+
+### フロントエンド側
+- **生成先**: `src/shared/api/generated/`
+- **生成ツール**: Orval（設定: `orval.config.ts`）
+
+### 生成コマンド
+```bash
+npm run api:generate
+```
+
+### 生成物の確認
+- 型定義: `src/shared/api/generated/api.ts`
+- クライアント関数: `src/shared/api/generated/client.ts`
+
+### CI での検証
+- `contract-codegen-check`で差分を検出（`../05_operations/CI_CD.md`参照）
+
+---
+
+## 2) ワークフロー（固定）
 
 1. **OpenAPI の取得**：バックエンドリポジトリ/環境から最新の `openapi.yaml`（または `openapi.json`）を取得
 2. **コード生成**：以下のコマンドを実行し、`src/shared/api` を更新
@@ -67,7 +95,7 @@ Last-updated: 2026-02-16
 
 ---
 
-## 2) ディレクトリ規約（推奨）
+## 3) ディレクトリ規約（推奨）
 
 ```text
 src/shared/api/
@@ -83,7 +111,7 @@ src/shared/api/
 
 ---
 
-## 3) baseURL / 認証（ポリシー）
+## 4) baseURL / 認証（ポリシー）
 
 ### baseURL
 - baseURL は環境変数で切り替える（ハードコード禁止）
@@ -268,7 +296,7 @@ export const baseURL =
 
 ---
 
-## 4) 生成設定（方針）
+## 5) 生成設定（方針）
 
 プロジェクト固有の Orval 設定（`orval.config.*` 等）は、以下を満たすようにする：
 
@@ -278,7 +306,7 @@ export const baseURL =
 
 ---
 
-## 5) 禁止（AI/人間共通）
+## 6) 禁止（AI/人間共通）
 
 - コンポーネント内での手書き `fetch` / `axios`（生成物がある前提）
 - エンドポイント/型の推測実装（OpenAPI に寄せる）
@@ -286,14 +314,14 @@ export const baseURL =
 
 ---
 
-## 6) Agent への最重要指示
+## 7) Agent への最重要指示
 
 バックエンドへのリクエストが必要な場合は、必ず `src/shared/api`（Public API）経由の生成物を使用してください。
 `fetch` や `axios.get` を直接コンポーネントに書かないでください。
 
 ---
 
-## 7) SSR/Hydration（必須）との統合
+## 8) SSR/Hydration（必須）との統合
 
 本テンプレートでは SSR/Hydration を **必須（Must）** とします。
 そのため「サーバで取得して HTML に載せる」か「クライアントで hooks が取得する」かを、暗黙で混ぜないことが重要です。
@@ -315,7 +343,7 @@ SSR/Hydration で初期表示データを埋めたい場合（推奨）：
 
 ---
 
-## 8) CI（Must）: 生成物ドリフト検出（api:generate の差分を落とす）
+## 9) CI（Must）: 生成物ドリフト検出（api:generate の差分を落とす）
 
 目的：
 - PR 時点で **OpenAPI / 生成設定 / 生成物** の整合性を強制し、契約ズレを運用で発見しない

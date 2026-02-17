@@ -32,3 +32,20 @@ Gemini 3 Flash を用いて検索戦略・停止判断・エビデンス選定�
 - DB/インデックス/バッチ処理（Professor の責務）
 - gRPC 以外の内部 RPC 方式の独自採用（Professor との契約は gRPC/Proto が正）
 
+## Phase 1での取り扱い
+
+**Phase 1では本サービス（Librarian）は未実装**
+
+- Phase 1（ローカル開発・認証スキップ）では、Professorが直接Gemini 2.0 Flashを呼び出す
+- Phase 2（SSO認証実装）でもLibrarianは不要
+- **Phase 3（推論ループ連携）で初めてLibrarianを実装・統合する**
+
+### Phase 3での責務
+- 検索戦略立案（Plan）
+- 検索結果の評価・停止判断（Evaluate/Decide）
+- エビデンス選定（Rank）
+
+### Phase 3での統合準備
+- gRPC契約（`eduanimaR_Professor/proto/librarian/v1/librarian.proto`）は既に定義済み
+- Professorは「Librarian未起動でも動作する」設計（Phase 1/2での後方互換）
+
