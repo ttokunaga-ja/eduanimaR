@@ -10,6 +10,72 @@
 0. `00_quickstart/QUICKSTART.md`
 1. `00_quickstart/PROJECT_DECISIONS.md`（プロジェクト固有の決定事項SSOT）
 
+---
+
+## Phase 1 OpenAPI仕様（最小版）
+
+Professor の外向きAPI契約は、以下の最小セットから開始する。
+
+### 必須エンドポイント
+
+#### 1. 資料アップロード
+```
+POST /subjects/{subjectId}/materials
+Content-Type: multipart/form-data
+
+Request:
+  - file: binary（PDF/PowerPoint）
+
+Response (202 Accepted):
+{
+  "material_id": "uuid",
+  "status": "processing"
+}
+```
+
+#### 2. 質問応答
+```
+POST /qa
+Content-Type: application/json
+
+Request:
+{
+  "subject_id": "uuid",
+  "question": "string"
+}
+
+Response (200 OK):
+{
+  "answer": "string",
+  "evidences": [
+    {
+      "material_id": "uuid",
+      "page_start": integer,
+      "page_end": integer,
+      "snippet_markdown": "string"
+    }
+  ]
+}
+```
+
+#### 3. 処理状態確認
+```
+GET /materials/{materialId}/status
+
+Response (200 OK):
+{
+  "material_id": "uuid",
+  "status": "ready" | "processing" | "failed",
+  "progress": integer (0-100)
+}
+```
+
+### OpenAPI 3.1.0完全版
+詳細な仕様は `docs/openapi.yaml` を参照してください。
+フロントエンド（eduanimaR）のOrval設定で自動生成するため、手書きクライアントは禁止。
+
+---
+
 ## まず読む（最短ルート）
 1. 技術スタック: `02_tech_stack/STACK.md`
 2. 全体構成: `01_architecture/MICROSERVICES_MAP.md`

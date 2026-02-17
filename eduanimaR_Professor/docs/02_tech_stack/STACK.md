@@ -1,5 +1,7 @@
 # STACK
 
+Last-updated: 2026-02-17
+
 ## 技術スタック（2026年2月最新版）
 
 | 項目 | バージョン | リリース日 | 備考・新機能要約 |
@@ -69,4 +71,22 @@
 ## Post-MVP候補（MVPでは使わない）
 - Elasticsearch（検索は Postgres/pgvector を正とする）
 - Debezium CDC（Elasticsearch を採用する場合の差分同期手段）
+
+---
+
+## Phase 1で明示的に使わない技術（Phase 2以降に延期）
+
+| 技術 | 延期理由 |
+|:---|:---|
+| **Kafka** | Phase 1は同期処理のみ（非同期ワーカー不要） |
+| **Elasticsearch** | Phase 1はpgvectorのみで検証（Hybrid検索はPhase 3） |
+| **Debezium CDC** | Phase 1はリアルタイム同期不要 |
+| **SSO認証** | Phase 1は固定dev-userで動作確認 |
+
+Phase 1の技術スタック（確定版）:
+- Go 1.25.7
+- PostgreSQL 18.1 + pgvector 0.8.1
+- Gemini 2.0 Flash（OCR/埋め込み）
+- Echo v5.0.1（HTTP API）
+- gRPC（Professor ↔ Librarian内部通信）
 
