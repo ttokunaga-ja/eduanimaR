@@ -337,6 +337,35 @@ DELETE FROM materials WHERE is_active = FALSE AND deleted_at < NOW() - INTERVAL 
 
 ---
 
+### 16. 会話継続と選択肢提示
+
+**問題**:
+- ユーザーが曖昧な質問をした場合、選択肢を提示して質問を具体化させたい
+- フォローアップ質問で前回の検索結果のコンテキストを引き継ぎたい
+
+**提案**:
+- `chats`テーブルに`parent_chat_id`を追加し、会話の親子関係を管理
+- 選択肢提示チャットでは資料検索を実施せず、LLMが直接選択肢を生成
+- フォローアップ質問では、親チャットの`question`をコンテキストとしてPhase 2のプロンプトに含める
+
+**フロー**:
+1. **曖昧な質問** → 選択肢提示(Chat #1, parent_chat_id=NULL)
+   - Professor → LLM (直接): 選択肢生成
+   - DB保存: question="機械学習について教えて", plan_json=NULL, actual_search_steps=0
+2. **選択肢選択** → 通常検索(Chat #2, parent_chat_id=Chat #1のID)
+   - Phase 2のプロンプトに親の質問("機械学習について教えて")を含める
+   - Professor → Librarian: Reasoning Loop実行
+3. **テキスト入力** → 通常検索(Chat #2', parent_chat_id=NULL)
+   - 新規の独立した質問として扱う
+
+**決定事項** (要記入):
+- [x] 選択肢提示でのLibrarian関与: 不要(Professor直接LLM呼び出し)
+- [x] 選択肢提示での資料検索: 実施しない
+- [ ] 会話ツリーの最大深さ: `無制限` / `3階層` / `5階層` / その他
+- [ ] 親チャットのコンテキスト渡し方法: `Phase 2プロンプトに含める` / その他
+
+---
+
 ## 次のステップ
 
 ### 実装開始前のチェックリスト

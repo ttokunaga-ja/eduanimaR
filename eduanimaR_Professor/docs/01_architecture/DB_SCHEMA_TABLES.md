@@ -338,6 +338,9 @@ CREATE TABLE chats (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
   
+  -- 会話の親子関係
+  parent_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
+  
   -- 質問内容
   question TEXT NOT NULL,
   
@@ -396,16 +399,23 @@ CREATE INDEX idx_chats_evidence_snippets ON chats USING GIN (evidence_snippets);
 
 -- 終了理由での分析用インデックス
 CREATE INDEX idx_chats_termination ON chats(termination_reason) WHERE is_active AND termination_reason IS NOT NULL;
+
+-- 会話ツリーの取得
+CREATE INDEX idx_chats_parent ON chats(parent_chat_id) WHERE is_active;
 ```
 
 **設計メモ**:
-- **質問・検索セッション**（Phase 2〜4の統合テーブル）
-- `plan_json` にPhase 2の計画（調査項目、終了条件、検索戦略）を保存
-- `termination_reason` で実際の検索終了理由を記録
-- `evidence_snippets` でチャンク単位の詳細根拠を保存（JSONB配列）
-- `used_raw_file_ids` でファイル単位の引用リストを保存（UUID配列）
-- `max_search_steps` を削除（plan_json内のtermination_conditionsに含まれる）
-- `feedback_comment` を削除（シンプル化）
+- **質問・検索セッション**(Phase 2〜4の統合テーブル)
+- `parent_chat_id`で会話の親子関係を管理:
+  - NULL: 独立した新規質問
+  - 値あり: フォローアップ質問、または選択肢選択後の質問
+- 選択肢提示チャットの特徴:
+  - `plan_json`: NULL (Phase 2未実行)
+  - `actual_search_steps`: 0 (Librarianループなし)
+  - `used_raw_file_ids`: [] (資料未使用)
+  - `evidence_snippets`: NULL
+  - `final_answer_markdown`: LLMが生成した選択肢テキスト
+- `plan_json`にPhase 2の計画(調査項目、終了条件、検索戦略)を保存
 
 ---
 
