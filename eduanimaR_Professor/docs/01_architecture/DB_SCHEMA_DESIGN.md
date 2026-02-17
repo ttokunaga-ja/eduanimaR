@@ -67,3 +67,162 @@ PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（�
 ### 実装
 - [STACK.md](../02_tech_stack/STACK.md) - 技術スタック（PostgreSQL 18.1, Atlas, sqlc, pgx, pgvector）
 - [SKILL_DB_ATLAS_SQLC_PGX.md](../skills/SKILL_DB_ATLAS_SQLC_PGX.md) - 実装ガイド
+
+---
+
+## Phase 1 最小テーブル定義
+
+Last-updated: 2026-02-17  
+Status: Published  
+Owner: @ttokunaga-ja
+
+### users（ユーザー）
+
+```sql
+CREATE TABLE users (
+  user_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  email TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Phase 1固定ユーザーの初期データ
+INSERT INTO users (user_id, email) VALUES 
+  ('00000000-0000-0000-0000-000000000001', 'dev@example.com');
+```
+
+**設計意図**:
+- Phase 1では固定ユーザー1名のみ
+- Phase 2でSSO対応時に `provider`, `provider_user_id` カラムを追加予定
+- `email` は UNIQUE 制約で重複を防止
+
+### subjects（科目）
+
+```sql
+CREATE TABLE subjects (
+  subject_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  lms_course_id TEXT, -- Moodle course ID（将来の自動紐付け用）
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_subjects_user_id ON subjects(user_id);
+```
+
+**設計意図**:
+- 1ユーザーが複数の科目を管理可能
+- `lms_course_id` は将来のLMS連携用（Phase 1では未使用）
+- user_id による物理絞り込みを想定したインデックス
+
+### files（アップロードファイル）
+
+```sql
+CREATE TABLE files (
+  file_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  subject_id UUID NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  gcs_path TEXT NOT NULL, -- GCS上のパス: gs://bucket/user_id/subject_id/file_id.pdf
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending'|'processing'|'ready'|'failed'
+  error_message TEXT, -- status='failed'時のエラー詳細
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_files_subject_id ON files(subject_id);
+CREATE INDEX idx_files_status ON files(status);
+```
+
+**設計意図**:
+- `status` は ENUM を推奨するが、Phase 1では TEXT で簡易実装
+- `gcs_path` は原本の所在を示すSSOT
+- `processed_at` は処理完了時刻（NULL = 未完了）
+
+### chunks（ベクトル検索用チャンク）
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE chunks (
+  chunk_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  page_number INT, -- PDFページ番号（画像の場合はNULL）
+  chunk_index INT NOT NULL, -- ファイル内での連番
+  content TEXT NOT NULL, -- OCR/抽出されたテキスト
+  embedding vector(768) NOT NULL, -- Gemini Embedding（次元数は要確認）
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_chunks_file_id ON chunks(file_id);
+CREATE INDEX idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
+```
+
+**設計意図**:
+- pgvector 0.8.1 の HNSW インデックスを使用
+- `embedding` の次元数（768）は Gemini Embedding の仕様に依存
+- `chunk_index` でファイル内の順序を保持
+
+### ingest_jobs（非同期処理ジョブ）
+
+```sql
+CREATE TABLE ingest_jobs (
+  job_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending'|'processing'|'completed'|'failed'
+  retry_count INT NOT NULL DEFAULT 0,
+  max_retries INT NOT NULL DEFAULT 3,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_ingest_jobs_status ON ingest_jobs(status);
+CREATE INDEX idx_ingest_jobs_file_id ON ingest_jobs(file_id);
+```
+
+**設計意図**:
+- ファイル処理の非同期ジョブ管理
+- `retry_count` と `max_retries` でリトライ制御
+- `status` による進捗追跡
+
+### qa_sessions（質問応答セッション）
+
+```sql
+CREATE TABLE qa_sessions (
+  session_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  answer TEXT, -- 最終回答（SSE完了後に保存）
+  sources JSONB, -- 参照元: [{ file_id, chunk_id, page_number, excerpt }]
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  answered_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_qa_sessions_user_id ON qa_sessions(user_id);
+CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions(subject_id);
+```
+
+**設計意図**:
+- 質問応答の履歴を保存（分析・改善用）
+- `sources` は JSONB で柔軟に参照元を記録
+- `answered_at` が NULL の場合は未回答（タイムアウト/エラー）
+
+## マイグレーション方針
+
+- **ツール**: Atlas（`atlas migrate diff`, `atlas migrate apply`）
+- **Phase 1 初期セットアップ**:
+  1. `uuid_generate_v7()` 拡張をインストール（PostgreSQL 18.1以降）
+  2. `vector` 拡張をインストール（pgvector 0.8.1）
+  3. 上記6テーブルを作成
+  4. 固定ユーザーを INSERT
+
+- **Phase 1→Phase 2 移行時の変更点**:
+  - `users` テーブルに `provider`, `provider_user_id` カラムを追加（SSO対応）
+  - 固定ユーザー（`dev@example.com`）を削除
+  - 既存の `subjects`, `files` は保持（user_id の再紐付けは不要）
+  - `status` カラムを TEXT から ENUM に変更（型安全性向上）
