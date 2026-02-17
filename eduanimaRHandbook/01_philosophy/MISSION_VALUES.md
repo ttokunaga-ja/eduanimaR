@@ -1,9 +1,9 @@
 Title: Mission & Values
 Description: eduanimaR のミッション／ビジョン／バリュー（提供目的と原則の定義）
-Owner: @OWNER
+Owner: @ttokunaga-ja
 Reviewers: @reviewer1
-Status: Draft
-Last-updated: 2026-02-14
+Status: Published
+Last-updated: 2026-02-17
 Tags: philosophy, mission
 
 # Mission / Vision / Values
@@ -78,6 +78,24 @@ North Star（指標の考え方）:
 ### V5. Respect Content Rights（権利の尊重）
 扱う資料の権利と取り扱い条件を尊重し、責任境界を明確にする。
 - 判断の問い: “このデータを保持・加工してよい根拠が明確か？”
+
+## 研究的位置づけ（Research Context）
+
+本プロジェクトは、以下の研究課題に取り組むための実証プラットフォームとして位置づけられる：
+
+1. **LLMの教育的応用における信頼性検証**
+   - 根拠提示が学習者の理解度に与える影響
+   - ハルシネーション抑制手法の実環境評価
+   
+2. **マルチモーダル資料解析の実用性検証**
+   - 図表・数式を含む学術資料のOCR精度
+   - Vision + Language統合推論の教育効果
+   
+3. **学習行動データの倫理的取扱い**
+   - 最小限のデータ収集で成立する学習支援の可能性
+   - プライバシー保護と教育効果のトレードオフ分析
+
+本サービスは**非営利の研究プロジェクト**として運用し、収益化は研究完了後の検討事項とする。
 
 ## 01章のスコープ（他章との責務分離）
 - 本章で定義する: 目的、原則、価値観、信頼・安全に関する基本姿勢。
