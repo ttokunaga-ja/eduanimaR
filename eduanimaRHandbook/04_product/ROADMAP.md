@@ -35,7 +35,8 @@ Tags: product, roadmap
 LLMによる資料ベース学習支援の**技術的実現可能性**と**学習効果の測定可能性**を検証する。
 
 ### 提供する機能（スコープ固定）
-- ✅ 資料アップロード（Web UIから手動、PDF/PowerPoint対応）
+- ✅ 資料アップロード（開発環境: curl/Postman等でProfessor API直接呼び出し、PDF/PowerPoint対応）
+- ✅ Chrome拡張機能の実装と検証（LMS資料自動検知・自動アップロード機能、ローカル読み込みで動作確認）
 - ✅ OCR + 構造化（Gemini 2.0 Flash使用）
 - ✅ pgvector埋め込み生成・保存（HNSW検索）
 - ✅ Q&A（単一科目内検索 + 根拠提示）
@@ -43,7 +44,9 @@ LLMによる資料ベース学習支援の**技術的実現可能性**と**学�
 
 ### 明示的なスコープ外（Phase 2以降に延期）
 - ❌ SSO認証（Phase 1は固定のdev-userを使用）
-- ❌ Chrome拡張機能（Phase 1はWeb UIのみ）
+- ❌ Chrome Web Storeへの公開（Phase 2で実施）
+- ❌ Web版からのファイルアップロードUI（全Phase禁止）
+- ❌ Web版からのユーザー登録（全Phase禁止、拡張機能のみ）
 - ❌ 複数ユーザー対応（Phase 1は単一ユーザー想定）
 - ❌ 小テストHTML解析（Phase 4の機能）
 - ❌ 学習計画自動生成（Phase 4の機能）
