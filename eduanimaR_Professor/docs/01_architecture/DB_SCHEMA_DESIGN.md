@@ -70,30 +70,36 @@ PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（�
 
 ---
 
-## Phase 1 最小テーブル定義
+## Phase 1 テーブル定義
 
-Last-updated: 2026-02-17  
-Status: Published  
+Last-updated: 2026-02-18
+Status: Published
 Owner: @ttokunaga-ja
 
 ### users（ユーザー）
 
 ```sql
+CREATE TYPE auth_provider AS ENUM ('google', 'meta', 'microsoft', 'line');
+
 CREATE TABLE users (
-  user_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-  email TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  user_id          UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+  email            TEXT         UNIQUE NOT NULL,
+  -- SSO カラム: Phase 1 では NULL、Phase 2 で実際に使用
+  provider         auth_provider            NULL,
+  provider_user_id TEXT                     NULL,
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CONSTRAINT users_provider_unique UNIQUE (provider, provider_user_id)
 );
 
 -- Phase 1固定ユーザーの初期データ
-INSERT INTO users (user_id, email) VALUES 
+INSERT INTO users (user_id, email) VALUES
   ('00000000-0000-0000-0000-000000000001', 'dev@example.com');
 ```
 
 **設計意図**:
-- Phase 1では固定ユーザー1名のみ
-- Phase 2でSSO対応時に `provider`, `provider_user_id` カラムを追加予定
+- `provider`, `provider_user_id` は Phase 1 から定義（NULLABLE）。Phase 2（SSO）で実際に使用する。
+- Phase 2 への移行時に ALTER TABLE 不要。固定 dev-user を DELETE するのみ。
 - `email` は UNIQUE 制約で重複を防止
 
 ### subjects（科目）
@@ -119,25 +125,27 @@ CREATE INDEX idx_subjects_user_id ON subjects(user_id);
 ### files（アップロードファイル）
 
 ```sql
+CREATE TYPE file_status AS ENUM ('pending', 'processing', 'ready', 'failed');
+
 CREATE TABLE files (
-  file_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-  subject_id UUID NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  gcs_path TEXT NOT NULL, -- GCS上のパス: gs://bucket/user_id/subject_id/file_id.pdf
-  mime_type TEXT NOT NULL,
-  size_bytes BIGINT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending', -- 'pending'|'processing'|'ready'|'failed'
-  error_message TEXT, -- status='failed'時のエラー詳細
-  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  processed_at TIMESTAMPTZ
+  file_id       UUID        PRIMARY KEY DEFAULT uuid_generate_v7(),
+  subject_id    UUID        NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
+  name          TEXT        NOT NULL,
+  gcs_path      TEXT        NOT NULL,  -- GCS上のパス: gs://bucket/user_id/subject_id/file_id.pdf
+  mime_type     TEXT        NOT NULL,
+  size_bytes    BIGINT      NOT NULL,
+  status        file_status NOT NULL DEFAULT 'pending',
+  error_message TEXT,                  -- status='failed'時のエラー詳細
+  uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at  TIMESTAMPTZ
 );
 
 CREATE INDEX idx_files_subject_id ON files(subject_id);
-CREATE INDEX idx_files_status ON files(status);
+CREATE INDEX idx_files_status     ON files(status);
 ```
 
 **設計意図**:
-- `status` は ENUM を推奨するが、Phase 1では TEXT で簡易実装
+- `status` は ENUM 型（typo・バリデーション漏れを防止）
 - `gcs_path` は原本の所在を示すSSOT
 - `processed_at` は処理完了時刻（NULL = 未完了）
 
@@ -168,26 +176,28 @@ CREATE INDEX idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_
 ### ingest_jobs（非同期処理ジョブ）
 
 ```sql
+CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
+
 CREATE TABLE ingest_jobs (
-  job_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-  file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'pending', -- 'pending'|'processing'|'completed'|'failed'
-  retry_count INT NOT NULL DEFAULT 0,
-  max_retries INT NOT NULL DEFAULT 3,
+  job_id        UUID       PRIMARY KEY DEFAULT uuid_generate_v7(),
+  file_id       UUID       NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  status        job_status NOT NULL DEFAULT 'pending',
+  retry_count   INT        NOT NULL DEFAULT 0,
+  max_retries   INT        NOT NULL DEFAULT 3,
   error_message TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at    TIMESTAMPTZ,
+  completed_at  TIMESTAMPTZ
 );
 
-CREATE INDEX idx_ingest_jobs_status ON ingest_jobs(status);
+CREATE INDEX idx_ingest_jobs_status  ON ingest_jobs(status);
 CREATE INDEX idx_ingest_jobs_file_id ON ingest_jobs(file_id);
 ```
 
 **設計意図**:
-- ファイル処理の非同期ジョブ管理
+- Kafka非同期パイプライン（OCR/Embedding）のジョブ管理
+- `status` は ENUM 型（typo・バリデーション漏れを防止）
 - `retry_count` と `max_retries` でリトライ制御
-- `status` による進捗追跡
 
 ### qa_sessions（質問応答セッション）
 
@@ -223,22 +233,16 @@ CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions(subject_id);
 
 ## Phase 1→Phase 2 移行時のDB変更
 
-### users テーブルの拡張
-
-Phase 1では固定のdev-userを使用しますが、Phase 2でSSO認証を導入するため、以下のカラムを追加します。
-
-```sql
-ALTER TABLE users 
-ADD COLUMN provider TEXT, -- 'google' | 'meta' | 'microsoft' | 'line'
-ADD COLUMN provider_user_id TEXT, -- SSOプロバイダーのユーザーID
-ADD CONSTRAINT users_provider_unique UNIQUE (provider, provider_user_id);
-```
-
 ### マイグレーション方針
 
-1. Phase 1の固定ユーザー（`dev@example.com`）は削除
+1. Phase 1の固定dev-user（`dev@example.com`）を削除
 2. 既存の `subjects`, `files`, `qa_sessions` は保持（user_idの再紐付けは不要）
-3. `status` カラムをTEXTからENUMに変更（型安全性向上）
+3. `users.provider`, `users.provider_user_id` は Phase 1 から定義済み（ALTER TABLE 不要）
+
+```sql
+-- Phase 1固定ユーザーの削除（Phase 2移行時）
+DELETE FROM users WHERE user_id = '00000000-0000-0000-0000-000000000001';
+```
 
 ### Phase 2以降のSSO認証フロー
 
@@ -251,26 +255,8 @@ ADD CONSTRAINT users_provider_unique UNIQUE (provider, provider_user_id);
 
 ---
 
-- **Phase 1→Phase 2 移行時の変更点（詳細実装）**:
-  - `users` テーブルに `provider`, `provider_user_id` カラムを追加（SSO対応）
-    ```sql
-    ALTER TABLE users ADD COLUMN provider TEXT; -- 'google', 'meta', 'microsoft', 'line'
-    ALTER TABLE users ADD COLUMN provider_user_id TEXT; -- SSO プロバイダーのユーザーID
-    CREATE UNIQUE INDEX idx_users_provider_user_id ON users(provider, provider_user_id);
-    ```
-  - 固定ユーザー（`dev@example.com`）を削除
-    ```sql
-    DELETE FROM users WHERE user_id = '00000000-0000-0000-0000-000000000001';
-    ```
-  - 既存の `subjects`, `files` は保持（user_id の再紐付けは不要）
-  - `status` カラムを TEXT から ENUM に変更（型安全性向上）
-    ```sql
-    CREATE TYPE file_status AS ENUM ('processing', 'ready', 'failed');
-    ALTER TABLE files ALTER COLUMN status TYPE file_status USING status::file_status;
-    ```
-
 - **Phase 2→Phase 3 移行時の変更点**:
-  - 変更なし（拡張機能のChrome Web Store公開のみ）
+  - 変更なし（Chrome Web Store公開のみ、バックエンド変更なし）
 
 - **Phase 3→Phase 4 移行時の変更点**:
   - 画面解説機能用のテーブル追加（未確定）

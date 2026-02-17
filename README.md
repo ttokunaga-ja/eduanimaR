@@ -26,30 +26,46 @@
 
 ## Phase 1開発開始チェックリスト
 
-このリストは、Phase 1（ローカル開発・認証スキップ）の実装を開始する前に満たすべき条件です。
+このリストは、Phase 1（ローカル開発・Web版完全動作）の実装を開始する前に満たすべき条件です。
 
 ### 契約・定義（MUST）
 - [ ] `eduanimaR_Professor/docs/openapi.yaml`が以下を定義:
   - `POST /v1/auth/dev-login`
-  - `POST /v1/qa/stream`
+  - `POST /v1/subjects/{subject_id}/chats`（SSE）
   - `GET /v1/subjects`
   - `GET /v1/subjects/{subject_id}/materials`
-- [ ] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み（Phase 3準備）
+  - `GET /v1/subjects/{subject_id}/chats`
+  - `POST /v1/subjects/{subject_id}/chats/{chat_id}/feedback`
+- [ ] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
+- [ ] `eduanimaR_Professor/docs/openapi.librarian.yaml`のgRPC位置づけが明記されている
 
 ### バックエンド（Professor）
 - [ ] `eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある
 - [ ] `eduanimaR_Professor/docs/05_operations/CI_CD.md`の最低ゲート（lint/test/contract drift）が実装可能
-- [ ] `docker-compose.yml`でProfessor + PostgreSQL + Kafkaが起動できる
+- [ ] `docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる
+- [ ] Professor ↔ Librarian gRPC双方向ストリーミングが実装できる（プロトコル: `proto/librarian/v1/librarian.proto`）
+- [ ] Kafka非同期パイプライン（OCR/Embedding）が実装できる
 
-### フロントエンド（eduanimaR）
+### フロントエンド（eduanimaR Web版）
 - [ ] `orval.config.ts`がProfessorの`openapi.yaml`を参照している
 - [ ] `eduanimaR/docs/03_integration/AUTH_SESSION.md`のPhase 1認証スキップ方針が実装可能
 - [ ] `http://localhost:8080`でProfessorに接続できる
+- [ ] Web版固有機能（科目プルダウン・資料一覧・会話履歴）が実装できる
 
 ### Librarian
 - [ ] `eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`の責務境界が明確
-- [ ] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み
-- [ ] Professor ↔ Librarian gRPC双方向ストリーミングの完全実装が完了している
+- [ ] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
+- [ ] gRPC双方向ストリーミング接続の準備が整っている
 
 ### 開発開始の判断
 上記のうち、**契約・定義** と **バックエンド（Professor）** の項目が全て満たされた時点で、Phase 1の実装を開始できます。
+
+### Phase別スコープ概要
+
+| Phase | ゴール |
+|---|---|
+| Phase 1 | バックエンド完全版（Kafka/gRPC）+ Web版全機能動作（dev-user固定） |
+| Phase 2 | Chrome拡張機能（ZIP配布）+ SSO認証 |
+| Phase 3 | Chrome Web Store公開 |
+| Phase 4 | 閲覧画面HTML+画像取得→LLM解説（小テスト支援） |
+| Phase 5 | 学習計画機能（構想段階） |

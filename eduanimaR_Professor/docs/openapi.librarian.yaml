@@ -3,8 +3,13 @@ info:
   title: eduanimaR Librarian API
   version: 0.1.0
   description: |
-    Professor ↔ Librarian（Python）の内部API契約。
-    このファイルが SSOT（契約の正）であり、HTTP/JSON のみを対象とする。
+    Professor ↔ Librarian（Python）の内部API契約（参考定義）。
+
+    ## 重要: gRPC が SSOT
+    - **SSOT（契約の正）**: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`（gRPC / Protocol Buffers）
+    - **このファイルの位置づけ**: gRPC設計の参考資料・HTTP/JSONフォールバック定義（gRPCが使えない環境向け）
+    - Professor ↔ Librarian の実通信は gRPC 双方向ストリーミング（Phase 1から）
+    - このファイルを直接実装に使わないこと。必ず proto ファイルを参照すること。
 servers:
   - url: /
 tags:

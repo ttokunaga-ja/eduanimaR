@@ -1,9 +1,9 @@
 Title: Technical Strategy
 Description: eduanimaR の技術方針（セキュリティ前提、検索/OCR、データ基盤、コンポーネント責務）を実装詳細抜きで定義
-Owner: @OWNER
-Reviewers: @reviewer1
-Status: Draft
-Last-updated: 2026-02-14
+Owner: @ttokunaga-ja
+Reviewers: @ttokunaga-ja
+Status: Published
+Last-updated: 2026-02-18
 Tags: strategy, architecture, security, search
 
 # Technical Strategy（実装詳細は別紙）
@@ -35,8 +35,16 @@ Tags: strategy, architecture, security, search
 - 最小権限・ゼロトラスト志向を採用する（ネットワーク内だから安全、を前提にしない）
 
 ### プロダクト形態
-- Chrome拡張機能: LMS上での導線
-- Webアプリ: 検索・整理・設定・監査/履歴などの導線
+- Chrome拡張機能: LMS上での導線（**Phase 2: ZIP配布、Phase 3: Chrome Web Store公開**）
+- Webアプリ: 検索・整理・設定・監査/履歴などの導線（**Phase 1: 全機能を Web版で実装・検証**）
+
+**Phase別リリース計画（確定）**:
+| Phase | スコープ |
+|---|---|
+| Phase 1 | バックエンド完全実装（Kafka/gRPC）+ Web版全固有機能 + dev-user固定 + Q&A完全動作 |
+| Phase 2 | Chrome拡張機能ZIP配布 + SSO go-live + Web版Cloud Runデプロイ |
+| Phase 3 | Chrome Web Store審査・公開 |
+| Phase 4 | 閲覧画面HTML+画像解析（小テスト復習支援） |
 
 補足（将来の共有）:
 - 将来的に「科目の資料セット」を共有する可能性がある。

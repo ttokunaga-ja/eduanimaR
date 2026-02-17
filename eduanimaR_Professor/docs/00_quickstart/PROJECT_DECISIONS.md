@@ -2,7 +2,7 @@
 
 Owner: @ttokunaga-ja  
 Status: Published  
-Last-updated: 2026-02-17  
+Last-updated: 2026-02-18  
 Tags: professor, backend, decisions
 
 ---
@@ -24,10 +24,17 @@ eduanimaR_Professor（Go バックエンド）は、**学習効果検証のた�
 - Q&A API（単一科目内検索 + 根拠提示）
 
 ### スコープ外
-- SSO認証（dev-user固定）
-- 複数ユーザー対応
-- Kafka非同期処理（Phase 1は同期処理のみ）
+- SSO認証（dev-user固定。Phase 2でSSO実装）
+- 複数ユーザー対応（Phase 2以降）
 - Elasticsearch（Phase 1はpgvectorのみ）
+- Chrome拡張機能（Phase 2: ZIP配布）
+
+### Phase 1で実装するもの（追加確定）
+- Kafka非同期パイプライン（OCR/Embedding Ingest、Phase 1から必須）
+- Professor ↔ Librarian gRPC双方向ストリーミング（Phase 1から必須）
+- users テーブルに SSO カラム先行追加（`provider`, `provider_user_id` NULLABLE: Phase 2移行時に ALTER TABLE 不要）
+- Web版全固有機能（科目プルダウン・資料一覧・会話履歴）
+- curlによる認証不要アップロード（ローカルテスト用）
 
 ---
 
@@ -51,10 +58,23 @@ eduanimaR_Professor（Go バックエンド）は、**学習効果検証のた�
 
 ## 4. OpenAPI契約（Phase 1版）
 
-### 必須エンドポイント
-1. `POST /subjects/{subjectId}/materials` - 資料アップロード
-2. `POST /qa` - 質問応答
-3. `GET /materials/{materialId}/status` - 処理状態確認
+### 必須エンドポイント（新設計）
+| エンドポイント | 用途 |
+|---|---|
+| `POST /v1/auth/dev-login` | Phase 1固定ユーザーログイン |
+| `GET /v1/subjects` | 科目一覧（`?lms_course_id=`で拡張機能のコース判別にも使用） |
+| `POST /v1/subjects` | 科目作成 |
+| `GET /v1/subjects/{subject_id}` | 科目詳細 |
+| `DELETE /v1/subjects/{subject_id}` | 科目削除 |
+| `GET /v1/subjects/{subject_id}/materials` | 資料一覧（Web版「資料一覧」表示） |
+| `POST /v1/subjects/{subject_id}/materials` | 資料アップロード（202: Kafka非同期） |
+| `GET /v1/subjects/{subject_id}/materials/{material_id}` | 処理状態確認（ポーリング） |
+| `DELETE /v1/subjects/{subject_id}/materials/{material_id}` | 資料削除 |
+| `POST /v1/subjects/{subject_id}/chats` | 質問送信（SSEストリーミング） |
+| `GET /v1/subjects/{subject_id}/chats` | 会話履歴一覧（Web版「会話履歴」表示） |
+| `GET /v1/subjects/{subject_id}/chats/{chat_id}` | 会話詳細 |
+| `POST /v1/subjects/{subject_id}/chats/{chat_id}/feedback` | Good/Bad フィードバック |
+| `GET /healthz` / `GET /readyz` | ヘルスチェック |
 
 ### 契約の配置
 - SSOT: `eduanimaR_Professor/docs/openapi.yaml`
@@ -109,27 +129,24 @@ Owner: @ttokunaga-ja
 #### 契約SSOT
 `eduanimaR_Professor/docs/openapi.yaml`
 
-#### 最小エンドポイント（Phase 1）
+#### エンドポイント（Phase 1 確定版 / openapi.yaml 準拠）
 
-1. **POST /v1/materials**
-   - 目的: ファイルアップロード（Chrome拡張機能→Professor）
-   - Request: `multipart/form-data` (file, subject_id)
-   - Response: `{ material_id: string, job_id: string, status: "pending" }`
+エンドポイント一覧はセクション4の表を参照。
+詳細な request/response スキーマは `eduanimaR_Professor/docs/openapi.yaml` を SSOT とする。
 
-2. **POST /v1/questions** + **GET /v1/questions/{request_id}/events**
-   - 目的: 質問送信と応答受信（拡張機能/Web→Professor）
-   - Request: `{ subject_id: string, question: string }`
-   - Response (202): `{ request_id: string }`
-   - SSE Stream: `event: progress|answer|done, data: { type, content, ... }`
+**ローカルテスト用 curl サンプル（認証不要）**:
+```bash
+# 資料アップロード
+curl -X POST http://localhost:8080/v1/subjects/{subject_id}/materials \
+  -H "X-Dev-User: dev-user" \
+  -F "file=@document.pdf"
 
-3. **GET /v1/subjects/{subject_id}/materials**
-   - 目的: 科目に紐づくファイル一覧取得
-   - Response: `[{ id, filename, uploaded_at }]`
-
-4. **POST /v1/auth/dev-login** (Phase 1専用)
-   - 目的: 開発用固定ユーザー認証
-   - Response: `{ user_id: "dev-user", authenticated: true }`
-   - 注意: Phase 2でSSO実装時に削除
+# 質問送信（SSE）
+curl -N -X POST http://localhost:8080/v1/subjects/{subject_id}/chats \
+  -H "X-Dev-User: dev-user" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"決定係数の計算式を教えてください"}'
+```
 
 ### gRPC契約（Professor ↔ Librarian）
 
@@ -169,11 +186,13 @@ message ReasoningOutput {
 
 ### データフロー（Phase 1）
 
-1. **ファイルアップロード**:
-   Chrome拡張 → Professor (POST /v1/materials) → GCS → Kafka (IngestJob) → Worker (OCR/Chunk/Embed) → PostgreSQL (chunks)
+1. **ファイルアップロード**（Kafka非同期）:
+   Web/curl → Professor (`POST /v1/subjects/{subject_id}/materials`) → GCS → Kafka (IngestJob) → Worker (OCR/Chunk/Embed) → PostgreSQL (chunks)
+   - レスポンス: `202 { material_id, status: "pending" }`
+   - 処理状態確認: `GET /v1/subjects/{subject_id}/materials/{material_id}` でポーリング
 
-2. **質問応答**:
-   拡張/Web → Professor (POST /v1/questions) → Librarian (gRPC Reason) → Professor (Vector Search) → Librarian (Plan/Evaluate) → Professor (SSE via /v1/questions/{request_id}/events) → 拡張/Web
+2. **質問応答**（SSE + gRPC）:
+   Web → Professor (`POST /v1/subjects/{subject_id}/chats`) → Librarian (gRPC Reason 双方向ストリーミング) → Professor (Vector/FTS Search) → Librarian (Plan/Evaluate) → Professor (SSE: thinking/searching/evidence/chunk/done) → Web
 
 ### エラーハンドリング方針
 

@@ -3,76 +3,118 @@ Description: eduanimaR 全体の機能要件・非機能要件のサマリ
 Owner: @ttokunaga-ja
 Reviewers: @reviewer1
 Status: Published
-Last-updated: 2026-02-17
+Last-updated: 2026-02-18
 Tags: strategy, requirements
 
 # Requirements Summary
 
-## Phase別機能要件
+## プラットフォーム役割定義
 
-### Phase 1: ローカル開発・認証スキップ(2026 Q1)
-**ゴール**: Professor+Librarian基本動作確認
+### 共通機能（Web版・拡張機能版 共通）
+- Q&Aチャット: 質問入力、AI Agent進捗プログレスバー表示、回答表示
+- 根拠として使用した資料の確認（ファイル名・ページ・抜粋・クリッカブルURL）
+- ヒアリング判断時の選択肢提示（曖昧な質問に対してLLMが候補を提示）
+- 回答末尾の Good/Bad フィードバックボタン
+- 認証（再ログイン等）
+- お問い合わせ機能（Googleフォームリンク）
 
-✅ **実装する機能**:
-- ファイルアップロード(PDF/画像)
-- 自動OCR/Embedding生成(Kafka非同期)
-- 科目別資料管理(users/subjects/files/chunks)
-- 質問応答(SSE)
-- ベクトル検索(pgvector 0.8.1 HNSW)
-- 固定ユーザー認証(`dev@example.com`)
+### Web版固有機能
+- トップメニューバー中央の科目選択プルダウン（選択した科目がQ&A/資料/履歴の絞り込みに連動）
+- 資料一覧: 選択科目のみ表示 or プルダウン「全て」で科目別グループ表示
+- 会話履歴: 選択科目のみ表示 or プルダウン「全て」で科目別グループ表示
+- 大画面レイアウトによる一覧閲覧
 
-❌ **実装しない機能**:
-- SSO認証(Phase 2)
-- Chrome拡張(Phase 3)
-- gRPC双方向ストリーミング(Phase 3で実装、Phase 1はHTTP REST暫定)
+### Chrome拡張機能固有機能
+- SSO経由のユーザー登録（Chrome拡張からのみ新規登録可）
+- Moodle資料の自動検知・自動アップロード（MutationObserver）
+- 現在閲覧中LMSコースの判別 → subject_id による物理検索制限（精度向上）
+- Web版へのリンク
 
 ---
 
-### Phase 2: SSO認証・Web版公開(2026 Q2)
-**ゴール**: 一般ユーザー向けサービス公開
+## Phase別機能要件
+
+### Phase 1: バックエンド完全版 + Web版完全動作(2026 Q1)
+**ゴール**: バックエンド機能の完全実装 + ローカルでのWeb版全機能動作確認
+
+✅ **実装する機能（バックエンド）**:
+- ファイルアップロード（PDF/画像）→ GCS保存 → Kafka非同期Ingest
+- 自動OCR/Embedding生成（Kafka非同期パイプライン）
+- 科目別資料管理（users/subjects/files/chunks テーブル）
+- 質問応答（SSE: `/v1/subjects/{id}/chats`）
+- Professor ↔ Librarian gRPC双方向ストリーミング（Phase 1から完全実装）
+- ベクトル検索（pgvector 0.8.1 HNSW）
+- 全文検索（PostgreSQL tsvector）
+- 固定dev-user認証（`dev@example.com`、Phase 2でSSO置換）
+- curlによる認証不要アップロード（ローカルテスト用）
+- フィードバック保存（Good/Bad）
+- 会話履歴保存・取得API
+
+✅ **実装する機能（フロントエンド Web版）**:
+- Q&Aチャット（SSEリアルタイム表示、プログレスバー）
+- 根拠資料カード表示（クリッカブルURL）
+- ヒアリング判断時の選択肢提示UI
+- Good/Bad フィードバックボタン
+- 科目選択プルダウン（メニューバー）
+- 資料一覧（科目別フィルタ・全科目グループ表示）
+- 会話履歴（科目別フィルタ・全科目グループ表示）
+- お問い合わせリンク（Googleフォーム）
+- dev-user自動ログイン（認証UIなし）
+
+❌ **実装しない機能（Phase 2以降）**:
+- SSO認証（Phase 2）
+- Chrome拡張機能（Phase 2: ZIP配布、Phase 3: Web Store公開）
+
+---
+
+### Phase 2: Chrome拡張機能（ZIP配布）+ SSO認証(2026 Q2)
+**ゴール**: Chrome拡張機能のZIPファイル配布 + SSO認証による本番運用開始
 
 ✅ **追加機能**:
-- OAuth認証(Google/Meta/Microsoft/LINE)
-- Web版デプロイ(Cloud Run)
+- Chrome拡張機能（Plasmo / Manifest V3）→ ZIPファイルで配布
+- SSO認証（Google/Meta/Microsoft/LINE）
+- Moodle資料の自動検知・自動アップロード
+- 現在閲覧LMSコース判別 → subject_id 物理制限
+- Web版へのリンク（拡張機能から）
+- Cloud Runデプロイ（Professor/Librarian）
 - プライバシーポリシー/利用規約の法務確認
 
 DB変更:
-- `users`テーブルに`provider`, `provider_user_id`追加
-- 固定ユーザー削除
-- `status`カラムをTEXT→ENUMに変更
+- `users`テーブルの`provider`, `provider_user_id`カラムをPhase 1から追加済み（NULLABLE）→ Phase 2で実際に使用
+- 固定dev-user削除
 
 ---
 
-### Phase 3: Chrome拡張公開(2026 Q3)
-**ゴール**: LMS上での利用体験向上
+### Phase 3: Chrome Web Store公開(2026 Q3)
+**ゴール**: Chrome Web Storeでの正式公開
 
 ✅ **追加機能**:
-- Chrome拡張機能(Manifest V3)
-- gRPC双方向ストリーミング(Professor ↔ Librarian)
-- LMS資料の自動検知
+- Chrome Web Store審査対応（プライバシーポリシー・スクリーンショット等）
+- Chrome Web Store公開（非公開配布 → 公開配布へ移行）
 
 ---
 
-### Phase 4: 画面解説機能(2026 Q4)
-**ゴール**: 小テスト復習支援
+### Phase 4: 閲覧画面解説機能(2026 Q4)
+**ゴール**: 小テスト復習支援（間違った原因を資料をもとに考える支援）
 
 ✅ **追加機能**:
-- LMS画面HTML解析
-- 画面スクリーンショット解析(Vision Reasoning)
-- 短期保存(7日後自動削除)
+- 現在閲覧中LMS画面のHTML取得
+- 画面内に表示されている画像ファイル取得（図・グラフ等）
+- 取得したHTML・画像をProfessor APIへ送信→LLM解析
+- 資料を根拠とした解説生成（「なぜ間違えたか」の支援）
+- 短期保存（7日後自動削除、プライバシー配慮）
 
 DB変更:
 - `screen_analyses`テーブル追加
 
 ---
 
-### Phase 5: 学習計画機能(2027 Q1)
-**ゴール**: 個別最適化された学習ロードマップ
+### Phase 5: 学習計画機能（構想段階）(2027 Q1~)
+**ゴール**: 個別最適化された学習ロードマップ（構想段階・備考程度の位置づけ）
 
-✅ **追加機能**:
-- 学習計画生成
-- 小テスト結果分析
-- プライバシー配慮の匿名化処理
+備考:
+- 過去の小テスト結果を取得・分析し、既存資料のどこを確認すべきか・どの順序で学ぶべきかをチャット形式で提案する機能を想定
+- 学習計画生成・匿名化処理等の詳細はPhase 1〜4完了後に検討する
 
 ---
 

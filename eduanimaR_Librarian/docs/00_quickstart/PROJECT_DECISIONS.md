@@ -20,11 +20,12 @@ AI/人間が推測で穴埋めしないために、まずここを埋めてか�
 	- Librarian → DB/Index（禁止）
 
 ## 契約（Must）
-- Professor ↔ Librarian（HTTP/JSON）:
-	- OpenAPI の SSOT 置き場: `03_integration/`（方針は `API_CONTRACT_WORKFLOW.md` を正）
-	- エンドポイント: `POST /v1/librarian/search-agent`
+- **Professor ↔ Librarian（gRPC / Protocol Buffers）**:
+  - **SSOT（契約の正）**: `eduanimaR_Professor/proto/librarian/v1/librarian.proto`
+  - RPC: `LibrarianService.Reason`（双方向ストリーミング）
+  - HTTP/JSON（`openapi.librarian.yaml`）は参考定義。実装では proto を使うこと
 - 互換性ポリシー（`API_VERSIONING_DEPRECATION.md` と整合）:
-	- 追加は原則互換、削除/必須化/型変更は破壊的
+  - フィールド追加は互換、フィールド削除/番号変更は破壊的（proto のルールを遵守）
 
 ## データ（Must）
 - Librarian は DB を持たない（DB-less）

@@ -9,7 +9,7 @@ Tags: frontend, eduanimaR, project-decisions, authentication, api
 
 # Project Decisions（SSOT）
 
-Last-updated: 2026-02-16
+Last-updated: 2026-02-18
 
 このファイルは「プロジェクトごとに選択が必要」な決定事項の SSOT。
 AI/人間が推測で埋めないために、まずここを埋めてから実装する。
@@ -71,9 +71,11 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 - **導線統一**: どちらの導線でも同一のログイン体験（SSO/OAuth）と同一の権限境界を維持
 
 **Phase別の提供内容**:
-- **Phase 1（開発環境）**: 自動アップロード実装・検証、Q&A機能動作確認、Chrome拡張のLMS資料自動検知
-- **Phase 2（本番環境）**: SSO go-live、Chrome Web Store公開、Web版デプロイ、履修科目の自動同期
-- **Phase 3以降**: 学習計画生成、小テストHTML解析、コンテキスト自動認識
+- **Phase 1（バックエンド完全版 + Web版全機能）**: バックエンド完全実装（Kafka/gRPC）、Web版全固有機能（科目プルダウン・資料一覧・会話履歴）、dev-user固定、Q&A完全動作
+- **Phase 2（Chrome拡張機能ZIP + SSO）**: Chrome拡張機能ZIP配布、SSO go-live（Google/Meta/Microsoft/LINE）、Web版Cloud Runデプロイ
+- **Phase 3（Chrome Web Store公開）**: Chrome Web Store審査・公開
+- **Phase 4**: 閲覧画面HTML+画像解析（小テスト復習支援）
+- **Phase 5（構想段階）**: 学習計画機能
 
 **参照元SSOT**:
 - [`../../eduanimaRHandbook/04_product/ROADMAP.md`](../../eduanimaRHandbook/04_product/ROADMAP.md)
@@ -218,9 +220,9 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 ## 重要な実装フロー: 汎用質問対応パイプライン
 
 ### 単一フロー（すべてのユースケースで共通）
-1. **Frontend → Professor**: ユーザーが質問を送信（SSE接続開始）
-   - エンドポイント: `POST /v1/qa/ask` + SSE
-   - リクエスト例: `{"question": "決定係数とは？", "subject_id": "xxx-xxx-xxx"}`
+1. **Frontend → Professor**: ユーザーが質問を送信（SSEストリーミング）
+   - エンドポイント: `POST /v1/subjects/{subject_id}/chats`
+   - リクエスト例: `{"question": "決定係数の計算式を教えてください"}`
 
 2. **Professor → Frontend**: SSEイベントで推論状態を配信
    - `thinking` → `searching` → `evidence` → `answer` → `done`
@@ -287,7 +289,8 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 ### Professor / Librarian の責務境界
 
 **Professor（Go）の責務**（データ所有者、外部API提供者）:
-- **HTTP/JSONのみを提供**: 外向きAPI（HTTP/JSON + SSE）、Librarianとの通信もHTTP/JSON
+- **外向きAPI**: HTTP/JSON + SSE（Frontend → Professor）
+- **内部通信**: gRPC双方向ストリーミング（Professor ↔ Librarian、Phase 1から）
 - **DB/GCS/Kafka直接アクセス**: 検索の物理実行、権限強制、最終回答生成
 - **データ変換**: Librarianの`temp_index`を安定ID（`document_id`）に変換してフロントエンドへ返却
 - **バッチ処理管理**: OCR/Embedding実行管理
@@ -297,7 +300,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 **Librarian（Python）の責務**（検索戦略立案、推論特化）:
 - **ステートレス設計**: DB直接アクセスなし、会話履歴なし、キャッシュなし（1リクエストで推論完結）
 - **Librarian推論ループ実行**: LangGraph Agentによる最大5回の反復戦略立案
-- **Professor経由でのみ検索実行**: HTTP/JSON経由でProfessorに検索を要求（DB/GCSに直接アクセスしない）
+- **Professor経由でのみ検索実行**: gRPC SearchRequestでProfessorに検索を要求（DB/GCSに直接アクセスしない）
 - **選定エビデンス抽出**: 停止条件判定、根拠箇所選定
 - **Librarian推論ループパラメータ**:
   - `max_retries`: Librarian推論ループの上限回数（例: 5回）
@@ -348,7 +351,7 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 - Librarian サービス仕様: [`../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md`](../../eduanimaRHandbook/02_strategy/SERVICE_SPEC_EDUANIMA_LIBRARIAN.md)
 
 ### 用語の統一（必須）
-- **Librarian推論ループ**: Librarianが検索戦略を立案し、Professor経由でHTTP/JSON検索を実行する反復プロセス（最大5回）
+- **Librarian推論ループ**: Librarianが検索戦略を立案し、gRPC SearchRequestでProfessorに検索実行を要求する反復プロセス（最大5回）
 - **選定エビデンス**: Librarianが選定した根拠箇所（`selected_evidence`）
 - **temp_index**: LLM可視の一時参照ID（Professorが安定ID `document_id` に変換してフロントエンドへ返却）
 - **ハイブリッド検索**: ベクトル検索（コサイン類似度）とキーワード検索（BM25）をRRFで統合した検索手法
@@ -421,15 +424,15 @@ export const EXTENSION_URLS = {
 
 ### バックエンド境界（厳格な責務分離）
 - **Professor（Go）**: データの守護者、APIのSSOT（OpenAPI）、唯一DBに直接アクセス
-  - **HTTP/JSONのみを提供**: 外部API、Librarianとの通信もHTTP/JSON
-  - Librarian推論ループを`POST /v1/librarian/search-agent`（HTTP/JSON）で呼び出し
-  - Librarianの`selected_evidence`（`temp_index`配列）を受け取り、安定ID（`document_id`）に変換
+  - **外向きAPI**: HTTP/JSON + SSE（Frontend → Professor）
+  - **内部通信**: gRPC双方向ストリーミング（Professor ↔ Librarian）でLibrarianを呼び出し
+  - Librarianの`Final`メッセージ（資料ID/根拠）を受け取り、最終回答を生成してフロントエンドへ返却
   - 動的k値設定、ハイブリッド検索（RRF統合）の物理実行
   - **参照**: [`../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md)
 - **Librarian（Python）**: Librarian推論ループ専門サービス（**ステートレス、Professorのみが呼ぶ**）
   - **DB直接アクセスなし、会話履歴なし、キャッシュなし**（1リクエスト内で推論完結）
   - `max_retries`上限でLibrarian推論ループを制御
-  - Professor経由でHTTP/JSON検索実行を要求
+  - gRPC SearchRequest で Professor に検索実行を要求（DB直接アクセスなし）
   - **参照**: [`../../eduanimaR_Librarian/docs/SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/SERVICE_SPEC.md)
 - **フロントエンド**: Professor の OpenAPI（HTTP/JSON + SSE）のみを呼ぶ
   - **Librarianへの直接通信は禁止**
@@ -438,18 +441,15 @@ export const EXTENSION_URLS = {
 - ユーザー別データ分離がデフォルト
 - 共有範囲: 将来「科目の資料セット」のみ共有、質問履歴や学習ログは共有しない
 
-### ロードマップ（Phase 1〜4）
-- **Phase 1**: ローカル開発、基本的なQ&A機能、資料管理
-- **Phase 2**: SSO認証、本番環境デプロイ
-- **Phase 3**: Librarian推論ループ連携、高度な検索
-  - **Librarian推論ループ連携UI要件**:
-    - Librarian推論ループ進行表示（`widgets/search-loop-status`）
-    - 選定エビデンス表示（`entities/evidence`）
-    - 推論理由の可視化（なぜこの選定エビデンスが選ばれたか）
+### ロードマップ（Phase 1〜5）
+- **Phase 1（バックエンド完全実装 + Web版全機能）**: バックエンド完全実装（Kafka/gRPC）、Web版全固有機能（科目プルダウン・資料一覧・会話履歴）、dev-user固定、Q&A完全動作
+  - **Phase 1 UI実装範囲**: `features/qa-chat`、`entities/subject`、`widgets/file-tree`
+- **Phase 2（Chrome拡張機能ZIP + SSO）**: Chrome拡張機能ZIP配布、SSO go-live、Cloud Runデプロイ
+  - **Phase 2 UI追加**: Librarian推論ループ進行表示（`widgets/search-loop-status`）、選定エビデンス表示（`entities/evidence`）
   - Professor SSEでのリアルタイム配信（`search_loop_progress`、`evidence_selected`イベント）
-  - ハイブリッド検索（RRF統合）の完全実装
-  - 動的k値設定による探索範囲最適化
-- **Phase 4**: 学習計画、進捗管理
+- **Phase 3（Chrome Web Store公開）**: Chrome Web Store審査・公開
+- **Phase 4（HTML解析）**: 閲覧画面HTML+画像解析（小テスト復習支援）
+- **Phase 5（構想段階）**: 学習計画機能
 
 ---
 
@@ -457,9 +457,10 @@ export const EXTENSION_URLS = {
 
 ### サービス境界（厳格な責務分離）
 - **Professor（Go）**: データ所有者。DB/GCS/Kafka直接アクセス。外向きAPI（HTTP/JSON + SSE）。
-  - **HTTP/JSONのみを提供**: Librarianとの通信もHTTP/JSON（gRPCではない）
+  - **外向きAPI**: HTTP/JSON + SSE（Frontend → Professor）
+  - **内部通信**: gRPC双方向ストリーミング（Professor ↔ Librarian、Phase 1から）
   - **参照**: [`../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md`](../../eduanimaR_Professor/docs/MICROSERVICES_MAP.md)
-- **Librarian（Python）**: 推論特化。Professor経由でのみHTTP/JSON検索実行。**ステートレス・DB直接アクセスなし**。
+- **Librarian（Python）**: 推論特化。gRPC経由でProfessorと通信。**ステートレス・DB直接アクセスなし**。
   - **参照**: [`../../eduanimaR_Librarian/docs/SERVICE_SPEC.md`](../../eduanimaR_Librarian/docs/SERVICE_SPEC.md)
 - **Frontend（Next.js + FSD）**: Professorの外部APIのみを呼ぶ。**Librarianへの直接通信は禁止**。
 
@@ -470,20 +471,18 @@ export const EXTENSION_URLS = {
 
 ### ファイルアップロード
 - **フロントエンドの責務範囲**: フロントエンドはファイルアップロードUIを持たない
-- **Phase 1（開発環境）**: 
-  - Web版: 外部ツール（curl, Postman等）でProfessor APIへ直接アップロード
-  - 拡張機能: 自動アップロード機能の実装と検証（ローカルでのChromeへの読み込み）
-- **Phase 2（本番環境）**: Chrome拡張機能による自動アップロードのみ（Phase 1で実装済みの機能を本番適用）
+- **Phase 1（開発環境）**: 外部ツール（curl, Postman等）でProfessor APIへ直接アップロード（Chrome拡張機能はPhase 2）
+- **Phase 2（Chrome拡張機能ZIP配布）**: Chrome拡張機能による自動アップロードのみ
 - **禁止事項**: Web版にファイルアップロード機能を実装してはならない
 
-### 自動アップロード機能
-- **Phase 1で実装**: Chrome拡張機能のLMS資料自動検知・アップロード機能を完全実装
+### 自動アップロード機能（Chrome拡張機能）
+- **Phase 2で実装・ZIP配布**: Chrome拡張機能のLMS資料自動検知・アップロード機能
 - **実装内容**:
   - Content Scriptによる資料リンク検知
   - Background Serviceによる定期チェック
-  - Professor APIへの自動送信
-- **Phase 1での検証方法**: Chromeにローカルで拡張機能を読み込み、Moodleテストサイトで動作確認
-- **Phase 2で公開**: Chrome Web Storeへ公開し、本番環境で提供
+  - Professor APIへの自動送信（`POST /v1/subjects/{subject_id}/materials`）
+- **Phase 2での検証方法**: Chromeにローカルで拡張機能を読み込み、Moodleテストサイトで動作確認
+- **Phase 3で公開**: Chrome Web Store審査・公開
 
 ### データ境界
 - user_id / subject_id による厳格な分離（Professor側で強制）

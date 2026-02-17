@@ -1,6 +1,6 @@
 # STACK
 
-Last-updated: 2026-02-17
+Last-updated: 2026-02-18
 
 ## 技術スタック（2026年2月最新版）
 
@@ -79,15 +79,15 @@ Last-updated: 2026-02-17
 
 | 技術 | 延期理由 |
 |:---|:---|
-| **Kafka** | Phase 1は同期処理のみ（非同期ワーカー不要） |
-| **Elasticsearch** | Phase 1はpgvectorのみで検証（Hybrid検索はPhase 3） |
+| **Elasticsearch** | Phase 1はpgvectorのみで検証（Hybrid検索はPhase 3以降） |
 | **Debezium CDC** | Phase 1はリアルタイム同期不要 |
-| **SSO認証** | Phase 1は固定dev-userで動作確認 |
+| **SSO認証** | Phase 1は固定dev-userで動作確認（Phase 2でSSO実装） |
 
 Phase 1の技術スタック（確定版）:
 - Go 1.25.7
 - PostgreSQL 18.1 + pgvector 0.8.1
+- Kafka（非同期OCR/Embedding Ingestパイプライン）
 - 高速推論モデル（OCR/埋め込み）
 - Echo v5.0.1（HTTP API）
-- gRPC（Professor ↔ Librarian内部通信）
+- gRPC（Professor ↔ Librarian内部通信、Phase 1から完全実装）
 

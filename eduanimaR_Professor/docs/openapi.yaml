@@ -4,10 +4,20 @@ info:
   version: 1.0.0
   description: |
     Professor API (HTTP/JSON + SSE)
-    Phase 1: ローカル開発用API(認証スキップ)
+
+    ## 通信スタック
+    - Frontend ↔ Professor: HTTP/JSON + SSE（永続）
+    - Professor ↔ Librarian: gRPC双方向ストリーミング（Phase 1から）
+
+    ## Phase 1: ローカル開発
     - 全リクエストで user_id='00000000-0000-0000-0000-000000000001' を固定使用
-    - Phase 2でSSO認証実装時に /v1/auth/dev-login を削除
-    - Authorization: Bearer <token> ヘッダー検証に移行
+    - `X-Dev-User: dev-user` ヘッダーによる固定ユーザー識別
+    - Phase 2でSSO認証実装時に /v1/auth/dev-login を削除し、Authorization: Bearer <token> に移行
+
+    ## エンドポイント設計原則
+    - リソースは名詞・複数形（subjects / materials / chats）
+    - 階層ネスト: subjects 配下に materials・chats を配置
+    - SSE: POST /v1/subjects/{id}/chats → Content-Type: text/event-stream で直接ストリーム
 
 servers:
   - url: http://localhost:8080
@@ -16,24 +26,26 @@ servers:
 tags:
   - name: Auth
     description: Authentication endpoints (Phase 1 dev-only)
-  - name: Questions
-    description: Q&A and SSE streaming
   - name: Subjects
     description: Subject management
   - name: Materials
     description: Material upload and management
+  - name: Chats
+    description: Q&A chat sessions with SSE streaming
   - name: Health
     description: Health check endpoints
 
 paths:
+  # ─────────────────────────────────────────
+  # Auth
+  # ─────────────────────────────────────────
   /v1/auth/dev-login:
     post:
       tags: [Auth]
-      summary: Phase 1固定ユーザーログイン(開発用)
+      summary: Phase 1固定ユーザーログイン（開発用）
       description: |
-        Phase 1のみ有効。固定のdev-userを発行する。
-        Phase 2でSSO認証に置き換え。
-        本番環境では無効化必須。
+        Phase 1のみ有効。固定のdev-userセッションを発行する。
+        Phase 2でSSO認証に置き換え。本番環境では無効化必須。
       requestBody:
         content:
           application/json:
@@ -50,9 +62,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                  - user_id
-                  - email
+                required: [user_id, email]
                 properties:
                   user_id:
                     type: string
@@ -62,13 +72,23 @@ paths:
                     type: string
                     example: "dev@example.com"
 
+  # ─────────────────────────────────────────
+  # Subjects（科目）
+  # ─────────────────────────────────────────
   /v1/subjects:
     get:
       tags: [Subjects]
       summary: 科目一覧取得
       description: |
         ユーザーの科目一覧を取得。
-        Phase 1: user_id固定
+        拡張機能がLMSコースIDから subject_id を解決する際にも使用（?lms_course_id= クエリ）。
+      parameters:
+        - name: lms_course_id
+          in: query
+          required: false
+          description: LMSコースIDで絞り込み（拡張機能のコース判別に使用）
+          schema:
+            type: string
       responses:
         '200':
           description: 科目リスト
@@ -81,17 +101,13 @@ paths:
     post:
       tags: [Subjects]
       summary: 科目作成
-      description: |
-        新しい科目を作成。
-        Phase 1: user_id固定
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - name
+              required: [name]
               properties:
                 name:
                   type: string
@@ -107,21 +123,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Subject'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
+  /v1/subjects/{subject_id}:
+    get:
+      tags: [Subjects]
+      summary: 科目詳細取得
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+      responses:
+        '200':
+          description: 科目詳細
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Subjects]
+      summary: 科目削除
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+      responses:
+        '204':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
+  # Materials（資料）- subjects 配下にネスト
+  # ─────────────────────────────────────────
   /v1/subjects/{subject_id}/materials:
     get:
       tags: [Materials]
-      summary: 科目の資料一覧取得
+      summary: 資料一覧取得
       description: |
         指定した科目の資料一覧を取得。
-        Phase 1: user_id固定
+        Web版の「資料一覧」表示に使用。
       parameters:
-        - name: subject_id
-          in: path
-          required: true
+        - $ref: '#/components/parameters/SubjectId'
+        - name: status
+          in: query
+          required: false
+          description: 処理状態でフィルタ
           schema:
-            type: string
-            format: uuid
+            $ref: '#/components/schemas/MaterialStatus'
       responses:
         '200':
           description: 資料リスト
@@ -131,74 +179,120 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Material'
-
-  /v1/files:
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
       tags: [Materials]
-      summary: ファイルアップロード
+      summary: 資料アップロード
       description: |
-        ファイルをアップロードし、非同期処理を開始。
-        Phase 1: user_id固定
+        ファイルをアップロードし、Kafka経由で非同期処理（OCR/Embedding）を開始。
+        Phase 1: X-Dev-User ヘッダーによる固定ユーザー（認証スキップ）
+        Phase 2以降: Bearer トークンによるSSO認証
+        curlによる直接アップロード（ローカルテスト用）:
+          curl -X POST http://localhost:8080/v1/subjects/{subject_id}/materials \
+            -H "X-Dev-User: dev-user" \
+            -F "file=@document.pdf"
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - subject_id
-                - file
+              required: [file]
               properties:
-                subject_id:
-                  type: string
-                  format: uuid
                 file:
                   type: string
                   format: binary
       responses:
         '202':
-          description: アップロード受付(非同期処理開始)
+          description: アップロード受付（Kafka非同期処理開始）
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - file_id
-                  - status
+                required: [material_id, status]
                 properties:
-                  file_id:
+                  material_id:
                     type: string
                     format: uuid
                   status:
-                    type: string
-                    example: "pending"
-                    enum: [pending, processing, ready, failed]
+                    $ref: '#/components/schemas/MaterialStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  /v1/qa/stream:
-    post:
-      tags: [Questions]
-      summary: 質問応答(SSE)
+  /v1/subjects/{subject_id}/materials/{material_id}:
+    get:
+      tags: [Materials]
+      summary: 資料詳細・処理状態確認
       description: |
-        質問を送信し、Server-Sent Eventsでストリーミング応答を受信。
-        Phase 1: user_id固定
-        Phase 2以降: SSO認証必須
+        アップロード後のKafka非同期処理状態をポーリングするために使用。
+        status: pending → processing → ready | failed
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - $ref: '#/components/parameters/MaterialId'
+      responses:
+        '200':
+          description: 資料詳細
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Material'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Materials]
+      summary: 資料削除
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - $ref: '#/components/parameters/MaterialId'
+      responses:
+        '204':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
+  # Chats（Q&Aセッション）- subjects 配下にネスト
+  # ─────────────────────────────────────────
+  /v1/subjects/{subject_id}/chats:
+    post:
+      tags: [Chats]
+      summary: 質問送信（SSE ストリーミング）
+      description: |
+        質問を送信し、Server-Sent Events でリアルタイム応答を受信。
+        内部では Professor が Librarian に gRPC 双方向ストリーミングで推論を委譲する。
+        Phase 1: X-Dev-User ヘッダーによる固定ユーザー
+        Phase 2以降: Bearer トークンによるSSO認証
+
+        SSEイベント種別:
+          thinking  → AI Agentが戦略立案中（プログレスバー表示用）
+          searching → 資料を検索中（クエリ文字列を含む）
+          evidence  → 根拠資料を選定完了（ファイル名・ページ・抜粋）
+          chunk     → 回答テキスト断片（Markdown形式で逐次配信）
+          done      → 完了（chat_idを含む）
+          error     → エラー発生（再試行可能）
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - subject_id
-                - question
+              required: [question]
               properties:
-                subject_id:
-                  type: string
-                  format: uuid
-                  example: "12345678-1234-1234-1234-123456789012"
                 question:
                   type: string
-                  example: "次回の試験範囲は？"
+                  example: "決定係数の計算式を教えてください"
+                parent_chat_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: ヒアリング判断で選択肢から選んだ場合、親チャットIDを指定
       responses:
         '200':
           description: SSEストリーミング開始
@@ -207,30 +301,134 @@ paths:
               schema:
                 type: string
                 description: |
-                  SSEフォーマット:
-                  data: {"type":"chunk","content":"テキスト断片"}
-                  data: {"type":"source","file_id":"uuid","page":12,"excerpt":"引用"}
-                  data: {"type":"done"}
+                  SSEフォーマット（各行は "data: {json}" 形式）
               examples:
+                thinking:
+                  summary: 戦略立案中
+                  value: |
+                    data: {"type":"thinking","content":"検索戦略を立案中..."}
+                searching:
+                  summary: 検索中
+                  value: |
+                    data: {"type":"searching","query":"決定係数 計算式"}
+                evidence:
+                  summary: 根拠資料選定
+                  value: |
+                    data: {"type":"evidence","material_id":"uuid","name":"lecture03.pdf","page":12,"excerpt":"決定係数 R² は..."}
                 chunk:
-                  summary: テキスト断片
+                  summary: 回答テキスト断片
                   value: |
-                    data: {"type":"chunk","content":"試験範囲は第3章から第5章までです。"}
-                source:
-                  summary: 参照元
-                  value: |
-                    data: {"type":"source","file_id":"12345678-1234-1234-1234-123456789012","page":12,"excerpt":"第3章: データ構造"}
+                    data: {"type":"chunk","content":"決定係数 R² の計算式は..."}
                 done:
                   summary: 完了
                   value: |
-                    data: {"type":"done"}
+                    data: {"type":"done","chat_id":"uuid"}
+                error:
+                  summary: エラー
+                  value: |
+                    data: {"type":"error","code":"SEARCH_TIMEOUT","request_id":"uuid"}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      tags: [Chats]
+      summary: 会話履歴一覧取得
+      description: |
+        指定した科目の会話履歴一覧を取得。
+        Web版の「会話履歴」表示に使用。
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: cursor
+          in: query
+          required: false
+          description: カーソルベースページネーション
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 会話履歴リスト
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chats]
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatSummary'
+                  next_cursor:
+                    type: string
+                    nullable: true
+        '404':
+          $ref: '#/components/responses/NotFound'
 
+  /v1/subjects/{subject_id}/chats/{chat_id}:
+    get:
+      tags: [Chats]
+      summary: 会話詳細取得
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - $ref: '#/components/parameters/ChatId'
+      responses:
+        '200':
+          description: 会話詳細
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/subjects/{subject_id}/chats/{chat_id}/feedback:
+    post:
+      tags: [Chats]
+      summary: フィードバック送信（Good/Bad）
+      description: |
+        回答末尾のGood/Badボタンによるフィードバックを送信。
+        研究目的の学習効果測定に使用。
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - $ref: '#/components/parameters/ChatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: string
+                  enum: [good, bad]
+                  example: "good"
+                comment:
+                  type: string
+                  nullable: true
+                  example: "根拠が明確で分かりやすかった"
+      responses:
+        '204':
+          description: フィードバック受付
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
+  # Health
+  # ─────────────────────────────────────────
   /healthz:
     get:
       tags: [Health]
       summary: Liveness check
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -240,12 +438,13 @@ paths:
                   status:
                     type: string
                     example: "ok"
+
   /readyz:
     get:
       tags: [Health]
       summary: Readiness check
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -256,19 +455,64 @@ paths:
                     type: string
                     example: "ready"
 
+# ─────────────────────────────────────────
+# Components
+# ─────────────────────────────────────────
 components:
+  parameters:
+    SubjectId:
+      name: subject_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MaterialId:
+      name: material_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChatId:
+      name: chat_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
   schemas:
+    MaterialStatus:
+      type: string
+      enum: [pending, processing, ready, failed]
+      description: |
+        pending   → アップロード受付、Kafkaキュー待ち
+        processing → OCR/Embedding処理中
+        ready     → 検索可能
+        failed    → 処理失敗（error_messageを参照）
+
     Subject:
       type: object
-      required:
-        - subject_id
-        - name
-        - created_at
+      required: [subject_id, name, created_at]
       properties:
         subject_id:
           type: string
           format: uuid
-          example: "12345678-1234-1234-1234-123456789012"
         name:
           type: string
           example: "データ構造とアルゴリズム"
@@ -285,24 +529,101 @@ components:
 
     Material:
       type: object
-      required:
-        - file_id
-        - name
-        - status
-        - uploaded_at
+      required: [material_id, subject_id, name, status, uploaded_at]
       properties:
-        file_id:
+        material_id:
           type: string
           format: uuid
-          example: "87654321-4321-4321-4321-210987654321"
+        subject_id:
+          type: string
+          format: uuid
         name:
           type: string
           example: "lecture01.pdf"
         status:
+          $ref: '#/components/schemas/MaterialStatus'
+        error_message:
           type: string
-          enum: [pending, processing, ready, failed]
-          example: "ready"
+          nullable: true
+          description: status=failed 時のエラー詳細
         uploaded_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ChatSummary:
+      type: object
+      required: [chat_id, subject_id, question, created_at]
+      properties:
+        chat_id:
+          type: string
+          format: uuid
+        subject_id:
+          type: string
+          format: uuid
+        question:
+          type: string
+          example: "決定係数の計算式を教えてください"
+        answered_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: null の場合は未完了（タイムアウト/エラー）
+        created_at:
+          type: string
+          format: date-time
+
+    ChatDetail:
+      type: object
+      required: [chat_id, subject_id, question, created_at]
+      properties:
+        chat_id:
+          type: string
+          format: uuid
+        subject_id:
+          type: string
+          format: uuid
+        question:
+          type: string
+        answer:
+          type: string
+          nullable: true
+          description: 最終回答テキスト（SSE完了後に保存）
+        sources:
+          type: array
+          nullable: true
+          description: 参照した資料の一覧
+          items:
+            type: object
+            required: [material_id, name]
+            properties:
+              material_id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              page:
+                type: integer
+                nullable: true
+              excerpt:
+                type: string
+        feedback:
+          type: string
+          enum: [good, bad]
+          nullable: true
+        parent_chat_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ヒアリング判断による選択肢選択の親チャット
+        answered_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
           type: string
           format: date-time
 
@@ -316,11 +637,11 @@ components:
           properties:
             code:
               type: string
-              description: Stable application error code (see docs/03_integration/ERROR_CODES.md)
+              description: アプリケーションエラーコード（docs/03_integration/ERROR_CODES.md 参照）
               example: "VALIDATION_FAILED"
             message:
               type: string
-              description: User-facing message (no secrets / no internal details)
+              description: ユーザー向けメッセージ（内部詳細・Secretsを含まない）
               example: "Validation failed"
             details:
               type: object
