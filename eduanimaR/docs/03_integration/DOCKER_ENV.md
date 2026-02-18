@@ -24,6 +24,26 @@
 
 > 使用イメージ: `apache/kafka:3.7.0`（KRaftモード — ZooKeeper不要）。旧レガシーイメージ（3.7 系）は移動/非推奨のため、本リポジトリでは Apache 公式イメージに統一しています。
 
+> **⚠️ 開発環境は単一ブローカー構成 — Kafka レプリケーション設定について**
+>
+> Kafka のデフォルト設定では `offsets.topic.replication.factor=3` になっており、  
+> 単一ブローカー（開発 docker-compose）では `__consumer_offsets` の自動作成に失敗します。  
+> この状態で Consumer を起動すると `Group Coordinator Not Available` エラーが繰り返し発生します。
+>
+> そのため `docker-compose.yml` の `kafka` サービスに以下のオーバーライドを設定しています（変更しないこと）:
+> ```
+> KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+> KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+> KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+> ```
+>
+> **⚠️ 本番環境ではこの設定を使わないこと。** 本番 Kafka（またはフェーズ2以降の Cloud Pub/Sub）では  
+> ブローカー数に合わせて `replication.factor` を適切に設定してください。
+>
+> Kafka が正常に起動しているか確認する場合は `make smoke-kafka` を実行してください。
+>
+> CI ガード: リポジトリには `infra-smoke` GitHub Actions ワークフロー（`.github/workflows/infra-smoke.yml`）を追加しており、`docker-compose` 起動後に `GET /healthz` と `GET /api/v1/subjects` を検証します。不要な設定の巻き戻しを防ぎます。
+
 > **重要**: Docker ネットワーク内のサービス間通信はサービス名で解決する（例: `http://professor:8080`）。  
 > ブラウザからアクセスする URL は `localhost` ベース（例: `http://localhost:8080`）。
 
