@@ -217,5 +217,9 @@ git push origin main
 
 - `NEXT_PUBLIC_API_BASE_URL` は Next.js ビルド時に埋め込まれるため、**デプロイ前に正しい URL に設定すること**
 - Cloud SQL との接続は Unix ソケット（`/cloudsql/INSTANCE_CONNECTION_NAME`）を使用する
-- Kafka（ローカル）→ Cloud Pub/Sub（本番）の切り替えは Phase 2 で対応
+- Kafka（ローカル）→ Cloud Pub/Sub（本番）の切り替えは Phase 2 で対応（**本番では Kafka を使わない**）
+- **本番移行時の Kafka 設定チェックリスト**（万が一本番でも Kafka を使う場合）:
+  - `KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR` をブローカー数に合わせて設定（デフォルト `3`、単一ブローカーでは `1`）
+  - `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR` も同様に設定
+  - 開発用 `docker-compose.yml` の `replication.factor=1` 設定は**本番向けではない**
 - Librarian は gRPC（HTTP/2）を使用するため、Cloud Run の HTTP/2 を有効化すること
