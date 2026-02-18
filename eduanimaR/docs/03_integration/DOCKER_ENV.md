@@ -133,6 +133,12 @@ docker-compose.prod.yml   # プロダクション上書き設定（make prod で
 | `docker-compose.yml`      | 全サービス定義（dev ステージ・ボリュームマウント） |
 | `docker-compose.prod.yml` | production ステージ上書き（ボリューム無効化）    |
 
+> ⚠️ PostgreSQL 18（`pgvector/pgvector:pg18` 等）を使用する場合 **必ずデータボリュームを `/var/lib/postgresql` にマウント**してください。
+>
+> 理由: PG18 系イメージはメジャーバージョン別ディレクトリを内部で管理するため、既存の `/var/lib/postgresql/data` を直接マウントするとデータレイアウト不整合で起動に失敗します（`pg_upgrade` 要件）。開発環境では `/var/lib/postgresql` マウントを標準とし、本番移行時はバックアップ→pg_upgrade 等の手順を必ず実施してください。
+>
+> 参照: Docker-Postgres のマウント仕様（PG18+）とアップグレード注意点。
+
 ---
 
 ## URL / ポート早見表

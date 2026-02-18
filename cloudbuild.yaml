@@ -47,6 +47,19 @@ steps:
           echo "✅ no forbidden image references";
         fi
 
+  - id: lint-postgres-mount
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        # Fail build if deprecated Postgres data mount is present in compose files
+        if grep -nE ":/var/lib/postgresql/data|/var/lib/postgresql/data" docker-compose.yml docker-compose.prod.yml . >/dev/null 2>&1; then
+          echo "❌ Deprecated Postgres data mount found ('/var/lib/postgresql/data'). Use '/var/lib/postgresql' instead."; exit 1;
+        else
+          echo "✅ postgres mount checks passed";
+        fi
+
   # ════════════════════════════════════════════════════════════
   # 1. Librarian（Python gRPC）— runtime イメージをビルド
   # ════════════════════════════════════════════════════════════

@@ -44,8 +44,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-eduanima_professor}
     ports:
       - "5432:5432"
+    # NOTE: PostgreSQL 18+ images expect the single data mount at /var/lib/postgresql
+    # (the image manages major-version subdirectories). Mounting at /var/lib/postgresql
+    # prevents data-layout/version mismatches when the image is upgraded.
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}"]
       interval: 5s
