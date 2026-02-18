@@ -4,8 +4,13 @@
 # 起動方法:
 #   インフラのみ（開発中）:
 #     docker compose up postgres kafka minio kafka-init minio-init
-#   全サービス（アプリ含む）:
-#     docker compose --profile app up
+#
+#   本番イメージで全サービス起動:
+#     docker compose --profile app up --build
+#
+#   開発モード（ホットリロード）で全サービス起動:
+#     docker compose --profile dev up --build
+#     ※ ソースコードの変更が即時反映される
 #
 # 前提: .env.example を .env にコピーして GEMINI_API_KEY を設定すること
 
@@ -25,7 +30,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # pg18+ はマウントを /var/lib/postgresql にする必要がある
+      # PG18 が /var/lib/postgresql/18/main/ にデータを置くため
+      # /var/lib/postgresql/data へのマウントは起動失敗の原因になる
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}"]
       interval: 5s
@@ -35,35 +43,38 @@ services:
 
   # ─────────────────────────────────────────
   # Apache Kafka 3.9 (KRaft mode / Zookeeper不要)
+  # ※ bitnami/kafka は Docker Hub から撤去済み → apache/kafka 公式イメージを使用
   # ─────────────────────────────────────────
   kafka:
-    image: bitnami/kafka:3.9
+    image: apache/kafka:3.9.0
     container_name: eduanima_kafka
     restart: unless-stopped
     environment:
-      # KRaft モード設定
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # KRaft モード（apache/kafka 形式）
+      KAFKA_NODE_ID: "0"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
       # リスナー設定（PLAINTEXT: 内部通信 / EXTERNAL: ホストからのアクセス）
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       # トピック設定
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
-      - KAFKA_CFG_NUM_PARTITIONS=1
-      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
-      - KAFKA_CFG_LOG_RETENTION_HOURS=168
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+      # KRaft クラスター ID（固定値・初回フォーマットに使用）
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
     ports:
       - "9092:9092"   # コンテナ間通信
       - "9094:9094"   # ホストからのアクセス（開発用）
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -71,22 +82,14 @@ services:
 
   # Kafka トピック初期化（ワンショットコンテナ）
   kafka-init:
-    image: bitnami/kafka:3.9
+    image: apache/kafka:3.9.0
     container_name: eduanima_kafka_init
     depends_on:
       kafka:
         condition: service_healthy
     entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "
-        echo '=== Creating Kafka topics ===' &&
-        kafka-topics.sh --bootstrap-server kafka:9092
-          --create --if-not-exists
-          --topic eduanima.ingest.jobs
-          --partitions 1
-          --replication-factor 1 &&
-        echo '=== Topics created ==='
-      "
+    # 単一行にすることで YAML folded block による引数分割バグを回避
+    command: "echo '=== Creating Kafka topics ===' && /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic eduanima.ingest.jobs --partitions 1 --replication-factor 1 && echo '=== Topics created ==='"
     restart: on-failure
 
   # ─────────────────────────────────────────
@@ -94,7 +97,7 @@ services:
   # Phase 2でGCS本番に切り替え時は professor の OBJECT_STORAGE_BACKEND=gcs に変更
   # ─────────────────────────────────────────
   minio:
-    image: minio/minio:RELEASE.2025-01-20T22-07-31Z
+    image: minio/minio:latest
     container_name: eduanima_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -188,6 +191,40 @@ services:
       start_period: 15s
 
   # ─────────────────────────────────────────
+  # eduanima-frontend（Next.js 15 フロントエンド）
+  # profile: app → docker compose --profile app up で起動
+  # ─────────────────────────────────────────
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./eduanimaR
+      dockerfile: Dockerfile
+      target: production
+      args:
+        # NEXT_PUBLIC_* はビルド時に埋め込まれる（ブラウザから見えるURL）
+        # Docker 外からブラウザがアクセスするため localhost のまま
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+    container_name: eduanima_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Next.js dev/prod
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      # サーバーサイドレンダリング（RSC / Route Handlers）用 URL
+      # Docker ネットワーク内で professor サービスに直接アクセス
+      API_BASE_URL: http://professor:8080/api
+    depends_on:
+      professor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ─────────────────────────────────────────
   # eduanima-librarian（Python 推論サービス）
   # profile: app → docker compose --profile app up で起動
   # ─────────────────────────────────────────
@@ -212,6 +249,116 @@ services:
       retries: 5
       start_period: 20s
 
+  # ─────────────────────────────────────────
+  # [DEV] eduanima-professor（Go + Air ホットリロード）
+  # profile: dev → docker compose --profile dev up で起動
+  # ─────────────────────────────────────────
+  professor-dev:
+    profiles: ["dev"]
+    build:
+      context: ./eduanimaR_Professor
+      dockerfile: Dockerfile
+      target: dev                # Air ホットリロードステージ
+    container_name: eduanima_professor_dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # HTTP API（OpenAPI）
+    environment:
+      # Database
+      DATABASE_URL: postgres://${POSTGRES_USER:-eduanima}:${POSTGRES_PASSWORD:-eduanima_password}@postgres:5432/${POSTGRES_DB:-eduanima_professor}?sslmode=disable
+      # Kafka
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_INGEST: eduanima.ingest.jobs
+      # Object Storage（Phase 1: MinIO）
+      OBJECT_STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-eduanima-materials}
+      MINIO_USE_SSL: "false"
+      # Librarian gRPC
+      LIBRARIAN_GRPC_ADDR: librarian-dev:50051
+      # Gemini AI
+      PROFESSOR_MODEL_FAST: ${PROFESSOR_MODEL_FAST:-gemini-2.0-flash}
+      PROFESSOR_MODEL_ACCURATE: ${PROFESSOR_MODEL_ACCURATE:-gemini-2.5-pro}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # Server
+      PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      # ソースコードをマウント（Air がファイル変更を検知してリビルド）
+      - ./eduanimaR_Professor:/app
+      # go cache をボリュームに永続化（再ビルド高速化）
+      - professor_go_cache:/root/.cache/go-build
+      - professor_go_mod_cache:/go/pkg/mod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+
+  # ─────────────────────────────────────────
+  # [DEV] eduanima-frontend（Next.js 15 dev server ホットリロード）
+  # profile: dev → docker compose --profile dev up で起動
+  # ─────────────────────────────────────────
+  frontend-dev:
+    profiles: ["dev"]
+    build:
+      context: ./eduanimaR
+      dockerfile: Dockerfile.dev
+    container_name: eduanima_frontend_dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Next.js dev server
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      # ブラウザからの API リクエスト先（ホスト経由）
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+      # サーバーサイド（RSC / Route Handler）から professor に直接アクセス
+      API_BASE_URL: http://professor-dev:8080/api
+    volumes:
+      # ソースをマウント（Next.js Fast Refresh で即時反映）
+      - ./eduanimaR/src:/app/src
+      - ./eduanimaR/public:/app/public
+      # node_modules はコンテナ内を使用（ホストとの混在を防ぐ）
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    depends_on:
+      - professor-dev
+
+  # ─────────────────────────────────────────
+  # [DEV] eduanima-librarian（Python watchdog ホットリロード）
+  # profile: dev → docker compose --profile dev up で起動
+  # ─────────────────────────────────────────
+  librarian-dev:
+    profiles: ["dev"]
+    build:
+      context: ./eduanimaR_Librarian
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: eduanima_librarian_dev
+    restart: unless-stopped
+    ports:
+      - "50051:50051"   # gRPC サーバー
+    environment:
+      GRPC_PORT: "50051"
+      LIBRARIAN_MODEL_FAST: ${LIBRARIAN_MODEL_FAST:-gemini-2.0-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      PYTHONPATH: /app/src
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # ソースコードをマウント（再起動不要で反映）
+      - ./eduanimaR_Librarian/src:/app/src
+    command: ["python", "-m", "librarian.main"]
+
 volumes:
   postgres_data:
     name: eduanima_postgres_data
@@ -219,6 +366,15 @@ volumes:
     name: eduanima_kafka_data
   minio_data:
     name: eduanima_minio_data
+  # dev プロファイル専用ボリューム
+  professor_go_cache:
+    name: eduanima_professor_go_cache
+  professor_go_mod_cache:
+    name: eduanima_professor_go_mod_cache
+  frontend_node_modules:
+    name: eduanima_frontend_node_modules
+  frontend_next_cache:
+    name: eduanima_frontend_next_cache
 
 networks:
   default:

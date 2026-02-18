@@ -1,0 +1,40 @@
+# .air.toml - Air ホットリロード設定
+# https://github.com/air-verse/air
+# 使用方法: air -c .air.toml
+
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  # ビルドコマンド
+  cmd = "go build -o ./tmp/professor ./cmd/professor"
+  # ビルド成果物
+  bin = "./tmp/professor"
+  # ファイル変更トリガー
+  include_ext = ["go", "tpl", "tmpl", "html", "yaml", "yml"]
+  exclude_dir = ["vendor", "tmp", "testdata", "docs", "proto"]
+  exclude_file = []
+  exclude_regex = ["_test\\.go"]
+  # 遅延（連続変更でのビルド抑制）
+  delay = 1000  # ms
+  # エラー時も再起動するか
+  stop_on_error = false
+  # 再起動前に旧プロセスを kill
+  send_interrupt = false
+  kill_delay = "0.5s"
+
+[color]
+  # ログカラー
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[log]
+  time = true
+  main_only = false
+
+[misc]
+  # tmp ディレクトリをクリーンアップ
+  clean_on_exit = true
