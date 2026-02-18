@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Generated proto stubs（make proto で再生成可能）
+src/librarian/v1/librarian_pb2.py
+src/librarian/v1/librarian_pb2.pyi
+src/librarian/v1/librarian_pb2_grpc.py
+src/librarian/v1/librarian_pb2_grpc.pyi
+
+# 環境変数
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# テスト
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# macOS
+.DS_Store

@@ -43,7 +43,7 @@ export default [
       },
       'boundaries/elements': [
         { type: 'app', pattern: 'src/app/**' },
-        { type: 'pages', pattern: 'src/pages/*', capture: ['slice'] },
+        { type: 'views', pattern: 'src/views/*', capture: ['slice'] },
         { type: 'widgets', pattern: 'src/widgets/*', capture: ['slice'] },
         { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
         { type: 'entities', pattern: 'src/entities/*', capture: ['slice'] },
@@ -57,13 +57,13 @@ export default [
           default: 'disallow',
           rules: [
             // app: wires routing/providers; keep it as a thin adapter.
-            { from: ['app'], allow: ['pages', 'shared'] },
+            { from: ['app'], allow: ['views', 'shared'] },
 
-            // pages/widgets/features/entities: allow downward deps + same-slice internal deps.
+            // views/widgets/features/entities: allow downward deps + same-slice internal deps.
             {
-              from: [['pages', { slice: '*' }]],
+              from: [['views', { slice: '*' }]],
               allow: [
-                ['pages', { slice: '${from.slice}' }],
+                ['views', { slice: '${from.slice}' }],
                 'widgets',
                 'features',
                 'entities',
@@ -109,8 +109,8 @@ export default [
         'error',
         {
           patterns: [
-            { group: ['@/app/**'], message: 'Do not import from app layer. Compose in pages/widgets.' },
-            { group: ['@/pages/*/*'], message: 'Do not deep-import pages. Use the slice public API (index.ts).' },
+            { group: ['@/app/**'], message: 'Do not import from app layer. Compose in views/widgets.' },
+            { group: ['@/views/*/*'], message: 'Do not deep-import views. Use the slice public API (index.ts).' },
             { group: ['@/widgets/*/*'], message: 'Do not deep-import widgets. Use the slice public API (index.ts).' },
             { group: ['@/features/*/*'], message: 'Do not deep-import features. Use the slice public API (index.ts).' },
             { group: ['@/entities/*/*'], message: 'Do not deep-import entities. Use the slice public API (index.ts).' },

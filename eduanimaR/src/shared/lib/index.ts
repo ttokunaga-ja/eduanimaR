@@ -1,1 +1,2 @@
-export { noop } from './noop';
+export * from './noop';
+export * from './i18n';

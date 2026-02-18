@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package librarian.v1;
+
+option go_package = "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1";
+
+// Professor ↔ Librarian 双方向ストリーミング
+service LibrarianService {
+  // Phase 3で実装: gRPC双方向ストリーミング
+  // Phase 1では未使用(HTTP REST APIのみ)
+  // Professor opens a bidirectional reasoning session.
+  // Librarian can request searches; Professor executes them with enforced physical constraints
+  // (user_id / subject_id / is_active etc.) and returns results to Librarian.
+  rpc Think(stream ThinkRequest) returns (stream ThinkResponse);
+}
+
+// Professor → Librarian
+message ThinkRequest {
+  string request_id = 1;  // トレーシング用UUID
+  string user_query = 2;  // ユーザーの質問
+  string subject_id = 3;  // 科目ID(user_id/subject_idでDB絞り込み)
+  
+  // LangGraph state(シリアライズ済み)
+  string state = 4;
+  
+  // 検索履歴(前回までのSEARCH/COMPLETE記録)
+  repeated SearchHistory search_history = 5;
+  
+  // 制約条件
+  Constraints constraints = 6;
+}
+
+message SearchHistory {
+  int32 step = 1;
+  string action = 2;  // "SEARCH" | "COMPLETE" | "ERROR"
+  repeated string queries_text = 3;
+  string rationale = 4;
+  int32 result_count = 5;
+}
+
+message Constraints {
+  int32 max_loops = 1;  // デフォルト3
+  int32 max_results = 2;  // 検索結果上限(デフォルト10)
+  int32 timeout_ms = 3;  // タイムアウト(デフォルト30000)
+}
+
+// Librarian → Professor
+message ThinkResponse {
+  string request_id = 1;
+  
+  oneof action {
+    SearchAction search = 2;
+    CompleteAction complete = 3;
+    ErrorAction error = 4;
+  }
+}
+
+// (A) 検索要求
+message SearchAction {
+  repeated string queries_text = 1;  // 全文検索用クエリ
+  repeated string queries_vector = 2;  // ベクトル検索用クエリ(任意)
+  string rationale = 3;  // なぜこの検索を行うか(監査用)
+}
+
+// (B) 収集完了
+message CompleteAction {
+  repeated Evidence evidence = 1;
+  string coverage_notes = 2;  // 充足している点/不確実な点
+}
+
+message Evidence {
+  int32 temp_index = 1;  // Professor側の検索結果配列インデックス
+  string why_relevant = 2;  // 選定理由
+}
+
+// (C) 失敗
+message ErrorAction {
+  string error_type = 1;  // "LOOP_LIMIT" | "TIMEOUT" | "INVALID_INPUT" | "MODEL_FAILURE"
+  string message = 2;
+}

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eduanima-librarian"
+version = "0.1.0"
+description = "eduanimaR Librarian gRPC service – LangGraph-powered RAG reasoning agent"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio>=1.63.0",
+    "grpcio-tools>=1.63.0",
+    "grpcio-reflection>=1.63.0",
+    "google-generativeai>=0.8.0",
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "structlog>=24.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.10.0",
+    "ruff>=0.4.0",
+    "grpc-stubs>=1.53.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/librarian"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

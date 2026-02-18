@@ -1,0 +1,13 @@
+version: v2
+plugins:
+  # .pb.go ファイルを生成
+  - remote: buf.build/protocolbuffers/go
+    out: gen/proto
+    opt:
+      - paths=source_relative
+  # _grpc.pb.go ファイルを生成
+  - remote: buf.build/grpc/go
+    out: gen/proto
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
