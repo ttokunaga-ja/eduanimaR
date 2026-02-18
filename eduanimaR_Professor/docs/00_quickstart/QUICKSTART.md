@@ -51,7 +51,4 @@
    ```bash
    atlas schema apply --env local --auto-approve
    ```
-
-3. **Phase 1→Phase 2移行時のDB変更準備**:
-   - `users`テーブルへ `provider`, `provider_user_id` カラム追加準備
-   - SSO認証用のセッションテーブル追加準備
+> 開発向け: ルート Makefile の `make dev` / `make dev-d` は内部で `make migrate` を実行して初期スキーマを適用します。手動でマイグレーションを実行する場合は `make migrate` を利用してください。

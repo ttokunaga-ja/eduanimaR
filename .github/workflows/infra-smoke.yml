@@ -21,10 +21,19 @@ jobs:
       - name: Ensure Docker Compose is available
         run: docker compose version
 
-      - name: Start infra + Professor (no frontend)
+      - name: Start infra (no professor/frontend)
         run: |
-          # Start only the infra and Professor/Librarian services to keep runtime reasonable
-          docker compose up -d --build postgres minio minio-init kafka kafka-init librarian professor
+          # Start only the infra and Librarian service first so we can apply DB migrations
+          docker compose up -d --build postgres minio minio-init kafka kafka-init librarian
+
+      - name: Apply DB migrations
+        run: |
+          # Atlas is not installed on the runner; apply SQL directly to Postgres container
+          cat eduanimaR_Professor/schema/migrations/001_init.sql | docker compose exec -T postgres psql -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}
+
+      - name: Start Professor
+        run: |
+          docker compose up -d --build professor
 
       - name: Wait for Professor /healthz
         run: |
