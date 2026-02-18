@@ -8,7 +8,7 @@
 # ============================================================
 
 .PHONY: help infra dev prod down restart logs ps \
-        migrate migrate-dry migrate-hash build build-prod \
+        migrate migrate-dry migrate-hash smoke-kafka build build-prod \
         test-all test-professor test-librarian test-frontend \
         lint-all clean \
         deploy deploy-librarian deploy-professor deploy-frontend
@@ -49,12 +49,16 @@ infra:
 ## dev: 全サービス起動（開発モード・ホットリロード）
 dev: setup
 	@echo "==> 開発環境を起動中..."
+	# infra を先に起動してマイグレーションを確実に適用する
+	$(COMPOSE) up postgres minio minio-init kafka kafka-init -d
+	@$(MAKE) migrate
 	$(COMPOSE) up --build
 # ※ -d を付けるとデタッチモード（バックグラウンド）で起動する
 
 ## dev-d: 全サービスをバックグラウンドで起動
 dev-d: setup
 	$(COMPOSE) up --build -d
+	@$(MAKE) migrate
 	@echo "✅ バックグラウンド起動完了"
 	@echo "   Frontend  : http://localhost:3000"
 	@echo "   Professor : http://localhost:8080"
@@ -121,6 +125,23 @@ migrate:
 ## migrate-dry: 未適用マイグレーションを確認（適用しない）
 migrate-dry:
 	cd eduanimaR_Professor && make migrate-dry
+
+## smoke-kafka: Kafka の内部トピックと Consumer 接続が正常かを確認するスモークテスト
+## 　使いどころ: make dev 後にセットアップが正常か確認したい場合
+smoke-kafka:
+	@echo "==> Kafka スモークテスト..."
+	@$(COMPOSE) exec kafka /opt/kafka/bin/kafka-topics.sh \
+		--bootstrap-server localhost:9092 --list 2>/dev/null | grep -q '__consumer_offsets' \
+		&& echo "✅ __consumer_offsets OK（Kafka Consumer は正常に動作できます）" \
+		|| (echo "❌ __consumer_offsets が存在しません"; \
+		    echo "   原因: 単一ブローカーで replication.factor=3 のまま起動した可能性があります"; \
+		    echo "   対処: make clean && make dev  # ボリュームを削除して再起動"; \
+		    exit 1)
+	@$(COMPOSE) exec kafka /opt/kafka/bin/kafka-topics.sh \
+		--bootstrap-server localhost:9092 --list 2>/dev/null | grep -q '${KAFKA_TOPIC_INGEST:-eduanima.ingest.jobs}' \
+		&& echo "✅ トピック '${KAFKA_TOPIC_INGEST:-eduanima.ingest.jobs}' OK" \
+		|| echo "⚠️  トピック '${KAFKA_TOPIC_INGEST:-eduanima.ingest.jobs}' が未作成（kafka-init が完了していない可能性）"
+	@echo "✅ Kafka スモークテスト完了"
 
 ## migrate-hash: migration ファイル変更後の Atlas ハッシュを再生成（必須）
 ## ⚠️  migration ファイルを直接編集した後は必ずこのコマンドを実行すること
