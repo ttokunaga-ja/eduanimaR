@@ -33,3 +33,12 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Security (do not commit private keys or certificates)
+*.pem
+*.key
+id_rsa
+
+# Logs / Databases
+*.log
+*.sqlite3

@@ -51,4 +51,16 @@ src/shared/api/generated/**
 # Misc
 *.tgz
 
+# Security (do not commit private keys or certificates)
+*.pem
+*.key
+id_rsa
+
+# Python
+__pycache__/
+*.pyc
+
+# Databases / logs
+*.sqlite3
+
 # Optional: keep .env and .env.example in repo; ignore local overrides above
