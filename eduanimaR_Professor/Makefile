@@ -2,7 +2,7 @@
 # 使い方: make help
 
 .PHONY: all proto sqlc generate migrate migrate-dry migrate-hash \
-        build run dev test test-integration lint fmt clean help
+        build run dev test test-unit test-integration test-contract lint fmt clean help
 
 MODULE  = github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor
 BINARY  = bin/eduanima-professor
@@ -71,13 +71,21 @@ dev:
 # テスト
 # ─────────────────────────────────────────
 
-## test: ユニットテストを実行
+## test: 全テスト（ユニット）を実行
 test:
 	go test ./... -v -race -count=1
+
+## test-unit: UseCase ユニットテストのみ実行（外部依存不要）
+test-unit:
+	go test ./internal/usecases/... ./internal/domain/... -v -race -count=1
 
 ## test-integration: 統合テストを実行（DB 起動が必要）
 test-integration:
 	go test ./... -v -race -count=1 -tags=integration
+
+## test-contract: コントラクトテストを実行
+test-contract:
+	go test ./internal/contracttest/... -v -race -count=1 -tags=contract
 
 # ─────────────────────────────────────────
 # Lint / フォーマット

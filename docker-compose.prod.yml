@@ -1,0 +1,50 @@
+# ============================================================
+# eduanimaR — Docker Compose プロダクション上書き設定
+#
+# 使い方:
+#   make prod
+#   # 内部的には以下を実行:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#
+# このファイル単体では動かない。docker-compose.yml と組み合わせて使う。
+# ============================================================
+
+services:
+
+  # ── Librarian（Python gRPC）──────────────────────────────────
+  # production: 最小 runtime イメージ（dev deps なし）
+  librarian:
+    build:
+      context: ./eduanimaR_Librarian
+      target: runtime
+    volumes: []      # ← ボリュームマウント無効化
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app/src
+    command: python -m librarian.main
+    restart: always
+
+  # ── Professor（Go バックエンド）──────────────────────────────
+  # production: distroless 最小イメージ（air/shell なし）
+  professor:
+    build:
+      context: ./eduanimaR_Professor
+      target: production
+    volumes: []      # ← ボリュームマウント無効化
+    restart: always
+
+  # ── Frontend（Next.js standalone ビルド）─────────────────────
+  # production: Next.js standalone モード（node_modules 不要）
+  frontend:
+    build:
+      context: ./eduanimaR
+      target: production
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+    image: node:22-alpine   # ← base image を上書き（Dockerfile の production ステージを使う）
+    volumes: []             # ← ボリュームマウント無効化
+    command: ["node", "server.js"]
+    environment:
+      NODE_ENV: production
+      API_BASE_URL: http://professor:8080/api
+    restart: always

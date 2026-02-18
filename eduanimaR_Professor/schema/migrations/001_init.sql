@@ -1,11 +1,17 @@
 -- ===================================================================
 -- 001_init.sql
 -- eduanima-professor Phase 1 初期スキーマ
+-- 前提: PostgreSQL 18 + pgvector 0.8.1
 -- 適用方法: atlas migrate apply --dir "file://schema/migrations" --url $DATABASE_URL
 -- ===================================================================
 
 -- ── 拡張機能 ────────────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "vector";      -- pgvector 0.8.x
+-- pgvector: HNSW インデックス・vector 型・<=> 演算子（コサイン類似度）に必要
+-- PG18 でも pgvector は引き続き必要（HNSW / IVFFlat の実装は pgvector が提供）
+CREATE EXTENSION IF NOT EXISTS "vector";      -- pgvector 0.8.1 (pg18 対応)
+
+-- UUIDv7: PG18 組み込みネイティブ関数 uuidv7() を使用（拡張インストール不要）
+-- 時系列ソート可能・B-tree インデックス効率が UUID v4 より優れる
 
 -- ── ENUM 型定義 ──────────────────────────────────────────────────────
 CREATE TYPE auth_provider AS ENUM (
@@ -33,7 +39,7 @@ CREATE TYPE job_status AS ENUM (
 -- SSO カラム (provider, provider_user_id) は Phase 1 で NULLABLE として先行定義。
 -- Phase 2 (SSO) 移行時に ALTER TABLE 不要。
 CREATE TABLE users (
-    user_id          UUID         NOT NULL DEFAULT gen_random_uuid(),
+    user_id          UUID         NOT NULL DEFAULT uuidv7(),
     email            TEXT         NOT NULL,
     -- Phase 2 で使用（SSOプロバイダー識別）
     provider         auth_provider         NULL,
@@ -54,7 +60,7 @@ ON CONFLICT DO NOTHING;
 
 -- ── subjects ─────────────────────────────────────────────────────────
 CREATE TABLE subjects (
-    subject_id    UUID        NOT NULL DEFAULT gen_random_uuid(),
+    subject_id    UUID        NOT NULL DEFAULT uuidv7(),
     user_id       UUID        NOT NULL,
     name          TEXT        NOT NULL,
     lms_course_id TEXT        NULL,    -- 将来の LMS 連携用（Phase 1 未使用）
@@ -71,7 +77,7 @@ CREATE INDEX idx_subjects_user_id ON subjects (user_id);
 -- ── files ─────────────────────────────────────────────────────────────
 -- storage_path: Phase 1 は MinIO パス / Phase 2 は GCS パス
 CREATE TABLE files (
-    file_id       UUID        NOT NULL DEFAULT gen_random_uuid(),
+    file_id       UUID        NOT NULL DEFAULT uuidv7(),
     subject_id    UUID        NOT NULL,
     user_id       UUID        NOT NULL,
     name          TEXT        NOT NULL,
@@ -98,7 +104,7 @@ CREATE INDEX idx_files_status     ON files (status);
 -- pgvector HNSW インデックス（コサイン類似度検索）
 -- embedding 次元数: 768（Gemini Embedding）
 CREATE TABLE chunks (
-    chunk_id    UUID         NOT NULL DEFAULT gen_random_uuid(),
+    chunk_id    UUID         NOT NULL DEFAULT uuidv7(),
     file_id     UUID         NOT NULL,
     subject_id  UUID         NOT NULL,
     page_number INT          NULL,     -- PDF ページ番号（画像スライドは NULL）
@@ -124,7 +130,7 @@ CREATE INDEX idx_chunks_embedding_hnsw
 -- ── ingest_jobs ───────────────────────────────────────────────────────
 -- Kafka 非同期パイプライン（OCR/Embedding）のジョブ管理テーブル
 CREATE TABLE ingest_jobs (
-    job_id        UUID       NOT NULL DEFAULT gen_random_uuid(),
+    job_id        UUID       NOT NULL DEFAULT uuidv7(),
     file_id       UUID       NOT NULL,
     status        job_status NOT NULL DEFAULT 'pending',
     retry_count   INT        NOT NULL DEFAULT 0,
@@ -145,7 +151,7 @@ CREATE INDEX idx_ingest_jobs_file_id ON ingest_jobs (file_id);
 -- ── qa_sessions ───────────────────────────────────────────────────────
 -- Q&A セッション（SSE ストリーミング完了後に answer を永続化）
 CREATE TABLE qa_sessions (
-    session_id  UUID        NOT NULL DEFAULT gen_random_uuid(),
+    session_id  UUID        NOT NULL DEFAULT uuidv7(),
     user_id     UUID        NOT NULL,
     subject_id  UUID        NOT NULL,
     question    TEXT        NOT NULL,

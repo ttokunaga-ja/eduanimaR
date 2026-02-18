@@ -1,7 +1,14 @@
 # DB_SCHEMA_DESIGN
 
 ## 目的
-PostgreSQL 18.1 + Atlas + sqlc 前提で、スキーマ設計の意思決定（型/制約/インデックス）を統一する。
+**PostgreSQL 18 + pgvector 0.8.1 + Atlas + sqlc** 前提で、スキーマ設計の意思決定（型/制約/インデックス）を統一する。
+
+> **PostgreSQL バージョン根拠（PG18 採用理由）**
+> - `uuidv7()` ネイティブ関数（時系列ソート可能 UUID、B-tree 効率が v4 より優れる）
+> - `UNIQUE NULLS NOT DISTINCT`（NULL を区別しない一意制約、PG15+）
+> - B-tree Skip Scan（部分インデックス効率向上）
+> - pgvector 0.8.1 は PG18 対応済み（`pgvector/pgvector:pg18` Docker イメージ）
+> - Cloud SQL for PostgreSQL 18 が利用可能
 
 ## データ所有（最重要）
 - Cloud SQL（PostgreSQL）と GCS の直接アクセス権限は **Professor のみに付与**する
@@ -82,7 +89,7 @@ Owner: @ttokunaga-ja
 CREATE TYPE auth_provider AS ENUM ('google', 'meta', 'microsoft', 'line');
 
 CREATE TABLE users (
-  user_id          UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+  user_id          UUID         PRIMARY KEY DEFAULT uuidv7(),
   email            TEXT         UNIQUE NOT NULL,
   -- SSO カラム: Phase 1 では NULL、Phase 2 で実際に使用
   provider         auth_provider            NULL,
@@ -106,7 +113,7 @@ INSERT INTO users (user_id, email) VALUES
 
 ```sql
 CREATE TABLE subjects (
-  subject_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  subject_id UUID PRIMARY KEY DEFAULT uuidv7(),
   user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   lms_course_id TEXT, -- Moodle course ID（将来の自動紐付け用）
@@ -128,7 +135,7 @@ CREATE INDEX idx_subjects_user_id ON subjects(user_id);
 CREATE TYPE file_status AS ENUM ('pending', 'processing', 'ready', 'failed');
 
 CREATE TABLE files (
-  file_id       UUID        PRIMARY KEY DEFAULT uuid_generate_v7(),
+  file_id       UUID        PRIMARY KEY DEFAULT uuidv7(),
   subject_id    UUID        NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
   name          TEXT        NOT NULL,
   gcs_path      TEXT        NOT NULL,  -- GCS上のパス: gs://bucket/user_id/subject_id/file_id.pdf
@@ -155,7 +162,7 @@ CREATE INDEX idx_files_status     ON files(status);
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE chunks (
-  chunk_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  chunk_id UUID PRIMARY KEY DEFAULT uuidv7(),
   file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
   page_number INT, -- PDFページ番号（画像の場合はNULL）
   chunk_index INT NOT NULL, -- ファイル内での連番
@@ -179,7 +186,7 @@ CREATE INDEX idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_
 CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
 
 CREATE TABLE ingest_jobs (
-  job_id        UUID       PRIMARY KEY DEFAULT uuid_generate_v7(),
+  job_id        UUID       PRIMARY KEY DEFAULT uuidv7(),
   file_id       UUID       NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
   status        job_status NOT NULL DEFAULT 'pending',
   retry_count   INT        NOT NULL DEFAULT 0,
@@ -203,7 +210,7 @@ CREATE INDEX idx_ingest_jobs_file_id ON ingest_jobs(file_id);
 
 ```sql
 CREATE TABLE qa_sessions (
-  session_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  session_id UUID PRIMARY KEY DEFAULT uuidv7(),
   user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
   question TEXT NOT NULL,
@@ -226,10 +233,13 @@ CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions(subject_id);
 
 - **ツール**: Atlas（`atlas migrate diff`, `atlas migrate apply`）
 - **Phase 1 初期セットアップ**:
-  1. `uuid_generate_v7()` 拡張をインストール（PostgreSQL 18.1以降）
-  2. `vector` 拡張をインストール（pgvector 0.8.1）
+  1. `uuidv7()` は **PostgreSQL 18 のネイティブ組み込み関数**（拡張インストール不要）
+  2. `vector` 拡張をインストール（pgvector 0.8.1）: `CREATE EXTENSION IF NOT EXISTS vector;`
   3. 上記6テーブルを作成
   4. 固定ユーザーを INSERT
+  5. **Atlas ハッシュ更新**: migration ファイル変更後は必ず `atlas migrate hash` を実行すること
+
+> **注意**: `uuidv7()` は PostgreSQL 18 の組み込み関数であり、拡張インストール不要。旧来の外部拡張とは異なり、`CREATE EXTENSION` なしで即座に使用できる。
 
 ## Phase 1→Phase 2 移行時のDB変更
 
@@ -262,7 +272,7 @@ DELETE FROM users WHERE user_id = '00000000-0000-0000-0000-000000000001';
   - 画面解説機能用のテーブル追加（未確定）
     ```sql
     CREATE TABLE screen_analyses (
-      analysis_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+      analysis_id UUID PRIMARY KEY DEFAULT uuidv7(),
       user_id UUID NOT NULL REFERENCES users(user_id),
       subject_id UUID NOT NULL REFERENCES subjects(subject_id),
       screen_html TEXT NOT NULL,

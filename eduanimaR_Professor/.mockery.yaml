@@ -1,0 +1,25 @@
+# .mockery.yaml — mockery v2 設定
+# 使い方: go run github.com/vektra/mockery/v2@v2.43.0 --all
+# ただし Phase 1 では手動モック（testhelper/mocks.go）を使用するため
+# このファイルは将来の自動生成移行時に備えた設定として保持する。
+
+version: "2"
+
+packages:
+  github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports:
+    config:
+      dir: internal/mocks/ports
+      outpkg: mockports
+      mockname: "Mock{{.InterfaceName}}"
+      with-expecter: true
+      interfaces:
+        SubjectRepository:
+        QASessionRepository:
+        ChunkRepository:
+        FileRepository:
+        IngestJobRepository:
+        LLMClient:
+        LibrarianClient:
+        ObjectStorage:
+        MessagePublisher:
+        MessageConsumer:

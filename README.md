@@ -12,18 +12,54 @@ AI（Coding Agent）と人間が迷わずに開発を開始できるよう、設
 | `eduanimaR_Librarian/` | 推論サービス（検索戦略・停止判断） | Python / LangGraph |
 | `eduanimaRHandbook/` | サービスコンセプト・戦略・プロダクト定義 | — |
 
+## ⚡ クイックスタート（Docker-first）
+
+**すべての起動は Docker Compose 経由で管理する。** ローカルに Go / Python / Node のインストールは不要。
+
+```bash
+# 1. 環境変数を設定（初回のみ）
+cp .env.example .env
+vim .env   # GEMINI_API_KEY を設定（必須）
+
+# 2. 全サービス起動（開発モード・ホットリロード）
+make dev
+```
+
+| アクセス先       | URL                              |
+|----------------|----------------------------------|
+| Frontend       | http://localhost:3000            |
+| Professor API  | http://localhost:8080/api/v1/... |
+| MinIO Console  | http://localhost:9001            |
+
+```bash
+make help          # コマンド一覧
+make infra         # インフラのみ起動（postgres / minio / kafka）
+make dev-d         # バックグラウンドで起動
+make migrate       # DB マイグレーション適用
+make logs          # ログ追尾
+make down          # 全コンテナ停止
+make test-all      # 全テスト（ユニット）
+make clean         # コンテナ + ボリューム全削除
+```
+
+> 詳細: [`eduanimaR/docs/03_integration/DOCKER_ENV.md`](eduanimaR/docs/03_integration/DOCKER_ENV.md)
+
+---
+
 ## 読む順（最短）
 
 1. サービス概念: `eduanimaRHandbook/README.md`
 2. バックエンド契約（SSOT）: `eduanimaR_Professor/docs/README.md`
 3. フロントエンド構成: `eduanimaR/docs/README.md`
 4. 推論サービス境界: `eduanimaR_Librarian/docs/README.md`
+5. Docker 環境詳細: `eduanimaR/docs/03_integration/DOCKER_ENV.md`
 
 ## 基本方針
 
 - "実装より先にドキュメント（契約）を更新する"
 - SSOT（Single Source of Truth）を明示し、推測での実装を避ける
 - 例外を増やさず、境界/責務/契約を直して解決する
+- **すべての起動は `make` コマンド（Docker Compose）経由で行う**
 ---
 
 ## Phase 1開発開始チェックリスト
@@ -44,7 +80,7 @@ AI（Coding Agent）と人間が迷わずに開発を開始できるよう、設
 ### バックエンド（Professor）
 - [x] `eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある
 - [ ] `eduanimaR_Professor/docs/05_operations/CI_CD.md`の最低ゲート（lint/test/contract drift）が実装可能
-- [ ] `docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる
+- [x] `docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる（`make dev`）
 - [ ] Professor ↔ Librarian gRPC双方向ストリーミングが実装できる（プロトコル: `proto/librarian/v1/librarian.proto`）
 - [ ] Kafka非同期パイプライン（OCR/Embedding）が実装できる
 
