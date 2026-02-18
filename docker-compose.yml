@@ -107,7 +107,7 @@ services:
       # Listeners:
       #   PLAINTEXT  → コンテナ間通信 (9092)
       #   CONTROLLER → KRaft コントローラー (9093)
-      #   EXTERNAL   → ホストからの接続 (9094)
+      #   EXTERNAL   → ホストから接続 (9094)
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -115,6 +115,13 @@ services:
       - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
       - ALLOW_PLAINTEXT_LISTENER=yes
+      # --- 開発環境（単一ブローカー）向けのオーバーライド ---
+      # デフォルトだと offsets/topic の replication.factor が 3 になり
+      # 単一ブローカーでは __consumer_offsets が作成されず Consumer が失敗します
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      # -------------------------------------------------
       # クラスター ID（固定しないと再起動ごとに変わる）
       - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
       - KAFKA_KRAFT_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
