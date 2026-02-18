@@ -1,0 +1,54 @@
+name: infra-smoke
+
+on:
+  pull_request:
+    paths:
+      - 'docker-compose.yml'
+      - 'eduanimaR/**'
+      - '.github/workflows/**'
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    name: Infra smoke (docker-compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker Compose is available
+        run: docker compose version
+
+      - name: Start infra + Professor (no frontend)
+        run: |
+          # Start only the infra and Professor/Librarian services to keep runtime reasonable
+          docker compose up -d --build postgres minio minio-init kafka kafka-init librarian professor
+
+      - name: Wait for Professor /healthz
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null 2>&1; then
+              echo "✅ professor ready"; break
+            fi
+            echo "waiting for professor... ($i)"; sleep 5
+          done
+
+      - name: Check Professor API: /api/v1/subjects
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v1/subjects || true)
+          echo "status=$status"
+          if [ "$status" != "200" ]; then
+            echo "❌ /api/v1/subjects did not return 200"; exit 1
+          fi
+
+      - name: Kafka smoke (verify __consumer_offsets exists)
+        run: |
+          # Ensure Kafka internal topics were created (single-broker dev override must be present)
+          docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep -q '__consumer_offsets' || (echo '❌ __consumer_offsets missing' && exit 1)
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans
