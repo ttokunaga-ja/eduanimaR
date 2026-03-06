@@ -1,4 +1,4 @@
-.PHONY: install proto run dev lint test test-unit test-integration test-contract clean
+.PHONY: install proto run dev lint typecheck test test-unit test-integration test-contract clean
 
 # Python venv
 VENV := .venv
@@ -48,6 +48,9 @@ dev: install
 lint: install
 	$(VENV)/bin/ruff check src/librarian tests/
 	$(VENV)/bin/ruff format --check src/librarian tests/
+
+typecheck: install
+	PYTHONPATH=src $(PYTHON) -m mypy src/librarian
 
 format: install
 	$(VENV)/bin/ruff format src/librarian tests/

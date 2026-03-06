@@ -10,7 +10,7 @@
 .PHONY: help infra dev prod down restart logs ps \
         migrate migrate-dry migrate-hash smoke-kafka build build-prod \
         test-all test-professor test-librarian test-frontend \
-	lint-all typecheck-web build-web verify verify-apps clean \
+	lint-all typecheck-web build-web build-smoke contract-smoke env-validate verify verify-apps ci-local clean \
         deploy deploy-librarian deploy-professor deploy-frontend
 
 # ─────────────────────────────────────────────────────────────
@@ -31,6 +31,11 @@ setup:
 	else \
 		echo "ℹ️  .env はすでに存在します。スキップしました。"; \
 	fi
+	@$(MAKE) env-validate
+
+## env-validate: .env が .env.schema の必須項目を満たすか検証
+env-validate:
+	@./scripts/validate-env.sh .env.schema .env
 
 # ─────────────────────────────────────────────────────────────
 # 起動（開発）
@@ -215,13 +220,38 @@ build-web:
 	@echo "==> [Frontend] Next.js build..."
 	cd apps/web && npm run build
 
-## verify-apps: リリース前の最低検証（lint + unit test + web typecheck/build）
-verify-apps: lint-all test-all typecheck-web build-web
+## build-smoke: サービス別の最小ビルド検証を実行
+build-smoke: build-web
+	@echo "==> [Professor] Go build smoke..."
+	cd apps/professor && go build ./cmd/professor
+	@echo "==> [Librarian] Python compile smoke..."
+	cd apps/librarian && make install && .venv/bin/python -m compileall -q src/librarian
+
+## contract-smoke: 各サービスの契約生成を実行して整合を検証
+contract-smoke:
+	@echo "==> [Web] OpenAPI codegen..."
+	cd apps/web && npm run api:generate
+	@echo "==> [Professor] Proto codegen..."
+	@if command -v buf >/dev/null 2>&1; then \
+		cd apps/professor && buf generate; \
+	else \
+		echo "buf が見つからないため Docker で実行します"; \
+		docker run --rm -v "$(PWD):/workspace" -w /workspace/apps/professor bufbuild/buf:1.39.0 generate; \
+	fi
+	@echo "==> [Librarian] Proto codegen..."
+	cd apps/librarian && make proto
+
+## verify-apps: リリース前の最低検証（lint + test + contract + build smoke）
+verify-apps: lint-all test-all typecheck-web contract-smoke build-smoke
 	@echo "✅ アプリケーション横断の最低検証が完了しました"
 
 ## verify: CI 互換のローカル検証エントリーポイント
-verify: verify-apps
+verify: env-validate verify-apps
 	@echo "✅ verify 完了"
+
+## ci-local: CI 相当の事前検証をローカルで再現
+ci-local: verify
+	@echo "✅ ci-local 完了"
 
 # ─────────────────────────────────────────────────────────────
 # クリーン

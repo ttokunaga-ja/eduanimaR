@@ -41,6 +41,7 @@ make logs          # ログ追尾
 make down          # 全コンテナ停止
 make test-all      # 全テスト（ユニット）
 make verify        # リリース前の最低検証（lint/test/typecheck/build）
+make ci-local      # CI 相当のローカル事前検証
 make clean         # コンテナ + ボリューム全削除
 ```
 
@@ -59,6 +60,7 @@ make clean         # コンテナ + ボリューム全削除
 7. 構造リファクタリング実行バックログ: `docs/REFRACTORING_PHASE1_BACKLOG.md`
 8. テストトポロジ移行ガイド: `docs/TEST_TOPOLOGY_MIGRATION.md`
 9. 運用ポータル（Compose/Cloud Run導線）: `ops/README.md`
+10. 依存ロック方針: `docs/DEPENDENCY_LOCK_POLICY.md`
 
 ## 基本方針
 
