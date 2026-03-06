@@ -96,15 +96,9 @@ jobs:
       - name: Generate Python proto code
         run: |
           cd apps/librarian
-          mkdir -p src/librarian/v1
-          python -m grpc_tools.protoc \
-            -I ../../contracts/proto \
-            --python_out=src \
-            --grpc_python_out=src \
-            --pyi_out=src \
-            ../../contracts/proto/librarian/v1/librarian.proto
-          test -f src/librarian/v1/librarian_pb2.py
-          test -f src/librarian/v1/librarian_pb2_grpc.py
+          make proto
+          test -f gen/proto/python/librarian/v1/librarian_pb2.py
+          test -f gen/proto/python/librarian/v1/librarian_pb2_grpc.py
           echo "✅ Librarian proto codegen output exists."
 
   # ────────────────────────────────────────────────────────────
