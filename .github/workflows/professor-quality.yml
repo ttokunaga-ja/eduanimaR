@@ -1,0 +1,40 @@
+name: professor / quality
+
+on:
+  pull_request:
+    paths:
+      - 'apps/professor/**'
+      - '.github/workflows/professor-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/professor/**'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/professor
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/professor/go.mod
+          cache-dependency-path: apps/professor/go.sum
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run contract tests
+        run: make test-contract
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: apps/professor

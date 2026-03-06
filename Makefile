@@ -10,7 +10,7 @@
 .PHONY: help infra dev prod down restart logs ps \
         migrate migrate-dry migrate-hash smoke-kafka build build-prod \
         test-all test-professor test-librarian test-frontend \
-        lint-all clean \
+	lint-all typecheck-web build-web verify verify-apps clean \
         deploy deploy-librarian deploy-professor deploy-frontend
 
 # ─────────────────────────────────────────────────────────────
@@ -204,6 +204,24 @@ lint-all:
 	cd apps/librarian && make lint
 	@echo "==> [Frontend] ESLint..."
 	cd apps/web && npm run lint
+
+## typecheck-web: Frontend の TypeScript 型チェックを実行
+typecheck-web:
+	@echo "==> [Frontend] TypeScript typecheck..."
+	cd apps/web && npm run typecheck
+
+## build-web: Frontend の production build 検証を実行
+build-web:
+	@echo "==> [Frontend] Next.js build..."
+	cd apps/web && npm run build
+
+## verify-apps: リリース前の最低検証（lint + unit test + web typecheck/build）
+verify-apps: lint-all test-all typecheck-web build-web
+	@echo "✅ アプリケーション横断の最低検証が完了しました"
+
+## verify: CI 互換のローカル検証エントリーポイント
+verify: verify-apps
+	@echo "✅ verify 完了"
 
 # ─────────────────────────────────────────────────────────────
 # クリーン

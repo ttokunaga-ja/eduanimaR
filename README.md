@@ -40,6 +40,7 @@ make migrate       # DB マイグレーション適用
 make logs          # ログ追尾
 make down          # 全コンテナ停止
 make test-all      # 全テスト（ユニット）
+make verify        # リリース前の最低検証（lint/test/typecheck/build）
 make clean         # コンテナ + ボリューム全削除
 ```
 

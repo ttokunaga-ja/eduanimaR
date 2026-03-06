@@ -1,4 +1,4 @@
-name: web / lint
+name: web / quality
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - 'apps/web/**'
 
 jobs:
-  eslint:
+  quality:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,3 +25,6 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build

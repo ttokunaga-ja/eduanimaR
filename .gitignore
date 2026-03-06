@@ -73,7 +73,6 @@ id_rsa
 *.tgz
 *.zip
 *.tar
-*.lock
 
 # Project-specific
 eduanimaR_Professor/tmp/
