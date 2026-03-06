@@ -5,7 +5,7 @@
 # ビルド順: librarian → professor → frontend（依存関係順）
 #
 # 使い方（手動実行）:
-#   gcloud builds submit --config cloudbuild.yaml \
+#   gcloud builds submit --config ops/cloudrun/cloudbuild.yaml \
 #     --substitutions=_REGION=asia-northeast1,_REPO=eduanima
 #
 # 必要な Secret Manager シークレット:
@@ -54,7 +54,7 @@ steps:
       - -c
       - |
         # Fail build if deprecated Postgres data mount is present in compose files
-        if grep -nE ":/var/lib/postgresql/data|/var/lib/postgresql/data" docker-compose.yml docker-compose.prod.yml . >/dev/null 2>&1; then
+        if grep -nE ":/var/lib/postgresql/data|/var/lib/postgresql/data" ops/compose/docker-compose.yml ops/compose/docker-compose.prod.yml . >/dev/null 2>&1; then
           echo "❌ Deprecated Postgres data mount found ('/var/lib/postgresql/data'). Use '/var/lib/postgresql' instead."; exit 1;
         else
           echo "✅ postgres mount checks passed";

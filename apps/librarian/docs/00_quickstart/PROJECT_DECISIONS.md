@@ -53,7 +53,7 @@ AI/人間が推測で穴埋めしないために、まずここを埋めてか�
 
 ## 配信（Must）
 - デプロイ先:
-  - Phase 1: Docker Compose（`docker-compose.yml` 内 `librarian` サービスとして定義）
+  - Phase 1: Docker Compose（`ops/compose/docker-compose.yml` 内 `librarian` サービスとして定義）
   - Phase 2以降: Google Cloud Run（`us-central1`、min-instances=0、max-instances=3）
 - ロールバック方針（Librarian は DB 変更を伴わない前提での運用方針）:
   - DB 変更なし → 前バージョンのコンテナイメージへ即時ロールバック可能（Cloud Run の traffic split で 100% 切り替え）

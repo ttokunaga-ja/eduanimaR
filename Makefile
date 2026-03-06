@@ -16,8 +16,8 @@
 # ─────────────────────────────────────────────────────────────
 # 定数
 # ─────────────────────────────────────────────────────────────
-COMPOSE         := docker compose
-COMPOSE_PROD    := docker compose -f docker-compose.yml -f docker-compose.prod.yml
+COMPOSE         := docker compose -f ops/compose/docker-compose.yml
+COMPOSE_PROD    := docker compose -f ops/compose/docker-compose.yml -f ops/compose/docker-compose.prod.yml
 
 # ─────────────────────────────────────────────────────────────
 # セットアップ
@@ -223,7 +223,7 @@ build-web:
 ## build-smoke: サービス別の最小ビルド検証を実行
 build-smoke: build-web
 	@echo "==> [Professor] Go build smoke..."
-	cd apps/professor && go build ./cmd/professor
+	cd apps/professor && go build -o /tmp/eduanimar-professor-smoke ./cmd/professor && rm -f /tmp/eduanimar-professor-smoke
 	@echo "==> [Librarian] Python compile smoke..."
 	cd apps/librarian && make install && .venv/bin/python -m compileall -q src/librarian
 
@@ -271,7 +271,7 @@ clean-images: clean
 # ─────────────────────────────────────────────────────────────
 # Cloud Run デプロイ（本番）
 # 使い方: make deploy PROJECT_ID=your-gcp-project-id
-# 詳細: CLOUD_RUN.md 参照
+# 詳細: ops/docs/CLOUD_RUN.md 参照
 # ─────────────────────────────────────────────────────────────
 PROJECT_ID   ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION       ?= asia-northeast1
@@ -283,7 +283,7 @@ deploy:
 	@[ -n "$(PROJECT_ID)" ] || (echo "❌ PROJECT_ID を指定してください: make deploy PROJECT_ID=xxx"; exit 1)
 	@echo "==> Cloud Build でビルド＆デプロイ中... (project: $(PROJECT_ID))"
 	gcloud builds submit \
-		--config cloudbuild.yaml \
+		--config ops/cloudrun/cloudbuild.yaml \
 		--project=$(PROJECT_ID) \
 		--substitutions=_REGION=$(REGION),_REPO=$(REPO) \
 		.

@@ -25,3 +25,7 @@ make test             # unit tests
 - `tests/unit/`
 - `tests/integration/` (scaffold)
 - `tests/contract/` (scaffold)
+
+## Health And Observability
+- Health endpoints: `GET /healthz`, `GET /readyz` on `LIBRARIAN_HEALTH_PORT` (default `8081`)
+- Common log keys: `request_id`, `trace_id`, `user_id`

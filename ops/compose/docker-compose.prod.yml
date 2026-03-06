@@ -4,9 +4,9 @@
 # 使い方:
 #   make prod
 #   # 内部的には以下を実行:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#   docker compose -f ops/compose/docker-compose.yml -f ops/compose/docker-compose.prod.yml up --build -d
 #
-# このファイル単体では動かない。docker-compose.yml と組み合わせて使う。
+# このファイル単体では動かない。ops/compose/docker-compose.yml と組み合わせて使う。
 # ============================================================
 
 services:

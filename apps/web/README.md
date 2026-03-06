@@ -24,3 +24,7 @@ npm run build         # production build
 - Unit/component tests: `src/**/*.test.ts(x)`
 - E2E tests: `e2e/`
 - Contract tests: `tests/contract/` (scaffold)
+
+## Health And Observability
+- Health endpoints: `GET /api/healthz`, `GET /api/readyz`
+- Response keys include: `request_id`, `trace_id`, `user_id`

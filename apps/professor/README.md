@@ -25,3 +25,7 @@ make test-contract    # contract tests
 ## Test Topology
 - Legacy tests: `internal/usecases`, `internal/domain`, `internal/contracttest`
 - New topology: `tests/unit`, `tests/integration`, `tests/contract`
+
+## Health And Observability
+- Health endpoints: `GET /healthz`, `GET /readyz`
+- Common log keys: `request_id`, `trace_id`, `user_id`

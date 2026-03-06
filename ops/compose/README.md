@@ -1,8 +1,8 @@
 # Compose Operations Index
 
 ## Canonical Files
-- `docker-compose.yml`: development stack.
-- `docker-compose.prod.yml`: production overlay.
+- `ops/compose/docker-compose.yml`: development stack.
+- `ops/compose/docker-compose.prod.yml`: production overlay.
 - `Makefile`: compose entry commands (`make dev`, `make prod`, `make down`, etc).
 
 ## Usage
@@ -12,6 +12,6 @@ make dev
 make verify
 ```
 
-## Migration Plan
-- Keep compose files at repository root until all references are updated.
-- Use this index as stable operator entrypoint.
+## Policy
+- Use `ops/compose/docker-compose.yml` and `ops/compose/docker-compose.prod.yml` as the only compose manifests.
+- Keep this index as the compose operator entrypoint.

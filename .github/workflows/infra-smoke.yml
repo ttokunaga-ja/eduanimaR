@@ -3,7 +3,8 @@ name: infra-smoke
 on:
   pull_request:
     paths:
-      - 'docker-compose.yml'
+      - 'ops/compose/docker-compose.yml'
+      - 'ops/compose/docker-compose.prod.yml'
       - 'apps/web/**'
       - 'apps/professor/**'
       - 'apps/librarian/**'
@@ -27,16 +28,16 @@ jobs:
       - name: Start infra (no professor/frontend)
         run: |
           # Start only the infra and Librarian service first so we can apply DB migrations
-          docker compose up -d --build postgres minio minio-init kafka kafka-init librarian
+          docker compose -f ops/compose/docker-compose.yml up -d --build postgres minio minio-init kafka kafka-init librarian
 
       - name: Apply DB migrations
         run: |
           # Atlas is not installed on the runner; apply SQL directly to Postgres container
-          cat apps/professor/schema/migrations/001_init.sql | docker compose exec -T postgres psql -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}
+          cat apps/professor/schema/migrations/001_init.sql | docker compose -f ops/compose/docker-compose.yml exec -T postgres psql -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}
 
       - name: Start Professor
         run: |
-          docker compose up -d --build professor
+          docker compose -f ops/compose/docker-compose.yml up -d --build professor
 
       - name: Wait for Professor /healthz
         run: |
@@ -58,9 +59,9 @@ jobs:
       - name: Kafka smoke (verify __consumer_offsets exists)
         run: |
           # Ensure Kafka internal topics were created (single-broker dev override must be present)
-          docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep -q '__consumer_offsets' || (echo '❌ __consumer_offsets missing' && exit 1)
+          docker compose -f ops/compose/docker-compose.yml exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep -q '__consumer_offsets' || (echo '❌ __consumer_offsets missing' && exit 1)
 
       - name: Tear down
         if: always()
         run: |
-          docker compose down -v --remove-orphans
+          docker compose -f ops/compose/docker-compose.yml down -v --remove-orphans

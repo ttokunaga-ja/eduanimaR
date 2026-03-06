@@ -88,7 +88,7 @@ make clean         # コンテナ + ボリューム全削除
 ### バックエンド（Professor）
 - [x] `apps/professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある
 - [ ] `apps/professor/docs/05_operations/CI_CD.md`の最低ゲート（lint/test/contract drift）が実装可能
-- [x] `docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる（`make dev`）
+- [x] `ops/compose/docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる（`make dev`）
 - [ ] Professor ↔ Librarian gRPC双方向ストリーミングが実装できる（プロトコル: `contracts/proto/librarian/v1/librarian.proto`）
 - [ ] Kafka非同期パイプライン（OCR/Embedding）が実装できる
 

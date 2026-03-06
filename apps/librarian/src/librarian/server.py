@@ -29,6 +29,15 @@ from librarian.graph import build_search_queries, deserialize_state, select_evid
 logger = logging.getLogger(__name__)
 
 
+def obs_fields(request_id: str, user_id: str = "unknown") -> dict[str, str]:
+    """全ログで共通化する観測キーを返す。"""
+    return {
+        "request_id": request_id,
+        "trace_id": request_id,
+        "user_id": user_id,
+    }
+
+
 class LibrarianServicer:
     """
     gRPC LibrarianService の実装クラス。
@@ -81,7 +90,7 @@ class LibrarianServicer:
                     logger.info(
                         "Think セッション開始",
                         extra={
-                            "request_id": request_id,
+                            **obs_fields(request_id),
                             "subject_id": subject_id,
                             "max_loops": max_loops,
                         },
@@ -100,7 +109,7 @@ class LibrarianServicer:
                     )
                     logger.info(
                         "SearchAction 送信",
-                        extra={"request_id": request_id, "queries": queries},
+                        extra={**obs_fields(request_id), "queries": queries},
                     )
                     yield response
                     loop_count += 1
@@ -111,7 +120,7 @@ class LibrarianServicer:
                 logger.info(
                     "検索結果受信",
                     extra={
-                        "request_id": request_id,
+                        **obs_fields(request_id),
                         "results_count": len(search_results),
                         "loop_count": loop_count,
                     },
@@ -127,7 +136,7 @@ class LibrarianServicer:
                         request_id=request_id,
                         error=error_action,
                     )
-                    logger.warning("LOOP_LIMIT 到達", extra={"request_id": request_id})
+                    logger.warning("LOOP_LIMIT 到達", extra=obs_fields(request_id))
                     return
 
                 # ─── CompleteAction を生成して送信 ────────────────────
@@ -154,7 +163,7 @@ class LibrarianServicer:
                 logger.info(
                     "CompleteAction 送信",
                     extra={
-                        "request_id": request_id,
+                        **obs_fields(request_id),
                         "evidence_count": len(evidence_list),
                     },
                 )
@@ -164,12 +173,12 @@ class LibrarianServicer:
         except grpc.RpcError as rpc_err:
             logger.error(
                 "gRPC エラー",
-                extra={"request_id": request_id, "error": str(rpc_err)},
+                extra={**obs_fields(request_id), "error": str(rpc_err)},
             )
             raise
 
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Think 内部エラー", extra={"request_id": request_id})
+            logger.exception("Think 内部エラー", extra=obs_fields(request_id))
             try:
                 from librarian.v1 import librarian_pb2  # type: ignore[import]
 

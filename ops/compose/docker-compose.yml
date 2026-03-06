@@ -168,6 +168,7 @@ services:
     environment:
       PYTHONPATH: /build/src
       LIBRARIAN_PORT: ${GRPC_PORT:-50051}
+      LIBRARIAN_HEALTH_PORT: ${LIBRARIAN_HEALTH_PORT:-8081}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY is required. cp .env.example .env}
       LIBRARIAN_MODEL_FAST: ${LIBRARIAN_MODEL_FAST:-gemini-2.0-flash}
       LIBRARIAN_MAX_LOOPS: ${LIBRARIAN_MAX_LOOPS:-3}
@@ -177,6 +178,7 @@ services:
     command: python -m librarian.main
     ports:
       - "50051:50051"
+      - "8081:8081"
     networks:
       - eduanima_net
     restart: unless-stopped

@@ -46,7 +46,7 @@ eduanimaRHandbook/   # 製品ドキュメント
 ## 影響
 
 - ルート `Makefile` の全 `cd <service>` パスを更新した。
-- `docker-compose.yml` / `docker-compose.prod.yml` の `context:` と `volumes:` を更新した。
-- `cloudbuild.yaml` の `context:` を更新した。
+- `ops/compose/docker-compose.yml` / `ops/compose/docker-compose.prod.yml` の `context:` と `volumes:` を更新した。
+- `ops/cloudrun/cloudbuild.yaml` の `context:` を更新した。
 - `.github/workflows/infra-smoke.yml` のパスフィルタとマイグレーションパスを更新した。
 - フロントエンド内の CI workflow（`apps/web/.github/workflows/`）はルート `.github/workflows/` に昇格させた（ADR 003 参照）。

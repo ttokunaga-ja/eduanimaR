@@ -17,6 +17,7 @@ load_dotenv()
 class Config:
     # gRPC サーバー設定
     port: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_PORT", "50051")))
+    health_port: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_HEALTH_PORT", "8081")))
 
     # Gemini API
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))

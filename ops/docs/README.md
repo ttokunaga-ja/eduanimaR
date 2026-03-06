@@ -1,6 +1,6 @@
 # Ops Docs Index
 
-This directory centralizes links to operational docs while preserving existing file locations.
+This directory centralizes canonical operational docs for release and incident workflows.
 
 ## Linked Docs
 - `ops/docs/CLOUD_RUN.md`
@@ -8,5 +8,8 @@ This directory centralizes links to operational docs while preserving existing f
 - `ops/docs/TEST_ENV_SETUP.md`
 
 ## Policy
-- Stubs in this folder point to canonical docs.
-- Existing canonical docs remain valid during transition.
+- Health/ready conventions:
+	- Professor: `GET /healthz`, `GET /readyz`
+	- Librarian: `GET /healthz`, `GET /readyz` on `LIBRARIAN_HEALTH_PORT`
+	- Web: `GET /api/healthz`, `GET /api/readyz`
+- Common observability keys: `request_id`, `trace_id`, `user_id`

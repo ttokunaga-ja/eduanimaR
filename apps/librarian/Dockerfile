@@ -41,5 +41,6 @@ ENV PYTHONUNBUFFERED=1
 
 # gRPC ポート
 EXPOSE 50051
+EXPOSE 8081
 
 CMD ["python", "-m", "librarian.main"]

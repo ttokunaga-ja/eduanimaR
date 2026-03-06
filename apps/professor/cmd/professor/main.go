@@ -123,14 +123,15 @@ func main() {
 
 	// グローバルミドルウェア
 	e.Use(echomw.RequestID())
-	e.Use(echomw.Logger())
+	e.Use(httpmw.DevUser()) // Phase 1: 固定 dev user を設定
+	e.Use(httpmw.RequestLog())
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
-	e.Use(httpmw.DevUser()) // Phase 1: 固定 dev user を設定
 
 	// ─── ルーティング ─────────────────────────────────────────
 	// ヘルスチェック (認証不要)
 	e.GET("/healthz", handlers.Healthz)
+	e.GET("/readyz", handlers.Readyz)
 
 	// API v1 グループ
 	v1 := e.Group("/api/v1")

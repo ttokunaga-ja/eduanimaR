@@ -18,7 +18,9 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+import threading
 from concurrent import futures
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import grpc
 
@@ -26,6 +28,37 @@ from librarian.config import load as load_config
 from librarian.server import create_servicer
 
 logger = logging.getLogger(__name__)
+
+
+def start_health_server(port: int, ready_event: threading.Event) -> ThreadingHTTPServer:
+    """HTTP /healthz /readyz エンドポイントを別スレッドで起動する。"""
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/healthz":
+                body = b'{"status":"ok","service":"librarian"}'
+                self.send_response(200)
+            elif self.path == "/readyz":
+                status = b"ready" if ready_event.is_set() else b"starting"
+                code = 200 if ready_event.is_set() else 503
+                body = b'{"status":"' + status + b'","service":"librarian"}'
+                self.send_response(code)
+            else:
+                body = b'{"error":"not_found"}'
+                self.send_response(404)
+
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info("HTTP health server started: 0.0.0.0:%d", port)
+    return server
 
 
 def setup_logging(log_level: str) -> None:
@@ -52,6 +85,9 @@ def serve() -> None:
             e,
         )
         sys.exit(1)
+
+    ready_event = threading.Event()
+    health_server = start_health_server(cfg.health_port, ready_event)
 
     # gRPC サーバー構築
     # スレッドプールサイズ: 同時ストリーミングセッション数の上限
@@ -92,10 +128,14 @@ def serve() -> None:
 
     logger.info("Librarian gRPC サーバーを起動します: %s", listen_addr)
     server.start()
+    ready_event.set()
 
     # ─── シグナルハンドリング ────────────────────────────────────────
     def _graceful_shutdown(signum: int, frame: object) -> None:
         logger.info("シャットダウンシグナルを受信しました (signum=%d)。グレースフルシャットダウン開始...", signum)
+        ready_event.clear()
+        health_server.shutdown()
+        health_server.server_close()
         # 5秒以内に既存ストリームを完了させてから停止
         stopped = server.stop(grace=5)
         stopped.wait()

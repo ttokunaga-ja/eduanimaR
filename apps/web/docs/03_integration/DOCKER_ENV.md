@@ -30,7 +30,7 @@
 > 単一ブローカー（開発 docker-compose）では `__consumer_offsets` の自動作成に失敗します。  
 > この状態で Consumer を起動すると `Group Coordinator Not Available` エラーが繰り返し発生します。
 >
-> そのため `docker-compose.yml` の `kafka` サービスに以下のオーバーライドを設定しています（変更しないこと）:
+> そのため `ops/compose/docker-compose.yml` の `kafka` サービスに以下のオーバーライドを設定しています（変更しないこと）:
 > ```
 > KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 > KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
@@ -144,14 +144,14 @@ cp .env.example .env
 ## Docker Compose ファイル構成
 
 ```
-docker-compose.yml        # 開発環境（デフォルト・ホットリロード）
-docker-compose.prod.yml   # プロダクション上書き設定（make prod で使用）
+ops/compose/docker-compose.yml        # 開発環境（デフォルト・ホットリロード）
+ops/compose/docker-compose.prod.yml   # プロダクション上書き設定（make prod で使用）
 ```
 
 | ファイル                    | 用途                                           |
 |---------------------------|------------------------------------------------|
-| `docker-compose.yml`      | 全サービス定義（dev ステージ・ボリュームマウント） |
-| `docker-compose.prod.yml` | production ステージ上書き（ボリューム無効化）    |
+| `ops/compose/docker-compose.yml`      | 全サービス定義（dev ステージ・ボリュームマウント） |
+| `ops/compose/docker-compose.prod.yml` | production ステージ上書き（ボリューム無効化）    |
 
 > ⚠️ PostgreSQL 18（`pgvector/pgvector:pg18` 等）を使用する場合 **必ずデータボリュームを `/var/lib/postgresql` にマウント**してください。
 >
@@ -186,6 +186,6 @@ docker-compose.prod.yml   # プロダクション上書き設定（make prod で
 ## 禁止事項（AI 向け）
 
 - Docker を使わずに直接 `go run` / `python` / `npm run dev` を開発手順として記述しない
-- `docker-compose.yml` に記載されていないポート番号・ホスト名を推測で使わない
+- `ops/compose/docker-compose.yml` に記載されていないポート番号・ホスト名を推測で使わない
 - API 仕様を推測でエンドポイントを手書きしない（OpenAPI → Orval 生成を優先）
 - `.env` にシークレットをコミットしない

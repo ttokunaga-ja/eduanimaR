@@ -17,3 +17,9 @@ type HealthResponse struct {
 func Healthz(c echo.Context) error {
 	return c.JSON(http.StatusOK, HealthResponse{Status: "ok"})
 }
+
+// Readyz は GET /readyz ハンドラー。
+// アプリケーションがリクエストを処理可能かの疎通確認に使用する。
+func Readyz(c echo.Context) error {
+	return c.JSON(http.StatusOK, HealthResponse{Status: "ready"})
+}
