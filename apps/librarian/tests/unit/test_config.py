@@ -36,6 +36,16 @@ class TestConfigDefaults:
         cfg = Config()
         assert cfg.timeout_ms == 30000
 
+    def test_デフォルトkafka_enabledがfalse(self) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "LIBRARIAN_KAFKA_ENABLED"}
+        with patch.dict(os.environ, env, clear=True):
+            cfg = Config()
+            assert cfg.kafka_enabled is False
+
+    def test_デフォルトkafka_topic_ingest(self) -> None:
+        cfg = Config()
+        assert cfg.kafka_topic_ingest == "eduanima.ingest.jobs"
+
     def test_デフォルトlog_levelがINFO(self) -> None:
         # LOG_LEVEL を環境変数から除外して Config を生成する（アイソレーション）
         env = {k: v for k, v in os.environ.items() if k != "LOG_LEVEL"}
@@ -59,6 +69,11 @@ class TestConfigEnvOverride:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key-xyz"}):
             cfg = Config()
             assert cfg.gemini_api_key == "test-key-xyz"
+
+    def test_kafka_enabledを環境変数で上書きできる(self) -> None:
+        with patch.dict(os.environ, {"LIBRARIAN_KAFKA_ENABLED": "true"}):
+            cfg = Config()
+            assert cfg.kafka_enabled is True
 
     def test_gemini_api_key未設定の場合は空文字(self) -> None:
         with patch.dict(os.environ, {}, clear=False):

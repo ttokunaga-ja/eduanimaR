@@ -7,11 +7,8 @@ gRPC コンテキスト・proto stubs をモックして外部依存なしで実
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from librarian.config import Config
 from librarian.server import LibrarianServicer, create_servicer
@@ -97,6 +94,7 @@ class TestLibrarianServicerThink:
 
         # 2回目（検索結果を含む）
         import json
+
         req2 = MagicMock()
         req2.state = json.dumps({"search_results": [{"content": "量子力学の説明", "score": 0.9}]})
 
@@ -120,7 +118,6 @@ class TestLibrarianServicerThink:
         req.constraints.max_results = 5
 
         # proto stubs が import できない状態をシミュレート
-        import sys
         with patch.dict("sys.modules", {"librarian.v1": None}):
             # ImportError が発生する→ context.abort が呼ばれる
             try:

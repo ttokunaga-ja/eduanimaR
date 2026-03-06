@@ -1,3 +1,23 @@
+# pgvector HNSW Performance Check
+
+`chunks` テーブルのベクトル検索は HNSW インデックスを利用する。リリース前に
+`ef_search` のチューニングを行い、p95 レイテンシを計測する。
+
+```bash
+cd apps/professor
+DATABASE_URL='postgres://...' \
+BENCH_SUBJECT_ID='00000000-0000-0000-0000-000000000001' \
+make bench-vector
+```
+
+このコマンドは次を実行する。
+- `TestHNSWTuningExplainAnalyze`: `ef_search=40/80/120` の実行計画ログ出力
+- `BenchmarkChunksVectorSearch_HNSW`: 実際の検索レイテンシ計測 (`latency_us/op`)
+
+目安:
+- p95 レイテンシ 200ms 以下
+- HNSW インデックス (`idx_chunks_embedding_hnsw`) が使用されること
+
 # OBSERVABILITY
 
 ## 目的

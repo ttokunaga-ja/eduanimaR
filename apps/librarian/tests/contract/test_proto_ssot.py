@@ -8,7 +8,6 @@ Go 版の tests/contract/ssot_test.go に相当する。
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 
@@ -88,14 +87,12 @@ class TestGenProtoSsot:
         gen_dir = Path(__file__).resolve().parents[2] / "gen" / "proto" / "python" / "librarian" / "v1"
         pb2_path = gen_dir / "librarian_pb2.py"
         assert pb2_path.exists(), (
-            f"Proto stubs が見つかりません: {pb2_path}\n"
-            "  → `make proto` を実行して生成してください"
+            f"Proto stubs が見つかりません: {pb2_path}\n  → `make proto` を実行して生成してください"
         )
 
     def test_生成済みgrpc_stubsが存在する(self) -> None:
         gen_dir = Path(__file__).resolve().parents[2] / "gen" / "proto" / "python" / "librarian" / "v1"
         grpc_path = gen_dir / "librarian_pb2_grpc.py"
         assert grpc_path.exists(), (
-            f"gRPC stubs が見つかりません: {grpc_path}\n"
-            "  → `make proto` を実行して生成してください"
+            f"gRPC stubs が見つかりません: {grpc_path}\n  → `make proto` を実行して生成してください"
         )

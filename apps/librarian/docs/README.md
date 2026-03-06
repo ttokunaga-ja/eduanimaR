@@ -1,5 +1,8 @@
 # Docs Portal（eduanima-librarian）
 
+> Phase 3 Note: 横断運用ポリシー（CI/CD, セキュリティ共通基準, インシデント運用, 可観測性共通項目）は
+> `ops/docs/` を正とし、この `docs/05_operations/` は Librarian 固有差分のみを扱う。
+
 この `docs/` は `eduanima-librarian`（Python 推論マイクロサービス）の SSOT。
 本サービスは **DB-less** で、検索の物理実行・DB/インデックス管理・バッチは Go 側（Professor）が担う。
 Professor との通信は **gRPC（双方向ストリーミング）** で行い、契約は `contracts/proto/librarian/v1/librarian.proto` で定義される。

@@ -137,10 +137,10 @@ func main() {
 	e.Use(echomw.RequestID())
 	e.Use(echomw.RateLimiter(echomw.NewRateLimiterMemoryStore(20)))
 
-	// 認証ミドルウェア: 開発環境では固定 DevUser、本番では RequireAuth（Phase 2 で JWT に置き換え）
+	// 認証ミドルウェア: 開発環境では固定 DevUser、本番では Firebase JWT 検証
 	if cfg.AppEnv == "production" {
-		slog.Warn("APP_ENV=production: RequireAuth middleware active (JWT not yet implemented — Phase 2)")
-		e.Use(httpmw.RequireAuth())
+		slog.Info("APP_ENV=production: RequireJWT middleware active", "audience", cfg.FirebaseProjectID)
+		e.Use(httpmw.RequireJWT(cfg.FirebaseProjectID))
 	} else {
 		slog.Warn("APP_ENV=development: DevUser middleware active — DO NOT use in production")
 		e.Use(httpmw.DevUser())

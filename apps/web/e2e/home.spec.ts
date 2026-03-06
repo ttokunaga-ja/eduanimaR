@@ -6,9 +6,9 @@ import { test, expect } from '@playwright/test'
  * バックエンド: professor が起動していること
  */
 test.describe('ホームページ', () => {
-  test('ページタイトルが表示される', async ({ page }) => {
+  test('アプリヘッダー要素が存在する', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle(/EduAnima/i)
+    await expect(page.getByLabel('app-header')).toHaveCount(1)
   })
 
   test('ページが 200 で返る', async ({ page }) => {

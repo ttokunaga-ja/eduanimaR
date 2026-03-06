@@ -35,6 +35,11 @@ type Config struct {
 	// Librarian gRPC サービス
 	LibrarianAddr string
 
+	// 認証 (JWT / Firebase Auth)
+	// APP_ENV=production では必須。Firebase プロジェクト ID を設定する。
+	// 例: "my-project-12345"
+	FirebaseProjectID string
+
 	// OpenTelemetry (optional)
 	// 空文字の場合は noop プロバイダーを使用。
 	// 例: "http://otel-collector:4317" (OTLP gRPC)
@@ -45,20 +50,21 @@ type Config struct {
 // Load は環境変数から Config を構築して返す。
 func Load() *Config {
 	return &Config{
-		AppEnv:          getEnv("APP_ENV", "development"),
-		Port:            getEnv("PORT", "8080"),
-		DatabaseURL:     getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
-		MinioEndpoint:   getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey:  getEnv("MINIO_ROOT_USER", "minioadmin"),
-		MinioSecretKey:  getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
-		MinioBucket:     getEnv("MINIO_BUCKET", "eduanima-materials"),
-		MinioUseSSL:     false,
-		KafkaBrokers:    getEnv("KAFKA_BROKERS", "localhost:9094"),
-		KafkaTopic:      getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
-		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
-		LibrarianAddr:   getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
-		OtelEndpoint:    getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "eduanima-professor"),
+		AppEnv:            getEnv("APP_ENV", "development"),
+		Port:              getEnv("PORT", "8080"),
+		DatabaseURL:       getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
+		MinioEndpoint:     getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinioAccessKey:    getEnv("MINIO_ROOT_USER", "minioadmin"),
+		MinioSecretKey:    getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
+		MinioBucket:       getEnv("MINIO_BUCKET", "eduanima-materials"),
+		MinioUseSSL:       false,
+		KafkaBrokers:      getEnv("KAFKA_BROKERS", "localhost:9094"),
+		KafkaTopic:        getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
+		GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
+		LibrarianAddr:     getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
+		FirebaseProjectID: getEnv("FIREBASE_PROJECT_ID", ""),
+		OtelEndpoint:      getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		OtelServiceName:   getEnv("OTEL_SERVICE_NAME", "eduanima-professor"),
 	}
 }
 
@@ -66,6 +72,9 @@ func Load() *Config {
 func Validate(cfg *Config) error {
 	if cfg.GeminiAPIKey == "" {
 		return fmt.Errorf("GEMINI_API_KEY is required")
+	}
+	if cfg.AppEnv == "production" && cfg.FirebaseProjectID == "" {
+		return fmt.Errorf("FIREBASE_PROJECT_ID is required when APP_ENV=production")
 	}
 	return nil
 }

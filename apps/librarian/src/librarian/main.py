@@ -26,6 +26,7 @@ import grpc
 import structlog
 
 from librarian.config import load as load_config
+from librarian.kafka_consumer import IngestEventConsumer
 from librarian.server import create_servicer
 
 logger = structlog.get_logger(__name__)
@@ -91,6 +92,18 @@ def serve() -> None:
     cfg = load_config()
     setup_logging(cfg.log_level)
 
+    kafka_consumer: IngestEventConsumer | None = None
+
+    def on_ingest_event(payload: dict[str, object]) -> None:
+        # 受信イベントは現時点ではログ記録のみに限定し、将来の
+        # インデックスウォームアップや前処理フック拡張点として扱う。
+        logger.info(
+            "librarian_ingest_event_received",
+            event_type=str(payload.get("type", "unknown")),
+            job_id=str(payload.get("job_id", "")),
+            file_id=str(payload.get("file_id", "")),
+        )
+
     # 起動時必須設定のバリデーション
     if not cfg.gemini_api_key:
         logger.error("GEMINI_API_KEY is required but not set")
@@ -150,10 +163,23 @@ def serve() -> None:
     server.start()
     ready_event.set()
 
+    if cfg.kafka_enabled:
+        kafka_consumer = IngestEventConsumer(
+            brokers=cfg.kafka_brokers,
+            topic=cfg.kafka_topic_ingest,
+            group_id=cfg.kafka_group_id,
+            on_event=on_ingest_event,
+        )
+        kafka_consumer.start()
+    else:
+        logger.info("librarian_kafka_consumer_disabled")
+
     # ─── シグナルハンドリング ────────────────────────────────────────
     def _graceful_shutdown(signum: int, frame: object) -> None:
         logger.info("シャットダウンシグナルを受信。グレースフルシャットダウン開始", signum=signum)
         ready_event.clear()
+        if kafka_consumer is not None:
+            kafka_consumer.stop()
         health_server.shutdown()
         health_server.server_close()
         # 5秒以内に既存ストリームを完了させてから停止

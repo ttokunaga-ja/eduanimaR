@@ -27,6 +27,17 @@ class Config:
     max_results: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_RESULTS", "10")))
     timeout_ms: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_TIMEOUT_MS", "30000")))
 
+    # Kafka consumer (optional)
+    kafka_enabled: bool = field(default_factory=lambda: os.getenv("LIBRARIAN_KAFKA_ENABLED", "false").lower() == "true")
+    kafka_brokers: str = field(default_factory=lambda: os.getenv("KAFKA_BROKERS", "localhost:9094"))
+    kafka_topic_ingest: str = field(default_factory=lambda: os.getenv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"))
+    kafka_group_id: str = field(
+        default_factory=lambda: os.getenv(
+            "LIBRARIAN_KAFKA_GROUP_ID",
+            "librarian-ingest-consumer",
+        )
+    )
+
     # ロギング
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 

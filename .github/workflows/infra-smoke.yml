@@ -48,7 +48,7 @@ jobs:
             echo "waiting for professor... ($i)"; sleep 5
           done
 
-      - name: Check Professor API: /api/v1/subjects
+      - name: "Check Professor API: /api/v1/subjects"
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v1/subjects || true)
           echo "status=$status"

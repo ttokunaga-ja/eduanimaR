@@ -1,5 +1,8 @@
 # Docs Portal（Frontend / FSD Template）
 
+> Phase 3 Note: 横断運用ポリシー（CI/CD, セキュリティ共通基準, インシデント運用, 可観測性共通項目）は
+> `ops/docs/` が canonical。`apps/web/docs/05_operations/` は Web 固有差分のみを保持する。
+
 Last-updated: 2026-02-17  
 Status: Published  
 Owner: @ttokunaga-ja
