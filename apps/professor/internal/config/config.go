@@ -33,16 +33,16 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:           getEnv("PORT", "8080"),
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://professor:professor@localhost:5432/professor?sslmode=disable"),
+		DatabaseURL:    getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
 		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
-		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
-		MinioBucket:    getEnv("MINIO_BUCKET", "eduanima"),
+		MinioAccessKey: getEnv("MINIO_ROOT_USER", "minioadmin"),
+		MinioSecretKey: getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
+		MinioBucket:    getEnv("MINIO_BUCKET", "eduanima-materials"),
 		MinioUseSSL:    false,
-		KafkaBrokers:   getEnv("KAFKA_BROKERS", "localhost:9092"),
-		KafkaTopic:     getEnv("KAFKA_TOPIC", "eduanima.ingest.jobs"),
+		KafkaBrokers:   getEnv("KAFKA_BROKERS", "localhost:9094"),
+		KafkaTopic:     getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
 		GeminiAPIKey:   getEnv("GEMINI_API_KEY", ""),
-		LibrarianAddr:  getEnv("LIBRARIAN_ADDR", "localhost:50051"),
+		LibrarianAddr:  getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
 	}
 }
 

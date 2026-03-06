@@ -10,7 +10,7 @@
 .PHONY: help infra dev prod down restart logs ps \
         migrate migrate-dry migrate-hash smoke-kafka build build-prod \
         test-all test-professor test-librarian test-frontend \
-	lint-all typecheck-web typecheck-librarian test-professor-race lock-policy-check web-codegen-guard build-web build-smoke contract-smoke env-validate verify verify-apps ci-local clean \
+	lint-all typecheck-web typecheck-librarian test-professor-race lock-policy-check web-codegen-guard phase2-standards-check build-web build-smoke contract-smoke env-validate verify verify-apps ci-local clean \
         deploy deploy-librarian deploy-professor deploy-frontend
 
 # ─────────────────────────────────────────────────────────────
@@ -224,6 +224,10 @@ test-professor-race:
 lock-policy-check:
 	@./scripts/verify-lock-policy.sh
 
+## phase2-standards-check: ops/env/observability の Phase2 標準を検証
+phase2-standards-check:
+	@./scripts/verify-phase2-standards.sh
+
 ## typecheck-web: Frontend の TypeScript 型チェックを実行
 typecheck-web:
 	@echo "==> [Frontend] TypeScript typecheck..."
@@ -261,7 +265,7 @@ contract-smoke:
 	cd apps/librarian && make proto
 
 ## verify-apps: リリース前の最低検証（lint + test + contract + build smoke）
-verify-apps: lock-policy-check lint-all test-all test-professor-race typecheck-librarian typecheck-web web-codegen-guard contract-smoke build-smoke
+verify-apps: lock-policy-check phase2-standards-check lint-all test-all test-professor-race typecheck-librarian typecheck-web web-codegen-guard contract-smoke build-smoke
 	@echo "✅ アプリケーション横断の最低検証が完了しました"
 
 ## verify: CI 互換のローカル検証エントリーポイント

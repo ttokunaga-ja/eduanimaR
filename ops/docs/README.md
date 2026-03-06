@@ -13,3 +13,4 @@ This directory centralizes canonical operational docs for release and incident w
 	- Librarian: `GET /healthz`, `GET /readyz` on `LIBRARIAN_HEALTH_PORT`
 	- Web: `GET /api/healthz`, `GET /api/readyz`
 - Common observability keys: `request_id`, `trace_id`, `user_id`
+- Verification command: `./scripts/verify-phase2-standards.sh` (also included in `make verify`)
