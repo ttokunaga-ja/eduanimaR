@@ -23,11 +23,12 @@ from concurrent import futures
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import grpc
+import structlog
 
 from librarian.config import load as load_config
 from librarian.server import create_servicer
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def start_health_server(port: int, ready_event: threading.Event) -> ThreadingHTTPServer:
@@ -57,17 +58,31 @@ def start_health_server(port: int, ready_event: threading.Event) -> ThreadingHTT
     server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    logger.info("HTTP health server started: 0.0.0.0:%d", port)
+    logger.info("HTTP health server started", port=port)
     return server
 
 
 def setup_logging(log_level: str) -> None:
-    """構造化ロギングのセットアップ。"""
+    """構造化ロギングのセットアップ・ structlog を JSON レンダラーで設定する。"""
     level = getattr(logging, log_level.upper(), logging.INFO)
+    # stdlib logging を structlog のバックエンドとして設定
     logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        format="%(message)s",
         stream=sys.stdout,
+        level=level,
+    )
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.add_logger_name,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.JSONRenderer(),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(level),
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
     )
 
 
@@ -76,13 +91,18 @@ def serve() -> None:
     cfg = load_config()
     setup_logging(cfg.log_level)
 
+    # 起動時必須設定のバリデーション
+    if not cfg.gemini_api_key:
+        logger.error("GEMINI_API_KEY is required but not set")
+        sys.exit(1)
+
     # proto stubs を遅延インポート（make proto 後に利用可能）
     try:
         from librarian.v1 import librarian_pb2_grpc  # type: ignore[import]
     except ImportError as e:
         logger.error(
-            "proto stubs が見つかりません。`make proto` を実行してください: %s",
-            e,
+            "proto stubs が見つかりません。`make proto` を実行してください",
+            error=str(e),
         )
         sys.exit(1)
 
@@ -126,13 +146,13 @@ def serve() -> None:
     listen_addr = f"[::]:{cfg.port}"
     server.add_insecure_port(listen_addr)
 
-    logger.info("Librarian gRPC サーバーを起動します: %s", listen_addr)
+    logger.info("Librarian gRPC サーバーを起動します", listen_addr=listen_addr)
     server.start()
     ready_event.set()
 
     # ─── シグナルハンドリング ────────────────────────────────────────
     def _graceful_shutdown(signum: int, frame: object) -> None:
-        logger.info("シャットダウンシグナルを受信しました (signum=%d)。グレースフルシャットダウン開始...", signum)
+        logger.info("シャットダウンシグナルを受信。グレースフルシャットダウン開始", signum=signum)
         ready_event.clear()
         health_server.shutdown()
         health_server.server_close()

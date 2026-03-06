@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
 
 // FixtureUserID と FixtureSubjectID は全テストで共通利用する固定 UUID

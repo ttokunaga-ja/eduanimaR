@@ -12,9 +12,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	librarianv1 "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
+	librarianv1 "github.com/ttokunaga-ja/eduanimaR/apps/professor/gen/proto/librarian/v1"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
 
 const (

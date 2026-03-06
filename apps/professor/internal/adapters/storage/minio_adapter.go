@@ -9,7 +9,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
 
 type minioAdapter struct {

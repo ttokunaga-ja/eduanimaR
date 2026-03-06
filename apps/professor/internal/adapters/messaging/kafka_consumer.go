@@ -7,7 +7,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
 
 type kafkaConsumer struct {

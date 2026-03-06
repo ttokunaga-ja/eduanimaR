@@ -1,5 +1,5 @@
 {
-  "name": "codingagent-fsd-template",
+  "name": "eduanima-web",
   "private": true,
   "scripts": {
     "dev": "next dev",

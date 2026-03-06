@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
 
 // mapDBError は database/sql レベルのエラーをドメインエラーに変換する。

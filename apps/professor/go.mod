@@ -1,4 +1,4 @@
-module github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor
+module github.com/ttokunaga-ja/eduanimaR/apps/professor
 
 go 1.25
 
@@ -61,6 +61,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 // indirect
 	go.opentelemetry.io/otel v1.32.0 // indirect
 	go.opentelemetry.io/otel/metric v1.32.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.46.0 // indirect

@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	pgvector "github.com/pgvector/pgvector-go"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
 
 // UserRepository はユーザーの永続化操作を抽象化する

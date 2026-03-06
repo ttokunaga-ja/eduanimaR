@@ -16,15 +16,15 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
-	grpcadapter "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/grpc"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/http/handlers"
-	httpmw "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/http/middleware"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/llm"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/messaging"
-	pgadapter "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/postgres"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/storage"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/config"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/usecases"
+	grpcadapter "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/grpc"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/handlers"
+	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/llm"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/messaging"
+	pgadapter "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/postgres"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/storage"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/config"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/usecases"
 )
 
 func main() {
@@ -36,7 +36,19 @@ func main() {
 
 	// ─── 設定読み込み ─────────────────────────────────────────
 	cfg := config.Load()
-	slog.Info("config loaded", "port", cfg.Port)
+	if err := config.Validate(cfg); err != nil {
+		slog.Error("configuration validation failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("config loaded", "port", cfg.Port, "app_env", cfg.AppEnv)
+
+	// ─── OpenTelemetry 初期化 ────────────────────────────────
+	shutdownTracer := initTracer(cfg.OtelServiceName, cfg.OtelEndpoint)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		shutdownTracer(shutdownCtx)
+	}()
 
 	// ─── ルートコンテキスト（アダプタのライフタイム用） ──────
 	rootCtx, rootCancel := context.WithCancel(context.Background())
@@ -123,7 +135,16 @@ func main() {
 
 	// グローバルミドルウェア
 	e.Use(echomw.RequestID())
-	e.Use(httpmw.DevUser()) // Phase 1: 固定 dev user を設定
+	e.Use(echomw.RateLimiter(echomw.NewRateLimiterMemoryStore(20)))
+
+	// 認証ミドルウェア: 開発環境では固定 DevUser、本番では RequireAuth（Phase 2 で JWT に置き換え）
+	if cfg.AppEnv == "production" {
+		slog.Warn("APP_ENV=production: RequireAuth middleware active (JWT not yet implemented — Phase 2)")
+		e.Use(httpmw.RequireAuth())
+	} else {
+		slog.Warn("APP_ENV=development: DevUser middleware active — DO NOT use in production")
+		e.Use(httpmw.DevUser())
+	}
 	e.Use(httpmw.RequestLog())
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())

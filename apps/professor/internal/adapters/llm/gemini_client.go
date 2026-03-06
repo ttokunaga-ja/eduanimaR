@@ -10,7 +10,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
 
 const (

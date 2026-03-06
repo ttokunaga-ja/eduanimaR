@@ -621,7 +621,7 @@ const file_librarian_v1_librarian_proto_rawDesc = "" +
 	"error_type\x18\x01 \x01(\tR\terrorType\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2X\n" +
 	"\x10LibrarianService\x12D\n" +
-	"\x05Think\x12\x1a.librarian.v1.ThinkRequest\x1a\x1b.librarian.v1.ThinkResponse(\x010\x01BZZXgithub.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1b\x06proto3"
+	"\x05Think\x12\x1a.librarian.v1.ThinkRequest\x1a\x1b.librarian.v1.ThinkResponse(\x010\x01BZZXgithub.com/ttokunaga-ja/eduanimaR/apps/professor/gen/proto/librarian/v1;librarianv1b\x06proto3"
 
 var (
 	file_librarian_v1_librarian_proto_rawDescOnce sync.Once

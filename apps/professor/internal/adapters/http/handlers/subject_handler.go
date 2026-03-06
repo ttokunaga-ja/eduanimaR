@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	httpmw "github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/adapters/http/middleware"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/usecases"
+	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/usecases"
 )
 
 // SubjectHandler は科目 REST ハンドラー

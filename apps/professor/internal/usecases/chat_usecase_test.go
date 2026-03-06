@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/testhelper"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/usecases"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/testhelper"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/usecases"
 )
 
 // ─── テストヘルパー ────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
 
 // ctxKeyUserID はコンテキストへのユーザーID格納キー

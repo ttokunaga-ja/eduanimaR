@@ -11,8 +11,8 @@ import (
 	pgvector "github.com/pgvector/pgvector-go"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
 
 // ─── SubjectRepository ────────────────────────────────────────────

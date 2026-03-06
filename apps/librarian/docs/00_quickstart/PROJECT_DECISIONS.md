@@ -26,7 +26,7 @@ AI/人間が推測で穴埋めしないために、まずここを埋めてか�
 - **Professor ↔ Librarian（gRPC / Protocol Buffers）**:
   - **SSOT（契約の正）**: `contracts/proto/librarian/v1/librarian.proto`
   - RPC: `LibrarianService.Reason`（双方向ストリーミング）
-  - HTTP/JSON（`openapi.librarian.yaml`）は参考定義。実装では proto を使うこと
+  - HTTP/JSON（`openapi.librarian.reference.yaml`）は参考定義。実装では proto を使うこと
 - 互換性ポリシー（`API_VERSIONING_DEPRECATION.md` と整合）:
   - フィールド追加は互換、フィールド削除/番号変更は破壊的（proto のルールを遵守）
 

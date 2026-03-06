@@ -6,7 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/domain"
+	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
 
 // ErrorBody はエラーレスポンスの共通形式

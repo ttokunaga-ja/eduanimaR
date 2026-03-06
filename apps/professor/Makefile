@@ -4,7 +4,7 @@
 .PHONY: all proto sqlc generate migrate migrate-dry migrate-hash \
         build run dev test test-unit test-integration test-contract lint fmt clean help
 
-MODULE  = github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor
+MODULE  = github.com/ttokunaga-ja/eduanimaR/apps/professor
 BINARY  = bin/eduanima-professor
 DATABASE_URL ?= postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable
 

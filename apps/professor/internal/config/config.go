@@ -1,10 +1,17 @@
 // Package config は環境変数からアプリケーション設定を読み込む。
 package config
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 // Config はアプリケーション全体の設定を保持する。
 type Config struct {
+	// 実行環境: "development" | "production"
+	// APP_ENV=production の場合は DevUser ミドルウェアが無効化される。
+	AppEnv string
+
 	// HTTP サーバー
 	Port string
 
@@ -27,23 +34,40 @@ type Config struct {
 
 	// Librarian gRPC サービス
 	LibrarianAddr string
+
+	// OpenTelemetry (optional)
+	// 空文字の場合は noop プロバイダーを使用。
+	// 例: "http://otel-collector:4317" (OTLP gRPC)
+	OtelEndpoint    string
+	OtelServiceName string
 }
 
 // Load は環境変数から Config を構築して返す。
 func Load() *Config {
 	return &Config{
-		Port:           getEnv("PORT", "8080"),
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
-		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey: getEnv("MINIO_ROOT_USER", "minioadmin"),
-		MinioSecretKey: getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
-		MinioBucket:    getEnv("MINIO_BUCKET", "eduanima-materials"),
-		MinioUseSSL:    false,
-		KafkaBrokers:   getEnv("KAFKA_BROKERS", "localhost:9094"),
-		KafkaTopic:     getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
-		GeminiAPIKey:   getEnv("GEMINI_API_KEY", ""),
-		LibrarianAddr:  getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
+		AppEnv:          getEnv("APP_ENV", "development"),
+		Port:            getEnv("PORT", "8080"),
+		DatabaseURL:     getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
+		MinioEndpoint:   getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinioAccessKey:  getEnv("MINIO_ROOT_USER", "minioadmin"),
+		MinioSecretKey:  getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
+		MinioBucket:     getEnv("MINIO_BUCKET", "eduanima-materials"),
+		MinioUseSSL:     false,
+		KafkaBrokers:    getEnv("KAFKA_BROKERS", "localhost:9094"),
+		KafkaTopic:      getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
+		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
+		LibrarianAddr:   getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
+		OtelEndpoint:    getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "eduanima-professor"),
 	}
+}
+
+// Validate は起動に必須の設定項目を検証して最初に発見したエラーを返す。
+func Validate(cfg *Config) error {
+	if cfg.GeminiAPIKey == "" {
+		return fmt.Errorf("GEMINI_API_KEY is required")
+	}
+	return nil
 }
 
 func getEnv(key, defaultVal string) string {

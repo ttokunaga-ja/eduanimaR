@@ -83,7 +83,7 @@ make clean         # コンテナ + ボリューム全削除
   - `GET /v1/subjects/{subject_id}/chats`
   - `POST /v1/subjects/{subject_id}/chats/{chat_id}/feedback`
 - [x] `contracts/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
-- [x] `apps/professor/docs/openapi.librarian.yaml`のgRPC位置づけが明記されている
+- [x] `apps/professor/docs/openapi.librarian.reference.yaml`のgRPC位置づけが明記されている
 
 ### バックエンド（Professor）
 - [x] `apps/professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある

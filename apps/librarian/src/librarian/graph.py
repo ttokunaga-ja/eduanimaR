@@ -15,10 +15,11 @@ Phase 3 では:
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any, TypedDict
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 # ─── グラフ状態 ─────────────────────────────────────────────────────
@@ -115,7 +116,8 @@ def node_search(state: AgentState) -> AgentState:
     """SEARCH アクションの状態更新（クエリ生成のみ、実際の検索は Professor が行う）。"""
     logger.debug(
         "node_search",
-        extra={"loop_count": state["loop_count"], "request_id": state["request_id"]},
+        loop_count=state["loop_count"],
+        request_id=state["request_id"],
     )
     # このノードはクエリを生成するだけ。
     # 実際の検索実行・結果受信は server.py の gRPC ストリームで行う。

@@ -18,15 +18,15 @@ LibrarianServicer: gRPC 双方向ストリーミング実装
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 
 import grpc
+import structlog
 
 from librarian.config import Config
 from librarian.graph import build_search_queries, deserialize_state, select_evidence
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def obs_fields(request_id: str, user_id: str = "unknown") -> dict[str, str]:
@@ -89,11 +89,9 @@ class LibrarianServicer:
 
                     logger.info(
                         "Think セッション開始",
-                        extra={
-                            **obs_fields(request_id),
-                            "subject_id": subject_id,
-                            "max_loops": max_loops,
-                        },
+                        **obs_fields(request_id),
+                        subject_id=subject_id,
+                        max_loops=max_loops,
                     )
 
                     # ─── SearchAction を生成して送信 ──────────────────
@@ -109,7 +107,8 @@ class LibrarianServicer:
                     )
                     logger.info(
                         "SearchAction 送信",
-                        extra={**obs_fields(request_id), "queries": queries},
+                        **obs_fields(request_id),
+                        queries=queries,
                     )
                     yield response
                     loop_count += 1
@@ -119,11 +118,9 @@ class LibrarianServicer:
                 search_results = deserialize_state(req.state)
                 logger.info(
                     "検索結果受信",
-                    extra={
-                        **obs_fields(request_id),
-                        "results_count": len(search_results),
-                        "loop_count": loop_count,
-                    },
+                    **obs_fields(request_id),
+                    results_count=len(search_results),
+                    loop_count=loop_count,
                 )
 
                 # ループ上限チェック
@@ -136,7 +133,7 @@ class LibrarianServicer:
                         request_id=request_id,
                         error=error_action,
                     )
-                    logger.warning("LOOP_LIMIT 到達", extra=obs_fields(request_id))
+                    logger.warning("LOOP_LIMIT 到達", **obs_fields(request_id))
                     return
 
                 # ─── CompleteAction を生成して送信 ────────────────────
@@ -162,10 +159,8 @@ class LibrarianServicer:
                 )
                 logger.info(
                     "CompleteAction 送信",
-                    extra={
-                        **obs_fields(request_id),
-                        "evidence_count": len(evidence_list),
-                    },
+                    **obs_fields(request_id),
+                    evidence_count=len(evidence_list),
                 )
                 # Phase 1: 1回の検索で完了
                 return
@@ -173,12 +168,13 @@ class LibrarianServicer:
         except grpc.RpcError as rpc_err:
             logger.error(
                 "gRPC エラー",
-                extra={**obs_fields(request_id), "error": str(rpc_err)},
+                **obs_fields(request_id),
+                error=str(rpc_err),
             )
             raise
 
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Think 内部エラー", extra=obs_fields(request_id))
+            logger.exception("Think 内部エラー", **obs_fields(request_id))
             try:
                 from librarian.v1 import librarian_pb2  # type: ignore[import]
 
