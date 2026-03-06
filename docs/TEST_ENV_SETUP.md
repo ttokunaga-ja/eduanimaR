@@ -1,7 +1,7 @@
 # テスト環境整備計画
 
 **作成日**: 2026-02-18  
-**対象**: eduanimaR (Next.js 15), eduanimaR_Professor (Go 1.25), eduanimaR_Librarian (Python 3.12)
+**対象**: eduanimaR (Next.js 15), apps/professor (Go 1.25), apps/librarian (Python 3.12)
 
 ---
 
@@ -10,8 +10,8 @@
 | コンポーネント | 状態 | 詳細 |
 |---|---|---|
 | **eduanimaR** (Frontend) | ⚠️ 未整備 | `vitest@3`, `@playwright/test` は package.json に存在するが、`vitest.config.ts` / `playwright.config.ts` / `@testing-library/react` がない |
-| **eduanimaR_Professor** (Go) | ⚠️ 最小 | SSOT 契約テスト 1本のみ (`contracttest/ssot_test.go`)。Unit / Integration は未作成 |
-| **eduanimaR_Librarian** (Python) | ❌ 未整備 | テストファイルなし。pytest の設定もなし |
+| **apps/professor** (Go) | ⚠️ 最小 | SSOT 契約テスト 1本のみ (`contracttest/ssot_test.go`)。Unit / Integration は未作成 |
+| **apps/librarian** (Python) | ❌ 未整備 | テストファイルなし。pytest の設定もなし |
 
 ---
 
@@ -134,12 +134,12 @@ e2e/
 
 ---
 
-## Phase 2: Professor バックエンド（eduanimaR_Professor）テスト環境
+## Phase 2: Professor バックエンド（apps/professor）テスト環境
 
 ### 2-1. 依存パッケージの追加
 
 ```bash
-cd eduanimaR_Professor
+cd apps/professor
 
 # Unit テスト用
 go get github.com/stretchr/testify@v1.9.0
@@ -156,13 +156,13 @@ go get github.com/testcontainers/testcontainers-go/modules/kafka@v0.36.0
 ### 2-2. モック生成設定（`.mockery.yaml`）
 
 ```yaml
-# eduanimaR_Professor/.mockery.yaml
+# apps/professor/.mockery.yaml
 with-expecter: true
 dir: "internal/ports/mocks"
 mockname: "Mock{{.InterfaceName}}"
 outpkg: "mocks"
 packages:
-  github.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/internal/ports:
+  github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports:
     interfaces:
       QuestionRepository:
       SubjectRepository:
@@ -181,7 +181,7 @@ mockery
 ### 2-3. `Makefile` テストターゲット
 
 ```makefile
-# eduanimaR_Professor/Makefile
+# apps/professor/Makefile
 
 .PHONY: test test-unit test-integration test-contract
 
@@ -243,12 +243,12 @@ internal/testhelper/
 
 ---
 
-## Phase 3: Librarian（eduanimaR_Librarian）テスト環境
+## Phase 3: Librarian（apps/librarian）テスト環境
 
 ### 3-1. pytest セットアップ
 
 ```bash
-cd eduanimaR_Librarian
+cd apps/librarian
 
 # pyproject.toml または requirements-dev.txt に追加
 pip install pytest pytest-asyncio pytest-cov pytest-mock
@@ -270,7 +270,7 @@ omit = ["src/**/generated/*"]
 ### 3-2. テストディレクトリ構成
 
 ```
-eduanimaR_Librarian/
+apps/librarian/
   tests/
     unit/
       test_reason_service.py     # Reason ユースケース（LLM クライアントをモック）
@@ -319,7 +319,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
       - run: go test ./internal/usecases/... -v -count=1
-        working-directory: eduanimaR_Professor
+        working-directory: apps/professor
 
   test-contract:
     runs-on: ubuntu-latest
@@ -328,7 +328,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
       - run: go test ./internal/contracttest/... -v
-        working-directory: eduanimaR_Professor
+        working-directory: apps/professor
 
   test-integration:
     runs-on: ubuntu-latest
@@ -338,7 +338,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
       - run: go test ./internal/adapters/... -v -count=1 -tags=integration
-        working-directory: eduanimaR_Professor
+        working-directory: apps/professor
 ```
 
 ---
@@ -377,5 +377,5 @@ Month 2: Playwright E2E の主要導線（ホーム → チャット → 回答�
 ## 参照ドキュメント
 
 - `eduanimaR/docs/04_testing/TEST_STRATEGY.md`
-- `eduanimaR_Professor/docs/04_testing/TEST_STRATEGY.md`
-- `eduanimaR_Professor/docs/04_testing/TEST_PYRAMID.md`
+- `apps/professor/docs/04_testing/TEST_STRATEGY.md`
+- `apps/professor/docs/04_testing/TEST_PYRAMID.md`

@@ -1,0 +1,79 @@
+name: contract-drift
+
+# contracts/ の変更、または orval.config / src/shared/api/ の変更時に実行
+# 目的: OpenAPI → TS 生成コードの乖離 / Proto の breaking change を検出する
+on:
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'apps/web/orval.config.*'
+      - 'apps/web/src/shared/api/**'
+      - 'apps/professor/buf.gen.yaml'
+      - '.github/workflows/contract-drift.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # 1. OpenAPI → TypeScript 生成コードの drift チェック
+  # ────────────────────────────────────────────────────────────
+  openapi-drift:
+    name: OpenAPI codegen drift
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate API client from contracts/openapi/professor.yaml
+        run: npm run api:generate
+
+      - name: Fail if generated output changed (drift detected)
+        run: |
+          if ! git diff --exit-code; then
+            echo ""
+            echo "❌ OpenAPI drift detected!"
+            echo "   contracts/openapi/professor.yaml と生成コードが一致しません。"
+            echo "   ローカルで 'npm run api:generate' を実行してコミットしてください。"
+            exit 1
+          fi
+          echo "✅ OpenAPI codegen is up to date."
+
+  # ────────────────────────────────────────────────────────────
+  # 2. Proto breaking change チェック
+  # ────────────────────────────────────────────────────────────
+  proto-breaking:
+    name: Proto breaking change check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup buf CLI
+        uses: bufbuild/buf-setup-action@v1
+
+      - name: Proto lint
+        run: buf lint contracts/proto
+
+      - name: Proto breaking change check (vs. main branch)
+        run: |
+          buf breaking contracts/proto \
+            --against "https://github.com/${GITHUB_REPOSITORY}.git#branch=main,subdir=contracts/proto" \
+            || (echo "❌ Breaking change detected in contracts/proto/!" && exit 1)
+          echo "✅ No proto breaking changes."

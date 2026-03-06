@@ -119,12 +119,12 @@ ps:
 ## migrate: DB マイグレーションを適用（postgres 起動後に実行）
 migrate:
 	@echo "==> マイグレーション適用中..."
-	cd eduanimaR_Professor && make migrate
+	cd apps/professor && make migrate
 	@echo "✅ マイグレーション完了"
 
 ## migrate-dry: 未適用マイグレーションを確認（適用しない）
 migrate-dry:
-	cd eduanimaR_Professor && make migrate-dry
+	cd apps/professor && make migrate-dry
 
 ## smoke-kafka: Kafka の内部トピックと Consumer 接続が正常かを確認するスモークテスト
 ## 　使いどころ: make dev 後にセットアップが正常か確認したい場合
@@ -148,9 +148,9 @@ smoke-kafka:
 ## 　  実行しないと atlas migrate apply が "ERR: checksum mismatch" で失敗する
 migrate-hash:
 	@echo "==> Atlas migrate hash 再生成中..."
-	cd eduanimaR_Professor && atlas migrate hash --dir "file://schema/migrations"
+	cd apps/professor && atlas migrate hash --dir "file://schema/migrations"
 	@echo "✅ atlas.sum を更新しました"
-	@echo "   git add eduanimaR_Professor/schema/migrations/atlas.sum でコミットしてください"
+	@echo "   git add apps/professor/schema/migrations/atlas.sum でコミットしてください"
 
 # ─────────────────────────────────────────────────────────────
 # ビルド
@@ -175,22 +175,22 @@ test-all: test-professor test-librarian test-frontend
 ## test-professor: Go ユニットテスト（外部依存不要）
 test-professor:
 	@echo "==> [Professor] Go ユニットテスト..."
-	cd eduanimaR_Professor && make test-unit
+	cd apps/professor && make test-unit
 
 ## test-librarian: Python ユニットテスト
 test-librarian:
 	@echo "==> [Librarian] Python ユニットテスト..."
-	cd eduanimaR_Librarian && make test
+	cd apps/librarian && make test
 
 ## test-frontend: フロントエンド ユニットテスト
 test-frontend:
 	@echo "==> [Frontend] Vitest ユニットテスト..."
-	cd eduanimaR && npm run test
+	cd apps/web && npm run test
 
 ## test-e2e: E2E テスト（dev サーバーが起動している状態で実行）
 test-e2e:
 	@echo "==> [Frontend] Playwright E2E テスト..."
-	cd eduanimaR && npm run test:e2e
+	cd apps/web && npm run test:e2e
 
 # ─────────────────────────────────────────────────────────────
 # Lint
@@ -199,11 +199,11 @@ test-e2e:
 ## lint-all: 全サービスの Lint を実行
 lint-all:
 	@echo "==> [Professor] golangci-lint..."
-	cd eduanimaR_Professor && make lint
+	cd apps/professor && make lint
 	@echo "==> [Librarian] ruff..."
-	cd eduanimaR_Librarian && make lint
+	cd apps/librarian && make lint
 	@echo "==> [Frontend] ESLint..."
-	cd eduanimaR && npm run lint
+	cd apps/web && npm run lint
 
 # ─────────────────────────────────────────────────────────────
 # クリーン
@@ -246,7 +246,7 @@ deploy-librarian:
 	@echo "==> [Librarian] Cloud Run デプロイ中..."
 	docker build --target=runtime \
 		-t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-librarian:$(SHORT_SHA) \
-		./eduanimaR_Librarian
+		./apps/librarian
 	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-librarian:$(SHORT_SHA)
 	gcloud run deploy eduanima-librarian \
 		--image=$(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-librarian:$(SHORT_SHA) \
@@ -261,7 +261,7 @@ deploy-professor:
 	@echo "==> [Professor] Cloud Run デプロイ中..."
 	docker build --target=production \
 		-t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-professor:$(SHORT_SHA) \
-		./eduanimaR_Professor
+		./apps/professor
 	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-professor:$(SHORT_SHA)
 	gcloud run deploy eduanima-professor \
 		--image=$(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-professor:$(SHORT_SHA) \
@@ -276,7 +276,7 @@ deploy-frontend:
 	@echo "==> [Frontend] Cloud Run デプロイ中..."
 	docker build --target=production \
 		-t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-frontend:$(SHORT_SHA) \
-		./eduanimaR
+		./apps/web
 	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-frontend:$(SHORT_SHA)
 	gcloud run deploy eduanima-frontend \
 		--image=$(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/eduanima-frontend:$(SHORT_SHA) \

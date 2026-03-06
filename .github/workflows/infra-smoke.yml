@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - 'docker-compose.yml'
-      - 'eduanimaR/**'
+      - 'apps/web/**'
+      - 'apps/professor/**'
+      - 'apps/librarian/**'
+      - 'contracts/**'
       - '.github/workflows/**'
   workflow_dispatch: {}
 
@@ -29,7 +32,7 @@ jobs:
       - name: Apply DB migrations
         run: |
           # Atlas is not installed on the runner; apply SQL directly to Postgres container
-          cat eduanimaR_Professor/schema/migrations/001_init.sql | docker compose exec -T postgres psql -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}
+          cat apps/professor/schema/migrations/001_init.sql | docker compose exec -T postgres psql -U ${POSTGRES_USER:-eduanima} -d ${POSTGRES_DB:-eduanima_professor}
 
       - name: Start Professor
         run: |

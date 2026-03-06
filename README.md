@@ -5,12 +5,13 @@ AI（Coding Agent）と人間が迷わずに開発を開始できるよう、設
 
 ## サービス構成
 
-| リポジトリ | 役割 | 言語/フレームワーク |
+| ディレクトリ | 役割 | 言語/フレームワーク |
 |---|---|---|
-| `eduanimaR/` | フロントエンド | Next.js / FSD / TypeScript |
-| `eduanimaR_Professor/` | バックエンド（API・DB・検索実行） | Go / Clean Architecture |
-| `eduanimaR_Librarian/` | 推論サービス（検索戦略・停止判断） | Python / LangGraph |
-| `eduanimaRHandbook/` | サービスコンセプト・戦略・プロダクト定義 | — |
+| `apps/web/` | フロントエンド | Next.js / FSD / TypeScript |
+| `apps/professor/` | バックエンド（API・DB・検索実行） | Go / Clean Architecture |
+| `apps/librarian/` | 推論サービス（検索戦略・停止判断） | Python / LangGraph |
+| `contracts/` | サービス間契約 SSOT（OpenAPI / Proto） | — |
+| `handbook/` | サービスコンセプト・戦略・プロダクト定義 | — |
 
 ## ⚡ クイックスタート（Docker-first）
 
@@ -42,17 +43,18 @@ make test-all      # 全テスト（ユニット）
 make clean         # コンテナ + ボリューム全削除
 ```
 
-> 詳細: [`eduanimaR/docs/03_integration/DOCKER_ENV.md`](eduanimaR/docs/03_integration/DOCKER_ENV.md)
+> 詳細: [`apps/web/docs/03_integration/DOCKER_ENV.md`](apps/web/docs/03_integration/DOCKER_ENV.md)
 
 ---
 
 ## 読む順（最短）
 
-1. サービス概念: `eduanimaRHandbook/README.md`
-2. バックエンド契約（SSOT）: `eduanimaR_Professor/docs/README.md`
-3. フロントエンド構成: `eduanimaR/docs/README.md`
-4. 推論サービス境界: `eduanimaR_Librarian/docs/README.md`
-5. Docker 環境詳細: `eduanimaR/docs/03_integration/DOCKER_ENV.md`
+1. サービス概念: `handbook/README.md`
+2. バックエンド契約（SSOT）: `apps/professor/docs/README.md`
+3. フロントエンド構成: `apps/web/docs/README.md`
+4. 推論サービス境界: `apps/librarian/docs/README.md`
+5. サービス間契約（OpenAPI/Proto）: `contracts/README.md`
+6. Docker 環境詳細: `apps/web/docs/03_integration/DOCKER_ENV.md`
 
 ## 基本方針
 
@@ -67,32 +69,32 @@ make clean         # コンテナ + ボリューム全削除
 このリストは、Phase 1（ローカル開発・Web版完全動作）の実装を開始する前に満たすべき条件です。
 
 ### 契約・定義（MUST）
-- [x] `eduanimaR_Professor/docs/openapi.yaml`が以下を定義:
+- [x] `contracts/openapi/professor.yaml`が以下を定義:
   - `POST /v1/auth/dev-login`
   - `POST /v1/subjects/{subject_id}/chats`（SSE）
   - `GET /v1/subjects`
   - `GET /v1/subjects/{subject_id}/materials`
   - `GET /v1/subjects/{subject_id}/chats`
   - `POST /v1/subjects/{subject_id}/chats/{chat_id}/feedback`
-- [x] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
-- [x] `eduanimaR_Professor/docs/openapi.librarian.yaml`のgRPC位置づけが明記されている
+- [x] `contracts/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
+- [x] `apps/professor/docs/openapi.librarian.yaml`のgRPC位置づけが明記されている
 
 ### バックエンド（Professor）
-- [x] `eduanimaR_Professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある
-- [ ] `eduanimaR_Professor/docs/05_operations/CI_CD.md`の最低ゲート（lint/test/contract drift）が実装可能
+- [x] `apps/professor/docs/01_architecture/DB_SCHEMA_DESIGN.md`にER図・テーブル定義がある
+- [ ] `apps/professor/docs/05_operations/CI_CD.md`の最低ゲート（lint/test/contract drift）が実装可能
 - [x] `docker-compose.yml`でProfessor + PostgreSQL + Kafka + Librarianが起動できる（`make dev`）
-- [ ] Professor ↔ Librarian gRPC双方向ストリーミングが実装できる（プロトコル: `proto/librarian/v1/librarian.proto`）
+- [ ] Professor ↔ Librarian gRPC双方向ストリーミングが実装できる（プロトコル: `contracts/proto/librarian/v1/librarian.proto`）
 - [ ] Kafka非同期パイプライン（OCR/Embedding）が実装できる
 
-### フロントエンド（eduanimaR Web版）
-- [ ] `orval.config.ts`がProfessorの`openapi.yaml`を参照している（`eduanimaR/openapi/openapi.yaml` = Professor SSOT と同期済み）
-- [x] `eduanimaR/docs/03_integration/AUTH_SESSION.md`のPhase 1認証スキップ方針が実装可能
+### フロントエンド（Web版）
+- [x] `apps/web/orval.config.ts`が`contracts/openapi/professor.yaml`を参照している
+- [x] `apps/web/docs/03_integration/AUTH_SESSION.md`のPhase 1認証スキップ方針が実装可能
 - [ ] `http://localhost:8080`でProfessorに接続できる
 - [ ] Web版固有機能（科目プルダウン・資料一覧・会話履歴）が実装できる
 
 ### Librarian
-- [x] `eduanimaR_Librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`の責務境界が明確
-- [x] `eduanimaR_Professor/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
+- [x] `apps/librarian/docs/01_architecture/EDUANIMA_LIBRARIAN_SERVICE_SPEC.md`の責務境界が明確
+- [x] `contracts/proto/librarian/v1/librarian.proto`が定義済み（Phase 1から使用）
 - [ ] gRPC双方向ストリーミング接続の準備が整っている（実装待ち）
 
 ### 開発開始の判断

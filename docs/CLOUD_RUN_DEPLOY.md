@@ -330,7 +330,7 @@ jobs:
             --build-arg NEXT_PUBLIC_API_BASE_URL="https://api.eduanima.app" \
             -t $REGISTRY/$PROJECT_ID/eduanima/frontend:${{ steps.tag.outputs.TAG }} \
             -t $REGISTRY/$PROJECT_ID/eduanima/frontend:latest \
-            ./eduanimaR
+            ./apps/web
           docker push $REGISTRY/$PROJECT_ID/eduanima/frontend:${{ steps.tag.outputs.TAG }}
           docker push $REGISTRY/$PROJECT_ID/eduanima/frontend:latest
 
@@ -350,7 +350,7 @@ jobs:
             -t $REGISTRY/$PROJECT_ID/eduanima/professor:${{ steps.tag.outputs.TAG }} \
             -t $REGISTRY/$PROJECT_ID/eduanima/professor:latest \
             --target production \
-            ./eduanimaR_Professor
+            ./apps/professor
           docker push $REGISTRY/$PROJECT_ID/eduanima/professor:${{ steps.tag.outputs.TAG }}
           docker push $REGISTRY/$PROJECT_ID/eduanima/professor:latest
 
@@ -369,7 +369,7 @@ jobs:
           docker build \
             -t $REGISTRY/$PROJECT_ID/eduanima/librarian:${{ steps.tag.outputs.TAG }} \
             -t $REGISTRY/$PROJECT_ID/eduanima/librarian:latest \
-            ./eduanimaR_Librarian
+            ./apps/librarian
           docker push $REGISTRY/$PROJECT_ID/eduanima/librarian:${{ steps.tag.outputs.TAG }}
           docker push $REGISTRY/$PROJECT_ID/eduanima/librarian:latest
 

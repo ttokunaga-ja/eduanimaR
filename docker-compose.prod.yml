@@ -15,7 +15,7 @@ services:
   # production: 最小 runtime イメージ（dev deps なし）
   librarian:
     build:
-      context: ./eduanimaR_Librarian
+      context: ./apps/librarian
       target: runtime
     volumes: []      # ← ボリュームマウント無効化
     working_dir: /app
@@ -28,7 +28,7 @@ services:
   # production: distroless 最小イメージ（air/shell なし）
   professor:
     build:
-      context: ./eduanimaR_Professor
+      context: ./apps/professor
       target: production
     volumes: []      # ← ボリュームマウント無効化
     restart: always
@@ -37,7 +37,7 @@ services:
   # production: Next.js standalone モード（node_modules 不要）
   frontend:
     build:
-      context: ./eduanimaR
+      context: ./apps/web
       target: production
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}

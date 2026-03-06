@@ -71,7 +71,7 @@ steps:
       - --cache-from=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_LIBRARIAN}:latest
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_LIBRARIAN}:$SHORT_SHA
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_LIBRARIAN}:latest
-      - ./eduanimaR_Librarian
+      - ./apps/librarian
 
   - id: push-librarian
     name: gcr.io/cloud-builders/docker
@@ -92,7 +92,7 @@ steps:
       - --cache-from=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_PROFESSOR}:latest
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_PROFESSOR}:$SHORT_SHA
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_PROFESSOR}:latest
-      - ./eduanimaR_Professor
+      - ./apps/professor
 
   - id: push-professor
     name: gcr.io/cloud-builders/docker
@@ -114,7 +114,7 @@ steps:
       - --cache-from=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_FRONTEND}:latest
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_FRONTEND}:$SHORT_SHA
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SVC_FRONTEND}:latest
-      - ./eduanimaR
+      - ./apps/web
 
   - id: push-frontend
     name: gcr.io/cloud-builders/docker

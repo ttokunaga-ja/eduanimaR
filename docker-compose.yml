@@ -156,15 +156,15 @@ services:
 
   # ── Librarian（Python gRPC 推論サービス）─────────────────────
   # dev モード: builder ステージ + src ボリュームマウント
-  # ⚠️ 初回またはproto変更時は: cd eduanimaR_Librarian && make proto
+  # ⚠️ 初回またはproto変更時は: cd apps/librarian && make proto
   librarian:
     build:
-      context: ./eduanimaR_Librarian
+      context: ./apps/librarian
       target: builder
     working_dir: /build
     volumes:
-      - ./eduanimaR_Librarian/src:/build/src       # ソースコード（ホットリロード用）
-      - ./eduanimaR_Librarian/proto:/build/proto   # proto ファイル
+      - ./apps/librarian/src:/build/src             # ソースコード（ホットリロード用）
+      - ./contracts/proto:/build/proto              # proto ファイル（contracts/ が正本）
     environment:
       PYTHONPATH: /build/src
       LIBRARIAN_PORT: ${GRPC_PORT:-50051}
@@ -185,10 +185,10 @@ services:
   # dev モード: air ホットリロード（.air.toml 必須）
   professor:
     build:
-      context: ./eduanimaR_Professor
+      context: ./apps/professor
       target: dev          # air ホットリロードステージ
     volumes:
-      - ./eduanimaR_Professor:/app   # ソースコード全体をマウント
+      - ./apps/professor:/app        # ソースコード全体をマウント
     environment:
       PORT: ${PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-eduanima}:${POSTGRES_PASSWORD:-eduanima_password}@postgres:5432/${POSTGRES_DB:-eduanima_professor}?sslmode=disable
@@ -225,7 +225,7 @@ services:
     image: node:22-alpine
     working_dir: /app
     volumes:
-      - ./eduanimaR:/app           # ソースコード
+      - ./apps/web:/app             # ソースコード
       - /app/node_modules          # コンテナの node_modules を保護（anonymous volume）
       - /app/.next                 # ビルドキャッシュ
     command: sh -c "npm install && npm run dev"
