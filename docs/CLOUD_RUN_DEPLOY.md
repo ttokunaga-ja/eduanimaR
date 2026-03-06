@@ -1,5 +1,7 @@
 # Cloud Run デプロイアーキテクチャ
 
+> 運用導線（Phase 1）: `ops/README.md` / `ops/cloudrun/README.md`
+
 > **ステータス**: Phase 2 設計ドキュメント（Phase 1 はローカル Docker Compose 完結）  
 > **対象リポジトリ**: eduanimaR（モノレポ）  
 > **クラウド**: Google Cloud Platform

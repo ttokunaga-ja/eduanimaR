@@ -1,5 +1,7 @@
 # Cloud Run デプロイアーキテクチャ
 
+> 運用導線（Phase 1）: `ops/README.md` / `ops/cloudrun/README.md`
+
 ## 全体構成
 
 ```

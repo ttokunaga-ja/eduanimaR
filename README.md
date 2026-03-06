@@ -58,6 +58,7 @@ make clean         # コンテナ + ボリューム全削除
 6. Docker 環境詳細: `apps/web/docs/03_integration/DOCKER_ENV.md`
 7. 構造リファクタリング実行バックログ: `docs/REFRACTORING_PHASE1_BACKLOG.md`
 8. テストトポロジ移行ガイド: `docs/TEST_TOPOLOGY_MIGRATION.md`
+9. 運用ポータル（Compose/Cloud Run導線）: `ops/README.md`
 
 ## 基本方針
 
