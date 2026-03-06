@@ -4,10 +4,10 @@
 使い方:
     pytest tests/
 """
+
 from __future__ import annotations
 
 import pytest
-
 
 # ─── 共通フィクスチャ ───────────────────────────────────────────────
 

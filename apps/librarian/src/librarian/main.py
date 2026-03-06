@@ -74,6 +74,7 @@ def serve() -> None:
     # gRPC Reflection を有効化（grpcurl 等のデバッグツール用）
     try:
         from grpc_reflection.v1alpha import reflection  # type: ignore[import]
+
         from librarian.v1 import librarian_pb2  # type: ignore[import]
 
         service_names = (

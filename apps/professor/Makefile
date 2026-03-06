@@ -93,7 +93,12 @@ test-contract:
 
 ## lint: golangci-lint を実行
 lint:
-	golangci-lint run ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "golangci-lint が見つからないため Docker で実行します"; \
+		docker run --rm -v "$(PWD):/app" -w /app golangci/golangci-lint:latest golangci-lint run ./...; \
+	fi
 
 ## fmt: Go コードをフォーマット
 fmt:

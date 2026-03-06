@@ -19,7 +19,7 @@ LibrarianServicer: gRPC 双方向ストリーミング実装
 from __future__ import annotations
 
 import logging
-from typing import Iterator
+from collections.abc import Iterator
 
 import grpc
 
@@ -59,9 +59,7 @@ class LibrarianServicer:
         try:
             from librarian.v1 import librarian_pb2  # type: ignore[import]
         except ImportError as e:
-            logger.error(
-                "proto stubs が見つかりません。`make proto` を実行してください: %s", e
-            )
+            logger.error("proto stubs が見つかりません。`make proto` を実行してください: %s", e)
             context.abort(grpc.StatusCode.INTERNAL, "proto stubs not generated")
             return
 

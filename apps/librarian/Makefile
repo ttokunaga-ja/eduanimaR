@@ -3,16 +3,24 @@
 # Python venv
 VENV := .venv
 PYTHON := $(VENV)/bin/python
-PIP := $(VENV)/bin/pip
+DEPS_STAMP := $(VENV)/.deps-installed
 
 ## ─── 環境セットアップ ──────────────────────────────────────────────
-install: $(VENV)/bin/activate
-
-$(VENV)/bin/activate: pyproject.toml
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install -e ".[dev]"
-	touch $@
+install:
+	@set -e; \
+	if [ ! -x "$(PYTHON)" ] || ! "$(PYTHON)" -c "import sys" >/dev/null 2>&1; then \
+		echo "==> Recreating Python virtual environment"; \
+		rm -rf "$(VENV)"; \
+		python3 -m venv "$(VENV)"; \
+		rm -f "$(DEPS_STAMP)"; \
+	fi; \
+	if [ ! -f "$(DEPS_STAMP)" ] || [ pyproject.toml -nt "$(DEPS_STAMP)" ]; then \
+		echo "==> Installing Python dependencies"; \
+		"$(PYTHON)" -m ensurepip --upgrade; \
+		"$(PYTHON)" -m pip install --upgrade pip; \
+		"$(PYTHON)" -m pip install -e ".[dev]"; \
+		touch "$(DEPS_STAMP)"; \
+	fi
 
 ## ─── Proto コード生成 ─────────────────────────────────────────────
 # contracts/proto/ が正本。grpcio-tools で Python stubs を生成し src/ 以下に配置する
@@ -38,14 +46,14 @@ dev: install
 
 ## ─── 品質チェック ────────────────────────────────────────────────
 lint: install
-	$(VENV)/bin/ruff check src/ tests/
-	$(VENV)/bin/ruff format --check src/ tests/
+	$(VENV)/bin/ruff check src/librarian tests/
+	$(VENV)/bin/ruff format --check src/librarian tests/
 
 format: install
-	$(VENV)/bin/ruff format src/ tests/
+	$(VENV)/bin/ruff format src/librarian tests/
 
 test: install
-	PYTHONPATH=src $(VENV)/bin/pytest tests/ -v
+	PYTHONPATH=src $(PYTHON) -m pytest tests/ -v
 
 ## ─── クリーンアップ ──────────────────────────────────────────────
 clean:

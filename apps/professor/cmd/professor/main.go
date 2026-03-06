@@ -48,7 +48,11 @@ func main() {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("failed to close database connection", "error", err)
+		}
+	}()
 	slog.Info("database connected")
 
 	// ─── MinIO アダプター ─────────────────────────────────────
@@ -67,12 +71,20 @@ func main() {
 
 	// ─── Kafka プロデューサー ─────────────────────────────────
 	publisher := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-	defer publisher.Close()
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			slog.Warn("failed to close kafka producer", "error", err)
+		}
+	}()
 	slog.Info("kafka producer initialized", "brokers", cfg.KafkaBrokers)
 
 	// ─── Kafka コンシューマー（Ingest Worker 用） ─────────────
 	consumer := messaging.NewKafkaConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, "professor-ingest-worker")
-	defer consumer.Close()
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			slog.Warn("failed to close kafka consumer", "error", err)
+		}
+	}()
 	slog.Info("kafka consumer initialized")
 
 	// ─── Gemini LLM クライアント ──────────────────────────────

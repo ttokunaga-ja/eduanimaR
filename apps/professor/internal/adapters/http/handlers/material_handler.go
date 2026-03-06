@@ -112,7 +112,11 @@ func (h *MaterialHandler) Upload(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorBody{Error: "failed to open file"})
 	}
-	defer src.Close()
+	defer func() {
+		if err := src.Close(); err != nil {
+			c.Logger().Errorf("failed to close uploaded file stream: %v", err)
+		}
+	}()
 
 	// Content-Type を判定（フォームのヘッダーを優先）
 	mimeType := fh.Header.Get("Content-Type")

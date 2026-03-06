@@ -109,7 +109,11 @@ func (uc *IngestUseCase) ProcessJob(ctx context.Context, msg ports.IngestMessage
 		processErr = fmt.Errorf("storage download %q: %w", msg.StoragePath, err)
 		return processErr
 	}
-	defer rc.Close()
+	defer func() {
+		if err := rc.Close(); err != nil {
+			slog.Warn("failed to close storage reader", "job_id", jobID, "error", err)
+		}
+	}()
 
 	fileContent, err := io.ReadAll(rc)
 	if err != nil {
