@@ -28,7 +28,7 @@ export {
   // Health
   getHealthz,
   getReadyz,
-} from './generated/eduanimaProfessorAPI';
+} from '../../../gen/openapi/web/generated/eduanimaProfessorAPI';
 
 // ─── Generated model types ────────────────────────────────────────────────────
 export type {
@@ -46,10 +46,10 @@ export type {
   PostV1SubjectsSubjectIdChatsChatIdFeedbackBody,
   GetV1SubjectsSubjectIdChats200,
   GetV1SubjectsSubjectIdChatsParams,
-} from './generated/model';
+} from '../../../gen/openapi/web/generated/model';
 
 // Const enums (not type-only)
 export {
   PostV1SubjectsSubjectIdChatsChatIdFeedbackBodyRating,
   MaterialStatus as MaterialStatusEnum,
-} from './generated/model';
+} from '../../../gen/openapi/web/generated/model';

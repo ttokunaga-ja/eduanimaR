@@ -6,3 +6,7 @@ src/librarian/v1/librarian_pb2.py
 src/librarian/v1/librarian_pb2.pyi
 src/librarian/v1/librarian_pb2_grpc.py
 src/librarian/v1/librarian_pb2_grpc.pyi
+gen/proto/python/librarian/v1/librarian_pb2.py
+gen/proto/python/librarian/v1/librarian_pb2.pyi
+gen/proto/python/librarian/v1/librarian_pb2_grpc.py
+gen/proto/python/librarian/v1/librarian_pb2_grpc.pyi

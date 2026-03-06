@@ -7,8 +7,8 @@ export default defineConfig({
     },
     output: {
       mode: 'split',
-      target: './src/shared/api/generated',
-      schemas: './src/shared/api/generated/model',
+      target: './gen/openapi/web/generated',
+      schemas: './gen/openapi/web/generated/model',
       client: 'fetch',
       clean: true,
       override: {

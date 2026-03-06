@@ -1,8 +1,9 @@
 # contracttest
 
-This package contains **minimal Go test skeletons** to guard SSOT artifacts referenced by `docs/03_integration/CONTRACT_TESTING.md`.
+This package is kept for backward compatibility during test topology migration.
+The active contract tests are moving to `tests/contract`.
 
-- External SSOT: `docs/openapi.yaml`
-- Internal SSOT: `proto/**/*.proto`
+- External SSOT: `contracts/openapi/professor.yaml`
+- Internal SSOT: `contracts/proto/**/*.proto`
 
-Run: `go test ./...`
+Run: `make test-contract`

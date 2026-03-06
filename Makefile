@@ -229,7 +229,7 @@ build-smoke: build-web
 
 ## contract-smoke: 各サービスの契約生成を実行して整合を検証
 contract-smoke:
-	@echo "==> [Web] OpenAPI codegen..."
+	@echo "==> [Web] OpenAPI codegen (gen/openapi/web)..."
 	cd apps/web && npm run api:generate
 	@echo "==> [Professor] Proto codegen..."
 	@if command -v buf >/dev/null 2>&1; then \
@@ -242,7 +242,7 @@ contract-smoke:
 	cd apps/librarian && make proto
 
 ## verify-apps: リリース前の最低検証（lint + test + contract + build smoke）
-verify-apps: lint-all test-all typecheck-web contract-smoke build-smoke
+verify-apps: lint-all test-all contract-smoke typecheck-web build-smoke
 	@echo "✅ アプリケーション横断の最低検証が完了しました"
 
 ## verify: CI 互換のローカル検証エントリーポイント

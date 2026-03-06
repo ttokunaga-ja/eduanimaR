@@ -1,6 +1,6 @@
 // Package contracttest provides minimal, repository-local contract checks.
 //
-// This repo is Professor (Go) SSOT for contracts:
-// - External: docs/openapi.yaml
-// - Internal: proto/**/*.proto
+// Contract SSOT is repository-level:
+// - External: contracts/openapi/professor.yaml
+// - Internal: contracts/proto/**/*.proto
 package contracttest

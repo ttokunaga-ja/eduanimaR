@@ -8,6 +8,7 @@ on:
       - 'contracts/**'
       - 'apps/web/orval.config.*'
       - 'apps/web/src/shared/api/**'
+      - 'apps/web/gen/openapi/**'
       - 'apps/professor/buf.gen.yaml'
       - '.github/workflows/contract-drift.yml'
   push:
@@ -45,8 +46,8 @@ jobs:
 
       - name: Ensure code generation produced output
         run: |
-          test -d src/shared/api/generated
-          test -n "$(find src/shared/api/generated -type f | head -n 1)"
+          test -d gen/openapi/web/generated
+          test -n "$(find gen/openapi/web/generated -type f | head -n 1)"
           echo "✅ OpenAPI codegen output exists."
 
   # ────────────────────────────────────────────────────────────

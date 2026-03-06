@@ -13,7 +13,7 @@ export default [
       '**/.next/**',
       '**/dist/**',
       '**/coverage/**',
-      'src/shared/api/generated/**',
+      'gen/openapi/web/generated/**',
     ],
   },
   {

@@ -2,7 +2,7 @@
 # Common ignores (node_modules, .DS_Store, logs, caches, etc.) are consolidated in repository root `.gitignore`.
 
 # Generated API clients (do not commit generated files)
-src/shared/api/generated/
-src/shared/api/generated/**
+gen/openapi/web/generated/
+gen/openapi/web/generated/**
 
 # End of file
