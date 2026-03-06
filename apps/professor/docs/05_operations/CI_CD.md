@@ -53,9 +53,9 @@
 	- `buf breaking`（推奨。比較対象は `main` またはリリースタグ）
 	- `protoc` / `buf generate` の再実行で差分が出ないこと（生成物手編集の検出）
 - OpenAPI を更新/生成した場合:
-	- `docs/openapi.yaml` の lint（推奨）
+    - `contracts/openapi/professor.yaml` の lint（推奨）
 	- breaking change の検出（推奨。方式はプロジェクトで統一）
-	- 最低限、`go test ./...` で SSOT の存在/最低限の形が検査できること（例: `internal/contracttest`）
+	- 最低限、`go test ./tests/contract/...` で SSOT の存在/最低限の形が検査できること
 
 推奨（運用ルール）：
 - `.github/workflows/contract-codegen-check.yml` は **PRで必ず実行**し、差分が出た場合は PR をブロックする

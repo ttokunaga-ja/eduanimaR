@@ -6,6 +6,9 @@ on:
       - 'apps/**'
       - 'contracts/**'
       - 'Makefile'
+      - '.gitignore'
+      - 'scripts/verify-lock-policy.sh'
+      - 'docs/DEPENDENCY_LOCK_POLICY.md'
       - '.github/workflows/repo-verify.yml'
   workflow_dispatch: {}
 

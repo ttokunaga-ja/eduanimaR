@@ -10,7 +10,7 @@
 .PHONY: help infra dev prod down restart logs ps \
         migrate migrate-dry migrate-hash smoke-kafka build build-prod \
         test-all test-professor test-librarian test-frontend \
-	lint-all typecheck-web build-web build-smoke contract-smoke env-validate verify verify-apps ci-local clean \
+	lint-all typecheck-web typecheck-librarian test-professor-race lock-policy-check web-codegen-guard build-web build-smoke contract-smoke env-validate verify verify-apps ci-local clean \
         deploy deploy-librarian deploy-professor deploy-frontend
 
 # ─────────────────────────────────────────────────────────────
@@ -210,10 +210,29 @@ lint-all:
 	@echo "==> [Frontend] ESLint..."
 	cd apps/web && npm run lint
 
+## typecheck-librarian: Librarian の型チェックを実行
+typecheck-librarian:
+	@echo "==> [Librarian] mypy typecheck..."
+	cd apps/librarian && make typecheck
+
+## test-professor-race: Professor の race detector テストを実行
+test-professor-race:
+	@echo "==> [Professor] go test -race..."
+	cd apps/professor && make test
+
+## lock-policy-check: lockfile方針の整合を検証
+lock-policy-check:
+	@./scripts/verify-lock-policy.sh
+
 ## typecheck-web: Frontend の TypeScript 型チェックを実行
 typecheck-web:
 	@echo "==> [Frontend] TypeScript typecheck..."
 	cd apps/web && npm run typecheck
+
+## web-codegen-guard: Web の codegen 導線が正規パスを使っているか検証
+web-codegen-guard:
+	@echo "==> [Web] Codegen path guard..."
+	cd apps/web && npm run api:guard
 
 ## build-web: Frontend の production build 検証を実行
 build-web:
@@ -242,7 +261,7 @@ contract-smoke:
 	cd apps/librarian && make proto
 
 ## verify-apps: リリース前の最低検証（lint + test + contract + build smoke）
-verify-apps: lint-all test-all contract-smoke typecheck-web build-smoke
+verify-apps: lock-policy-check lint-all test-all test-professor-race typecheck-librarian typecheck-web web-codegen-guard contract-smoke build-smoke
 	@echo "✅ アプリケーション横断の最低検証が完了しました"
 
 ## verify: CI 互換のローカル検証エントリーポイント

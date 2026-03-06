@@ -168,7 +168,7 @@ eduanimaRは段階的リリースを前提とし、Phase 1〜4で機能を積み
    ```bash
    npm run api:generate
    ```
-3. `src/shared/api/generated/`に型定義・クライアントが生成されることを確認
+3. `gen/openapi/web/generated/`に型定義・クライアントが生成されることを確認
 
 ### 3. 開発サーバー起動（Phase 1）
 1. バックエンド（Professor）を起動:
@@ -244,14 +244,14 @@ SSOT：`03_integration/DOCKER_ENV.md` と `05_operations/RELEASE.md`
 
 1. Professor の OpenAPI を取得：
    ```bash
-   curl http://localhost:8080/swagger/openapi.yaml > openapi/openapi.yaml
+   curl http://localhost:8080/swagger/openapi.yaml > contracts/openapi/professor.yaml
    ```
 
 2. 型・クライアント生成：
    ```bash
    npm run api:generate
    ```
-   → `src/shared/api/generated/` に TypeScript コードが生成される
+   → `gen/openapi/web/generated/` に TypeScript コードが生成される
 
 **重要なエンドポイント**:
 - `/v1/qa/ask` (SSE): 質問 → Librarian推論ループ → 回答生成のストリーミング

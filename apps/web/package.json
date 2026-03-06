@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "api:generate": "orval --config ./orval.config.ts",
+    "api:guard": "node ./scripts/verify-codegen-paths.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "i18n:extract": "i18next-scanner -c i18next-scanner.config.js 'src/**/*.{js,jsx,ts,tsx,md}'",

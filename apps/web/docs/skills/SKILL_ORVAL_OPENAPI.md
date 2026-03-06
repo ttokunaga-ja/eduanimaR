@@ -26,7 +26,7 @@
 
 ### 実装メモ（導入手順の最小）
 
-- OpenAPI を取得 → `npm run api:generate` で `src/shared/api/generated` を更新
+- OpenAPI を取得 → `npm run api:generate` で `gen/openapi/web/generated` を更新
 - 手書き拡張（baseURL/認証/エラー正規化）は `client.ts` / `errors.ts` に閉じ込める
 
 ## 禁止

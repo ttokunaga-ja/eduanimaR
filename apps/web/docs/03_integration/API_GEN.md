@@ -60,7 +60,7 @@ Last-updated: 2026-02-16
     - `GET /v1/subjects/{subject_id}/materials` (資料一覧)
 
 ### フロントエンド側
-- **生成先**: `src/shared/api/generated/`
+- **生成先**: `gen/openapi/web/generated/`
 - **生成ツール**: Orval（設定: `orval.config.ts`）
 
 ### 生成コマンド
@@ -69,8 +69,8 @@ npm run api:generate
 ```
 
 ### 生成物の確認
-- 型定義: `src/shared/api/generated/api.ts`
-- クライアント関数: `src/shared/api/generated/client.ts`
+- 型定義: `gen/openapi/web/generated/api.ts`
+- クライアント関数: `gen/openapi/web/generated/client.ts`
 
 ### CI での検証
 - `contract-codegen-check`で差分を検出（`../05_operations/CI_CD.md`参照）
@@ -87,9 +87,9 @@ npm run api:generate
 3. **実装**：生成物（React Query hooks / client）を利用して実装
 
 テンプレのデフォルト：
-- OpenAPI 配置：`openapi/openapi.yaml`
+- OpenAPI 配置：`contracts/openapi/professor.yaml`
 - Orval 設定：`orval.config.ts`
-- 生成先：`src/shared/api/generated`
+- 生成先：`gen/openapi/web/generated`
 
 補足：Orval は React Query hooks の生成に対応し、MSW handlers も生成できます（テストで有効）。
 
@@ -400,7 +400,7 @@ jobs:
 
 契約駆動開発を徹底するため、OpenAPI契約の変更を自動検出する仕組みを明記:
 
-- **契約コードの配置**: 生成コードは `src/shared/api/generated/` に配置し、FSDの上位層から参照
+- **契約コードの配置**: 生成コードは `gen/openapi/web/generated/` に配置し、FSDの上位層から参照
 - **Breaking Changes検出**: CI/CDで以下を検出
   - 既存エンドポイントの削除
   - 必須パラメータの追加
@@ -435,7 +435,7 @@ export default {
     input: './openapi.yaml',
     output: {
       mode: 'single',
-      target: './src/shared/api/generated/professor.ts',
+      target: './gen/openapi/web/generated/professor.ts',
       client: 'react-query',
       mock: true,
     },
@@ -452,7 +452,7 @@ npm run api:generate  # Orval実行 + Prettier
 ```
 
 ### 生成物の配置
-- **ディレクトリ**: `src/shared/api/generated/`
+- **ディレクトリ**: `gen/openapi/web/generated/`
 - **ファイル**: `professor.ts` (型定義 + TanStack Queryフック)
 - **コミット方針**: 生成物をコミットする（差分レビューのため）
 

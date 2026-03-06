@@ -8,7 +8,7 @@ Converge services to a common test topology with minimal disruption:
 
 ## Current State
 - Librarian: `tests/unit` exists, integration/contract scaffolds added.
-- Professor: tests mainly under `internal/*` and `internal/contracttest`, scaffold added under `tests/*`.
+- Professor: unit tests under `internal/*`, contract tests under `tests/contract`, integration scaffold under `tests/integration`.
 - Web: unit tests in `src/**`, E2E in `e2e/`, contract scaffold added under `tests/contract`.
 
 ## Migration Rules
@@ -24,5 +24,5 @@ Converge services to a common test topology with minimal disruption:
 
 ## Done Criteria
 - New tests are placed in topology-compliant paths.
-- Legacy locations are documented until fully removed.
+- Legacy contract test locations are removed after CI parity confirmation.
 - CI and local verify run the same logical checks.

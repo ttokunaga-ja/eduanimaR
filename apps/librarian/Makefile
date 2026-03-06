@@ -5,7 +5,6 @@ VENV := .venv
 PYTHON := $(VENV)/bin/python
 DEPS_STAMP := $(VENV)/.deps-installed
 GEN_PROTO_DIR := gen/proto/python/librarian/v1
-SRC_PROTO_DIR := src/librarian/v1
 
 ## ─── 環境セットアップ ──────────────────────────────────────────────
 install:
@@ -26,28 +25,21 @@ install:
 
 ## ─── Proto コード生成 ─────────────────────────────────────────────
 # contracts/proto/ が正本。grpcio-tools で Python stubs を生成し gen/ に配置する。
-# 互換性維持のため src/librarian/v1 へ同期コピーする（段階移行）。
 proto: install
-	mkdir -p $(GEN_PROTO_DIR) $(SRC_PROTO_DIR)
+	mkdir -p $(GEN_PROTO_DIR)
 	$(PYTHON) -m grpc_tools.protoc \
 		-I ../../contracts/proto \
 		--python_out=gen/proto/python \
 		--grpc_python_out=gen/proto/python \
 		--pyi_out=gen/proto/python \
 		../../contracts/proto/librarian/v1/librarian.proto
-	for f in librarian_pb2.py librarian_pb2.pyi librarian_pb2_grpc.py librarian_pb2_grpc.pyi; do \
-		if [ -f "$(GEN_PROTO_DIR)/$$f" ]; then \
-			cp "$(GEN_PROTO_DIR)/$$f" "$(SRC_PROTO_DIR)/"; \
-		fi; \
-	done
-	touch $(SRC_PROTO_DIR)/__init__.py
-	@echo "✅ Proto stubs generated → $(GEN_PROTO_DIR)/ (synced to $(SRC_PROTO_DIR)/)"
+	@echo "✅ Proto stubs generated → $(GEN_PROTO_DIR)/"
 
 ## ─── 実行 ────────────────────────────────────────────────────────
-run: install
+run: proto
 	PYTHONPATH=src $(PYTHON) -m librarian.main
 
-dev: install
+dev: proto
 	PYTHONPATH=src $(PYTHON) -m librarian.main
 
 ## ─── 品質チェック ────────────────────────────────────────────────
@@ -55,7 +47,7 @@ lint: install
 	$(VENV)/bin/ruff check src/librarian tests/
 	$(VENV)/bin/ruff format --check src/librarian tests/
 
-typecheck: install
+typecheck: proto
 	PYTHONPATH=src $(PYTHON) -m mypy src/librarian
 
 format: install
@@ -63,16 +55,16 @@ format: install
 
 test: test-unit
 
-test-unit: install
+test-unit: proto
 	PYTHONPATH=src $(PYTHON) -m pytest tests/ -v
 
-test-integration: install
+test-integration: proto
 	PYTHONPATH=src $(PYTHON) -m pytest tests/integration -v
 
-test-contract: install
+test-contract: proto
 	PYTHONPATH=src $(PYTHON) -m pytest tests/contract -v
 
 ## ─── クリーンアップ ──────────────────────────────────────────────
 clean:
-	rm -rf $(VENV) gen/proto/python src/librarian/v1/__pycache__ __pycache__
+	rm -rf $(VENV) src/librarian/v1/__pycache__ __pycache__
 	find . -name "*.pyc" -delete

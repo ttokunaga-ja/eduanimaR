@@ -49,7 +49,7 @@
 - **契約コードチェック**（必須）
   - Job 名（推奨）: `contract-codegen-check`
   - 配置（推奨）: `.github/workflows/contract-codegen-check.yml`
-  - 対象: `openapi/openapi.yaml` / `src/shared/api/generated/`
+  - 対象: `contracts/openapi/professor.yaml` / `gen/openapi/web/generated/`
   - 実行内容: `npm run api:generate` → 差分検出
 
 ### セキュリティスキャン（Must）

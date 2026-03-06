@@ -38,9 +38,9 @@
    - 会話履歴取得API（選択科目の会話履歴表示用）
 
 ### 3.2 契約テストの準備（MUST）
-1. `internal/contracttest/ssot_test.go`で以下を検証:
-   - `docs/openapi.yaml`の存在
-   - `proto/librarian/v1/librarian.proto`の存在
+1. `tests/contract/ssot_test.go`で以下を検証:
+   - `contracts/openapi/professor.yaml`の存在
+   - `contracts/proto/librarian/v1/librarian.proto`の存在
    - 生成コードとの整合性
 
 2. CI で `contract-codegen-check` が実行されることを確認（`05_operations/CI_CD.md`参照）

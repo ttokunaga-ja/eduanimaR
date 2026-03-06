@@ -1,7 +1,12 @@
-# Contract Tests (Scaffold)
+# Contract Tests
 
-This directory is reserved for Professor contract tests.
+This directory is the canonical home for Professor contract tests.
 
-Current state:
-- Existing contract tests are under `internal/contracttest`.
-- Migration to this directory will happen in small PRs.
+Current checks:
+- OpenAPI SSOT shape checks for `contracts/openapi/professor.yaml`
+- Proto SSOT shape checks for `contracts/proto/librarian/v1/librarian.proto`
+
+Run:
+```bash
+make test-contract
+```

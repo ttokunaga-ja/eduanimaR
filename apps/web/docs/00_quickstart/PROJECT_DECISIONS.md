@@ -145,8 +145,8 @@ eduanimaRは、学習者が「探す時間を減らし、理解に使う時間�
 
 ## API（Must）
 - **OpenAPI の取得元**: apps/professor（Go）が提供
-- **OpenAPI の配置パス（このrepo内）**: `openapi/openapi.yaml`
-- **生成物の配置**: `src/shared/api/generated`（固定）
+- **OpenAPI の配置パス（このrepo内）**: `contracts/openapi/professor.yaml`
+- **生成物の配置**: `gen/openapi/web/generated`（固定）
 - **バックエンド構成**:
   - **Professor（Go）**: 
     - 外向きAPI（HTTP/JSON + SSE）
@@ -491,4 +491,4 @@ export const EXTENSION_URLS = {
 ### 外部API契約（SSOT）
 - Professor: `docs/openapi.yaml`（`contracts/openapi/professor.yaml` が正）
 - 生成: Orval（`npm run api:generate`）
-- 生成物: `src/shared/api/generated/`（コミット対象）
+- 生成物: `gen/openapi/web/generated/`（コミット対象）

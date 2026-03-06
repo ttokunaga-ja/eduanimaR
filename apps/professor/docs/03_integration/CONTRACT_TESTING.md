@@ -56,7 +56,7 @@
   - Event: schema compatibility check
 
 ## Goテスト（このリポジトリでの最小ガード）
-- `go test ./...` で SSOT ファイル（`docs/openapi.yaml`, `proto/**/*.proto`）の存在/最低限の形を検査する（例: `internal/contracttest`）
+- `go test ./tests/contract/...` で SSOT ファイル（`contracts/openapi/professor.yaml`, `contracts/proto/**/*.proto`）の存在/最低限の形を検査する
 
 > 具体ツール（buf / openapi-diff / schema registry 等）はプロジェクトで決める。
 > 本テンプレは“何を検査すべきか”を標準化する。

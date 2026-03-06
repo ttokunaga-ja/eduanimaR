@@ -6,7 +6,7 @@ export { ApiError, isApiError } from './errors';
 
 // ─── Professor API (generated) ───────────────────────────────────────────────
 // Re-export the full generated API so consumers don't need to deep-import
-// @/shared/api/generated/** (which violates no-restricted-imports).
+// @gen/openapi/web/generated/** (which violates no-restricted-imports).
 export {
   // Chat
   postV1SubjectsSubjectIdChats,
@@ -28,7 +28,7 @@ export {
   // Health
   getHealthz,
   getReadyz,
-} from '../../../gen/openapi/web/generated/eduanimaProfessorAPI';
+} from '@gen/openapi/web/generated/eduanimaProfessorAPI';
 
 // ─── Generated model types ────────────────────────────────────────────────────
 export type {
@@ -46,10 +46,10 @@ export type {
   PostV1SubjectsSubjectIdChatsChatIdFeedbackBody,
   GetV1SubjectsSubjectIdChats200,
   GetV1SubjectsSubjectIdChatsParams,
-} from '../../../gen/openapi/web/generated/model';
+} from '@gen/openapi/web/generated/model';
 
 // Const enums (not type-only)
 export {
   PostV1SubjectsSubjectIdChatsChatIdFeedbackBodyRating,
   MaterialStatus as MaterialStatusEnum,
-} from '../../../gen/openapi/web/generated/model';
+} from '@gen/openapi/web/generated/model';

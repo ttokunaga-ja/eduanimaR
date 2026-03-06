@@ -23,8 +23,9 @@ make test-contract    # contract tests
 ```
 
 ## Test Topology
-- Legacy tests: `internal/usecases`, `internal/domain`, `internal/contracttest`
-- New topology: `tests/unit`, `tests/integration`, `tests/contract`
+- Unit tests: `internal/usecases`, `internal/domain`
+- Contract tests: `tests/contract`
+- Integration tests: `tests/integration` (scaffold)
 
 ## Health And Observability
 - Health endpoints: `GET /healthz`, `GET /readyz`

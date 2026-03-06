@@ -14,7 +14,7 @@ Python gRPC microservice for reasoning/search strategy.
 ## Common Commands
 ```bash
 make install          # create/repair venv and install deps
-make proto            # generate proto stubs (gen/ + src sync)
+make proto            # generate proto stubs (gen/proto/python)
 make run              # run service
 make lint             # ruff check + format check
 make typecheck        # mypy

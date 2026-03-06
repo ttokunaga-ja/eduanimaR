@@ -195,7 +195,7 @@ test-integration:
 
 ## 契約テスト（OpenAPI / Proto SSOT 検証）
 test-contract:
-	go test ./internal/contracttest/... -v
+  go test ./tests/contract/... -v
 
 ## 全テスト
 test: test-unit test-contract test-integration
@@ -327,7 +327,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version: '1.25' }
-      - run: go test ./internal/contracttest/... -v
+      - run: go test ./tests/contract/... -v
         working-directory: apps/professor
 
   test-integration:

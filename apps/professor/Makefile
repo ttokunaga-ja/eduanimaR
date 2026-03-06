@@ -89,11 +89,7 @@ test-integration:
 
 ## test-contract: コントラクトテストを実行
 test-contract:
-	@if [ -d tests/contract ] && find tests/contract -name '*_test.go' -print -quit | grep -q .; then \
-		go test ./tests/contract/... -v -race -count=1 -tags=contract; \
-	else \
-		go test ./internal/contracttest/... -v -race -count=1 -tags=contract; \
-	fi
+	go test ./tests/contract/... -v -race -count=1 -tags=contract
 
 # ─────────────────────────────────────────
 # Lint / フォーマット

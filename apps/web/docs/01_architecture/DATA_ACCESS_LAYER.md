@@ -54,7 +54,7 @@ DAL を 1 箇所に寄せることで、監査・レビュー・変更が容易�
 
 ## 置き場所（推奨）
 
-本テンプレートでは、API クライアント生成（Orval）を `src/shared/api/generated` に置く前提のため、
+本テンプレートでは、API クライアント生成（Orval）を `gen/openapi/web/generated` に置く前提のため、
 DAL は「生成物の上に薄い手書きレイヤー」として分離します。
 
 推奨パターン（例）：
@@ -111,7 +111,7 @@ DAL の modules は先頭に `import 'server-only'` を置く運用を推奨し�
 ## Professor API統一呼び出し
 
 ### Orval生成クライアントの配置
-- **生成先**: `src/shared/api/generated/`
+- **生成先**: `gen/openapi/web/generated/`
 - **生成コマンド**: `npm run api:generate`
 - **SSOT**: `contracts/openapi/professor.yaml`
 

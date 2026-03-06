@@ -44,6 +44,9 @@ jobs:
       - name: Regenerate API client from contracts/openapi/professor.yaml
         run: npm run api:generate
 
+      - name: Verify web codegen paths
+        run: npm run api:guard
+
       - name: Ensure code generation produced output
         run: |
           test -d gen/openapi/web/generated

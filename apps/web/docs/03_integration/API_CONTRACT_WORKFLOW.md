@@ -213,7 +213,7 @@ Professor SSEは、Librarian推論ループの進捗を以下のイベントで�
 ## 1) SSOT（Single Source of Truth）
 
 **契約の種類と管理**:
-- **外部API（Frontend ↔ Professor）**: OpenAPI（`openapi/openapi.yaml`）
+- **外部API（Frontend ↔ Professor）**: OpenAPI（`contracts/openapi/professor.yaml`）
 - **内部RPC（Professor ↔ Librarian）**: gRPC/Proto（`contracts/proto/librarian/v1/librarian.proto`）
 
 **フロントエンドのSSOT優先順位**：
@@ -283,8 +283,8 @@ Professor SSEは、Librarian推論ループの進捗を以下のイベントで�
 
 ### OpenAPI の正（SSOT）
 - **定義元**: Professor（Go）の `docs/openapi.yaml`
-- **配置**: 本リポジトリの `openapi/openapi.yaml` にコピー（CI で差分検出）
-- **生成**: Orval で `src/shared/api/generated/` に TypeScript コード生成
+- **配置**: 本リポジトリの `contracts/openapi/professor.yaml` にコピー（CI で差分検出）
+- **生成**: Orval で `gen/openapi/web/generated/` に TypeScript コード生成
 
 ### SSE（Server-Sent Events）契約
 Professor の `/qa/stream` エンドポイントは以下のイベント型を配信：
@@ -339,7 +339,7 @@ Professor の `/qa/stream` エンドポイントは以下のイベント型を�
 2. **フロントエンド側で対応**
    - OpenAPI取得: `curl https://professor.example.com/openapi.yaml > openapi.yaml`
    - Orval再生成: `npm run api:generate`
-   - 差分確認: `git diff src/shared/api/generated/`
+   - 差分確認: `git diff gen/openapi/web/generated/`
    - 必要に応じてコード修正
 
 3. **CI/CDで整合性チェック**
@@ -389,7 +389,7 @@ QuestionRequest:
 
 2. **フロントエンド側で生成物更新**
    - `npm run api:generate`実行
-   - 生成物の差分確認: `git diff src/shared/api/generated/`
+   - 生成物の差分確認: `git diff gen/openapi/web/generated/`
    - Breaking Changesの場合はフロントエンド修正
 
 3. **更新頻度**

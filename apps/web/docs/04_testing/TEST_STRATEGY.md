@@ -69,7 +69,7 @@ Integration を書く基準：
 
 目的：API 契約ズレや “手編集” の混入を防ぐ。
 
-- `src/shared/api/generated/` は手編集禁止（差分が必要なら生成設定/上流 OpenAPI を直す）
+- `gen/openapi/web/generated/` は手編集禁止（差分が必要なら生成設定/上流 OpenAPI を直す）
 - テストというより **CI の検査** として、以下のいずれかを導入する（プロジェクトで選択）：
 	- `npm run api:generate` を実行し、生成物に差分が出ないことを確認（diff チェック）
 	- OpenAPI を固定（リポジトリに同梱）し、生成を再現可能にする
