@@ -77,7 +77,11 @@ test:
 
 ## test-unit: UseCase ユニットテストのみ実行（外部依存不要）
 test-unit:
-	go test ./internal/usecases/... ./internal/domain/... -v -race -count=1
+	@if [ -d tests/unit ] && find tests/unit -name '*_test.go' -print -quit | grep -q .; then \
+		go test ./tests/unit/... -v -race -count=1; \
+	else \
+		go test ./internal/usecases/... ./internal/domain/... -v -race -count=1; \
+	fi
 
 ## test-integration: 統合テストを実行（DB 起動が必要）
 test-integration:
@@ -85,7 +89,11 @@ test-integration:
 
 ## test-contract: コントラクトテストを実行
 test-contract:
-	go test ./internal/contracttest/... -v -race -count=1 -tags=contract
+	@if [ -d tests/contract ] && find tests/contract -name '*_test.go' -print -quit | grep -q .; then \
+		go test ./tests/contract/... -v -race -count=1 -tags=contract; \
+	else \
+		go test ./internal/contracttest/... -v -race -count=1 -tags=contract; \
+	fi
 
 # ─────────────────────────────────────────
 # Lint / フォーマット

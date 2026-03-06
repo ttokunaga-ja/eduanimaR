@@ -216,6 +216,8 @@ eduanimaRは、**LLMを活用した学習支援の研究プロジェクト**で�
 
 この `docs/` 配下は、Next.js（App Router）+ FSD（Feature-Sliced Design）での開発を「契約（運用ルール）」として固定するためのドキュメント集です。
 
+契約生成物の扱いは `03_integration/CODEGEN_OWNERSHIP.md` を参照してください。
+
 目的：
 - 判断のぶれ（人間/AI）を減らす
 - 依存境界・契約駆動・運用の事故を先に潰す

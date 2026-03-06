@@ -20,6 +20,7 @@ Professor との通信は **gRPC（双方向ストリーミング）** で行い
 - gRPC/Proto（Professor ↔ Librarian）: `03_integration/API_CONTRACT_WORKFLOW.md`、契約SSOT: `contracts/proto/librarian/v1/librarian.proto`
 - バージョニング/廃止: `03_integration/API_VERSIONING_DEPRECATION.md`
 - 契約テスト: `03_integration/CONTRACT_TESTING.md`
+- 生成コード所有: `03_integration/CODEGEN_OWNERSHIP.md`
 - エラー形式/コード: `03_integration/ERROR_HANDLING.md`, `03_integration/ERROR_CODES.md`
 
 ## 運用

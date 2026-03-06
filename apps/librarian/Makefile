@@ -1,4 +1,4 @@
-.PHONY: install proto run dev lint test clean
+.PHONY: install proto run dev lint test test-unit test-integration test-contract clean
 
 # Python venv
 VENV := .venv
@@ -52,8 +52,16 @@ lint: install
 format: install
 	$(VENV)/bin/ruff format src/librarian tests/
 
-test: install
+test: test-unit
+
+test-unit: install
 	PYTHONPATH=src $(PYTHON) -m pytest tests/ -v
+
+test-integration: install
+	PYTHONPATH=src $(PYTHON) -m pytest tests/integration -v
+
+test-contract: install
+	PYTHONPATH=src $(PYTHON) -m pytest tests/contract -v
 
 ## ─── クリーンアップ ──────────────────────────────────────────────
 clean:

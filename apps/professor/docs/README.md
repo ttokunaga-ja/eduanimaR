@@ -221,6 +221,7 @@ Response (200 OK):
    - `03_integration/INTER_SERVICE_COMM.md`
    - `03_integration/API_CONTRACT_WORKFLOW.md`
    - `03_integration/PROTOBUF_GRPC_STANDARDS.md`
+  - `03_integration/CODEGEN_OWNERSHIP.md`
 5. 同期（DB↔検索）: `01_architecture/SYNC_STRATEGY.md`
 
 ## 実装・統合（契約まわり）

@@ -57,6 +57,7 @@ make clean         # コンテナ + ボリューム全削除
 5. サービス間契約（OpenAPI/Proto）: `contracts/README.md`
 6. Docker 環境詳細: `apps/web/docs/03_integration/DOCKER_ENV.md`
 7. 構造リファクタリング実行バックログ: `docs/REFRACTORING_PHASE1_BACKLOG.md`
+8. テストトポロジ移行ガイド: `docs/TEST_TOPOLOGY_MIGRATION.md`
 
 ## 基本方針
 
