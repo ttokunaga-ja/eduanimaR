@@ -12,4 +12,7 @@ google-genai
 pydantic
 pandas
 datasets
+# --- API evaluation ---
+httpx            # SSE ストリーミング対応 HTTP クライアント
+# rouge-score は Python 3.14 未対応のため evaluate_api.py 内で純粋実装を使用
 # add additional libraries here as needed
