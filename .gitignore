@@ -30,14 +30,18 @@ build/
 # Python
 # ---------------------------------
 __pycache__/
+**/__pycache__/
 *.py[cod]
+.pyo
 .Python
 .venv/
 venv/
+env/
 *.egg-info/
 pip-wheel-metadata/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # ---------------------------------
 # Go
@@ -64,6 +68,7 @@ tmp*/
 .env
 .env.local
 .env.*.local
+.env.*
 *.pem
 *.key
 id_rsa
@@ -78,8 +83,16 @@ id_rsa
 # Project-specific
 eduanimaR_Professor/tmp/
 
+# Local setup cache
+.setup_state.json
+
+# Generated PDFs
+**/source_pdfs/
+!**/source_pdfs/.gitkeep
+
 # Keep examples and generated client exceptions in subprojects
 !**/.env.example
+!.env.example
 
 # End
 
