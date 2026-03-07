@@ -23,36 +23,123 @@ Last-updated: 2026-02-18
 | **Testcontainers** | **v0.40.1** | 2025/11/06 | PostgresSQLにてSSL設定（WithSSLSettings）の簡略化、証明書の自動マウントと設定対応 |
 
 ## モデル利用（SSOT）
+
 単一モデルで完結させず、用途ごとに最適モデルを使い分ける。
 
-| フェーズ | タスク | 使用モデル |
+| フェーズ | タスク | モデル | thinking_level |
+| :--- | :--- | :--- | :--- |
+| Phase 1（Ingestion） | PDF/画像→Markdown化・意味単位チャンク分割（バッチ非同期） | `gemini-3.1-flash-lite-preview` | `minimal` |
+| Phase 2（Plan） | 質問意図分析・調査項目（target_items）・停止条件生成 | `gemini-3-flash` | `medium` |
+| Phase 3-A（Search: クエリ生成）中間・最終ループ共通 | 検索クエリ生成・リファインメント | `gemini-3-flash` ※1 | `low` ※2 |
+| Phase 3-B（Search: 充足性検証）中間ループ | 情報充足性・混同検出・視覚情報確認 | `gemini-3-flash` ※1 | `low` |
+| Phase 3-B（Search: 充足性検証）最終ループのみ | 終了判定（偽陽性防止） | `gemini-3-flash` ※1 | `medium` |
+| Phase 4（Answer） | Librarianが選定したページのBlobを直接入力し最終回答生成 | `gemini-3-flash` → 昇格候補: `gemini-3.1-pro-preview` ※3 | `low` |
+
+※1 コスト最適化構成（将来）: 3-AのみFlash Liteに変更可。その場合 `LIBRARIAN_THINKING_PLAN=medium` とすること（Flash Lite medium ≒ Flash low の知見に基づく）  
+※2 3-Aは最終ループも `low` を維持する。理由: クエリ生成では多様性が重要であり、thinking_levelを上げると「慎重な1択」に収束しやすく逆効果になりうる  
+※3 Phase 4 Pro昇格条件は下記「Phase 4 運用ポリシー」を参照
+
+### thinking_level 運用ポリシー
+
+#### ⚠️ モデル別制約・デフォルト値（必ず確認すること）
+
+| モデル | デフォルト | minimal | 備考 |
+| :--- | :--- | :--- | :--- |
+| `gemini-3.1-flash-lite-preview` | `minimal` | ✅ 可 | |
+| `gemini-3-flash` | **`high`** ⚠️ | ✅ 可 | **未設定で高コスト・高レイテンシになる** |
+| `gemini-3.1-pro-preview` | **`high`** ⚠️ | ❌ 不可 | **`low` が最低値** |
+
+- **`thinking_level` は全フェーズで必ず明示設定すること**
+- `thinking_budget`（旧パラメータ）は Gemini 3系で廃止。`thinking_level` のみを使用し、両者を併用しないこと
+- Thinkingトークンは**出力トークンとして課金**される
+
+#### SSEストリーミングへの影響
+
+| thinking_level | TTFT | 実装要件 |
 | :--- | :--- | :--- |
-| Ingestion（Professor / 前処理） | PDF/画像→Markdown化・意味単位チャンク分割（`chunks[]` をJSON出力）を **バッチ処理** で実行 | **高速推論モデル** |
-| Phase 2（Plan / Professor） | タスク分割（調査項目）・停止条件（Stop Conditions）・コンテキスト定義（大戦略: WHAT） | **高速推論モデル** |
-| Phase 3（Search / Librarian） | クエリ生成・ツール選択・反省/再試行・停止条件の満足判定（小戦略: HOW） | **高速推論モデル** |
-| Phase 4（Answer / Professor） | 選定資料の全文Markdownを読み込み最終回答生成 | **高精度推論モデル** |
+| `minimal` | ほぼ遅延なし | 不要 |
+| `low` | 軽微な遅延 | 「AIが思考中...」UIプレースホルダーを表示すること |
+| `medium` | 標準の1.5〜2倍 | 同上 |
+| `high` | 大幅増加 | 教育UIでは原則使用しない |
 
-### 要件（運用ポリシー）
-- Summary（要約）は **原則生成しない**（検索精度は詳細Chunkを正とする）。大量ファイルからの高速選別が必要になった場合のみ「ファイル単位Summary」を追加する。
-- Phase 3（検索）中は **チャンク＋前後**を使い、Phase 4（回答）で初めて **選定資料の全文Markdown** を読み込む。
+#### Phase 3 thinking_level 判定ロジック（ループ回数ベース）
 
-### LangGraph ループ設定（推奨 / Librarian）
-- `MaxRetry`（検索ステップ上限）: **5回（3回 + 2回リカバリ）**
-- 5回で停止条件に達しない場合: 「現時点の根拠で回答へ進む」または「不足を明記して終了」を許可する（無限ループ回避）
+```
+判定方式: ループ回数ベース（loop_count / max_loops）
 
-### thinking_level（推奨）
-- Ingestion: `Minimal`（定型変換なので推論を最小化）
-- Phase 2: `Medium`（調査項目/停止条件のミスが全体コストに直結するため）
-- Phase 3: `Low`（速度優先。最終回のみ `Medium` に上げて再検討してよい）
+3-A クエリ生成:
+  全ループ共通 → LIBRARIAN_THINKING_PLAN（デフォルト: low）
+  ※ 最終ループも low を維持（多様性重視）
 
-### モデル設定（環境変数）
-2モデル戦略を採用:
+3-B 充足性検証:
+  loop_count < max_loops - 1  → LIBRARIAN_THINKING_EVALUATE（デフォルト: low）
+  loop_count == max_loops - 1 → LIBRARIAN_THINKING_EVALUATE_FINAL（デフォルト: medium）
 
-- `PROFESSOR_MODEL_FAST`（default: 高速推論モデル） - Ingestion/Planning用
-- `LIBRARIAN_MODEL_FAST`（default: 高速推論モデル） - Search用
-- `PROFESSOR_MODEL_ACCURATE`（default: 高精度推論モデル） - Answer用
+採用理由:
+  - 実装がシンプル（既存のloop_countを参照するだけ）
+  - max_loopsを環境変数で変更しても自動追従する
+  - Phase 2の分析結果との責務混在を避けられる
+  - 3-Bの偽陽性（不十分→充足と誤判定）は取り返しがつかないため最終判断のみ精度優先
+```
 
-**注意:** Gemini 2.0 Flash提供終了により、OCR/構造化処理も高速推論モデルで実行します。
+### Phase 1 Ingestion 運用ポリシー
+
+- **バッチAPIは使用しない**（リアルタイムAPI統一）
+  - 理由: アップロード直後に質問できる即時インデックス化が必要なため
+  - 小テストでわからない問題を調べた際、最新資料がヒットしないと満足度に影響する
+- 非同期処理はKafkaキューイングで維持（バッチAPIとは別概念）
+- `thinking_level=minimal` でデリミタ（`---CHUNK---`）遵守の安定性が高い
+  - thinking_levelを上げると自由記述が増えてフォーマット崩れが起きる報告あり
+- **ベクトル検索で補えないリスク**への対処
+  - リスク: 複雑な数式・表をモデルがスキップする「抽出の放棄（Omission）」
+  - 対処: プロンプトで `[図表: 〇〇に関するグラフ]` プレースホルダー指示を含める
+
+### Phase 4 運用ポリシー（Blob直接入力・段階的Pro昇格）
+
+#### Blob入力の設計制約
+- **選定ページのみを動的抽出して渡すこと**（Librarianが特定したページ番号群のみ）
+- 全ページ渡しは禁止（コスト増 + Lost in the Middle 問題の誘発）
+- 200kトークン以下に収めることでProの高額帯（>200k: $4/$18）を回避できる
+
+#### Flash → Pro 昇格条件
+以下のいずれかが報告された場合に `PROFESSOR_MODEL_ANSWER=gemini-3.1-pro-preview` へ変更:
+- 数式の誤り・ハルシネーションが複数回報告された
+- 複数ページにまたがる統合回答の品質が不十分
+- 図表の構造解釈ミスが回答に影響した
+- 修士〜博士レベルの理論的質問が増加した
+
+#### 部分的Pro昇格（将来の拡張）
+難問セッション（全体の10%程度）のみProに昇格させる動的切り替えも選択肢。
+実装時は `PROFESSOR_MODEL_ANSWER_HARD=gemini-3.1-pro-preview` 環境変数の追加で対応。
+
+### コスト試算（月額概算・参考値）
+
+| 構成 | 月額概算（USD） | 備考 |
+| :--- | :--- | :--- |
+| 推奨構成（Ingestion=Flash Lite + QA=Flash） | 約 $80〜90/月 | 1,000セッション・100ファイル想定 |
+| 難問10%をPro昇格した場合 | 約 $100〜110/月 | 上記に加算 |
+| Phase 3もFlash Liteに最適化した場合 | 約 $50〜60/月 | 3-AにFlash Lite medium使用 |
+
+※ `thinking_level=medium` 設定箇所では出力トークンが約1.5〜2倍になる可能性あり  
+※ `gemini-3-flash` のデフォルトは `high` のため、thinking_level未設定時は試算より大幅にコストが増加する
+
+### モデル設定（環境変数）フェーズ別構成
+
+```
+Professor:
+  PROFESSOR_MODEL_INGESTION        — Phase 1 専用（Flash Lite 固定）
+  PROFESSOR_MODEL_PLAN             — Phase 2 専用
+  PROFESSOR_MODEL_ANSWER           — Phase 4 専用（Pro昇格スイッチ）
+  PROFESSOR_THINKING_INGESTION     — Phase 1: minimal
+  PROFESSOR_THINKING_PLAN          — Phase 2: medium
+  PROFESSOR_THINKING_ANSWER        — Phase 4: low
+
+Librarian:
+  LIBRARIAN_MODEL_SEARCH           — Phase 3 専用
+  LIBRARIAN_THINKING_PLAN          — Phase 3-A 全ループ: low
+  LIBRARIAN_THINKING_EVALUATE      — Phase 3-B 中間ループ: low
+  LIBRARIAN_THINKING_EVALUATE_FINAL — Phase 3-B 最終ループ: medium
+```
 
 ## 通信スタック（SSOT）
 - Frontend ↔ Professor: **HTTP/JSON（OpenAPI）** + **SSE**
