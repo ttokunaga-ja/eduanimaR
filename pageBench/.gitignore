@@ -1,0 +1,30 @@
+# ── Go ───────────────────────────────────────────
+bin/
+*.exe
+*.exe~
+
+# ── Environment / secrets ─────────────────────────
+.env
+!.env.example
+
+# ── Editors & OS ─────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── pageBench domain artifacts ───────────────────
+# PDFs (potentially large / proprietary)
+domains/*/docs/
+# Evaluation artifacts (re-generated on each run)
+domains/*/.checkpoint.json
+domains/*/results.csv
+domains/*/report.md
+# testset は generate で生成するが、サンプルはコミット可
+
+# ── Legacy domain file names (旧命名規則) ─────────
+domains/*/source_pdfs/
+domains/*/0c_checkpoint.json
+domains/*/0d_eval_results.csv
+domains/*/0e_report.md

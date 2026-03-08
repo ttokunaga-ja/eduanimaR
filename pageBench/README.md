@@ -1,153 +1,183 @@
-# PageBench
+# pageBench
 
-PDF文書からQ&Aデータセットを作成するための実験用リポジトリです。  
-トピックごとにフォルダを分け、以下のCSVを生成します。
+**pageBench** は、PDF ドキュメントを RAG システムに投入し、Gemini LLM-as-Judge で性能を自動評価する OSS ツールです。
 
-- `0a_registry.csv`: 文書一覧（ファイル名、タイトル、URL、ページ数）
-- `0b_qa_pairs.csv`: Q&Aペア（質問、参照解答、対象ファイル、ページ、根拠テキスト）
+## 特徴
 
-## ディレクトリ構成
+- 🚀 **単一バイナリ** — Go 製。`brew install` または `go install` で即利用可能
+- 🔌 **OpenAI 互換 API に対応** — OpenAI / Ollama / LM Studio / Azure OpenAI / Dify など
+- 📄 **2 モード** — `chat_completions`（RAG 組み込み済みエンドポイント）と `assistants`（Vector Store + File Search）
+- 🤖 **LLM-as-Judge** — Gemini で正確性・忠実性・完全性の 3 軸を自動採点
+- 💡 **Thinking 対応** — Gemini 3 の ThinkingBudget で評価精度を段階調整
+- 📊 **自動レポート** — ROUGE-L / Exact Match + Markdown レポート生成
+- ♻️ **再開可能** — チェックポイントで評価を中断・再開
 
-- `00_sample/`
-- `01_academic_papers/`
-- `02_financial_results/`
-- `03_government_policy/`
-
-各トピック配下の基本構成:
-
-- `source_pdfs/`: 入力PDF
-- `scripts/`: 生成スクリプト
-- `0a_registry.csv`: 文書レジストリ
-- `0b_qa_pairs.csv`: Q&A出力
-
-## 前提環境
-
-- Python 3.10+ 推奨
-- macOS の場合: `brew` が使えること
-- Gemini API キー
-
-## セットアップ
-
-### 1. 仮想環境を作成して有効化
+## クイックスタート
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# 1. バイナリをインストール
+go install github.com/ttokunaga-ja/pagebench/cmd/pagebench@latest
+
+# または clone してビルド
+git clone https://github.com/ttokunaga-ja/pagebench
+cd pagebench
+make build   # → ./bin/pagebench
+
+# 2. 設定ファイルを準備
+cp .env.example .env
+# .env を編集: OPENAI_COMPAT_API_KEY と GEMINI_API_KEY を設定
+
+# 3. ドメインディレクトリを準備
+mkdir -p domains/my_domain/docs
+cp your_documents/*.pdf domains/my_domain/docs/
+
+# corpus.csv を作成 (ファイル一覧)
+echo "file_name,title" > domains/my_domain/corpus.csv
+echo "document1.pdf,Document 1" >> domains/my_domain/corpus.csv
+
+# 4. QA テストセットを自動生成 (Gemini File API 使用)
+pagebench generate --domain domains/my_domain
+
+# 5. 評価実行
+pagebench eval --domain domains/my_domain
+
+# 6. レポートを再生成 (オプション)
+pagebench report --domain domains/my_domain
 ```
 
-### 2. 依存関係のインストール
+## ディレクトリ構造
 
-`setup_env.py` はOS依存ツールとPythonパッケージをまとめてセットアップします。
+```
+domains/
+└── my_domain/
+    ├── corpus.csv          # ドキュメント一覧 (file_name, title, description)
+    ├── testset.csv         # QA テストセット (generate コマンドで自動生成)
+    ├── results.csv         # 評価結果 (eval コマンドで生成)
+    ├── report.md           # Markdown レポート (eval/report コマンドで生成)
+    ├── .checkpoint.json    # 中断再開用チェックポイント (自動管理)
+    └── docs/               # PDF ドキュメント置き場
+        ├── document1.pdf
+        └── document2.pdf
+```
+
+## コマンド一覧
+
+| コマンド | 説明 |
+|---------|------|
+| `pagebench generate` | Gemini File API で QA テストセット生成 |
+| `pagebench eval` | RAG システムの評価を実行 |
+| `pagebench report` | results.csv からレポートを再生成 |
+| `pagebench upload` | ドキュメントのアップロードのみ実行 (assistants モード) |
+| `pagebench check` | 設定と接続を確認 |
+
+### `generate` オプション
+
+```
+pagebench generate --domain <path> [flags]
+
+Flags:
+  -d, --domain string     ドメインディレクトリパス (必須)
+      --qa-per-doc int    1 ドキュメントあたりの QA 生成件数 (default 10)
+      --thinking string   thinking レベル: shallow|medium|deep
+      --model string      Gemini モデル名
+```
+
+### `eval` オプション
+
+```
+pagebench eval --domain <path> [flags]
+
+Flags:
+  -d, --domain string   ドメインディレクトリパス (必須)
+      --limit int       評価する最大 QA 件数 (0 = 全件)
+      --skip-judge      LLM-as-Judge をスキップ
+      --resume          チェックポイントから再開
+      --no-cleanup      評価後にコレクションを削除しない
+```
+
+## 設定 (.env)
+
+```dotenv
+# OpenAI 互換バックエンド
+OPENAI_COMPAT_MODE=chat_completions   # または assistants
+OPENAI_COMPAT_API_BASE=https://api.openai.com/v1
+OPENAI_COMPAT_API_KEY=sk-...
+OPENAI_COMPAT_MODEL=gpt-5-mini        # gpt-5-nano (最安) / gpt-5 / o3-mini も可
+
+# Gemini (Judge + Generate)
+GEMINI_API_KEY=AIza...
+GEMINI_JUDGE_MODEL=gemini-3-flash-preview   # gemini-3.1-pro (高精度) / gemini-3-flash-preview-lite (最安) も可
+GEMINI_GENERATE_MODEL=gemini-3-flash-preview
+GEMINI_THINKING_LEVEL=shallow         # shallow | medium | deep
+```
+
+詳細は [.env.example](.env.example) を参照してください。
+
+## Thinking レベル
+
+Gemini 3 の拡張思考機能で Judge/Generate の精度を調整できます。
+
+| レベル | ThinkingBudget | 特徴 |
+|--------|---------------|------|
+| `shallow` | 0 (無効) | 高速・低コスト（デフォルト） |
+| `medium` | 5,000 | バランス型 |
+| `deep` | 24,576 | 最高精度（コスト高） |
 
 ```bash
-python setup_env.py
+# deep thinking で QA 生成 + 評価
+pagebench generate --domain domains/my_domain --thinking deep
+pagebench eval --domain domains/my_domain
 ```
 
-補足:
+## 対応バックエンド
 
-- チェックのみ実行: `python setup_env.py --check`
-- システム依存をスキップ: `python setup_env.py --skip-system`
-- Python依存をスキップ: `python setup_env.py --skip-python`
-- 強制再インストール: `python setup_env.py --force`
+### chat_completions モード（デフォルト）
 
-### 3. `.env` を作成
+RAG が組み込まれた OpenAI 互換エンドポイントへ直接クエリを送ります。ドキュメントのアップロードは外部で行います。
 
-リポジトリ直下に `.env` を作成し、以下を設定します。
-
-```env
-GEMINI_API_KEY=your_api_key
-GEMINI_MODEL=gemini-3.1-flash-lite-preview
-GEMINI_TIMEOUT_MS=600000
-GEMINI_RATE_LIMIT_SLEEP_SEC=5
+```dotenv
+OPENAI_COMPAT_MODE=chat_completions
+OPENAI_COMPAT_API_BASE=http://localhost:11434/v1  # Ollama
+OPENAI_COMPAT_MODEL=llama3.2
+OPENAI_COMPAT_API_KEY=dummy
 ```
 
-### 4. NLTKリソースの取得（必要時）
+### assistants モード
 
-SSLやNLTKリソース不足で失敗する場合は実行してください。
+OpenAI Assistants API v2 (Vector Store + File Search) を使用します。`pagebench upload` でドキュメントを自動アップロードします。
+
+```dotenv
+OPENAI_COMPAT_MODE=assistants
+OPENAI_COMPAT_API_BASE=https://api.openai.com/v1
+OPENAI_COMPAT_API_KEY=sk-...
+OPENAI_COMPAT_MODEL=gpt-5             # gpt-5-mini (低コスト) も可
+```
+
+## 評価指標
+
+| 指標 | 説明 |
+|------|------|
+| **ROUGE-L** | 最長共通部分列ベースの F1 スコア（日英対応） |
+| **Exact Match** | 完全一致率（正規化後） |
+| **Judge Accuracy** | Gemini による正確性スコア (1-5) |
+| **Judge Faithfulness** | Gemini による忠実性スコア (1-5) |
+| **Judge Completeness** | Gemini による完全性スコア (1-5) |
+| **Judge Overall** | 上記の総合評価 (1-5) |
+| **Latency** | クエリの応答時間 (ms) |
+
+## 開発
 
 ```bash
-python fix_nltk.py
+# テスト実行
+make test
+
+# ビルド
+make build
+
+# すべて (tidy → lint → test → build)
+make all
 ```
 
-## 実行方法
+## ライセンス
 
-### A. `01_academic_papers` を作成する（推奨の最短ルート）
-
-`01_academic_papers/scripts/01_fetch_data.py` は、以下を一括で実行します。
-
-- Qasperデータセットの取得
-- PDFダウンロード（`source_pdfs/`）
-- `0a_registry.csv` 生成
-- `0b_qa_pairs.csv` 生成（`target_page` は `NULL`）
-
-```bash
-python 01_academic_papers/scripts/01_fetch_data.py --limit 20
-```
-
-主なオプション:
-
-- `--split`（既定: `train`）
-- `--sleep-seconds`（既定: `1.0`）
-- `--timeout`（既定: `20.0`）
-
-必要に応じて、根拠テキストからページ番号を埋める処理を実行できます。
-
-```bash
-python 01_academic_papers/scripts/04_fill_evidence_page.py
-```
-
-上書きしたい場合:
-
-```bash
-python 01_academic_papers/scripts/04_fill_evidence_page.py --overwrite-target-page
-```
-
-### B. `00_sample` / `02_financial_results` / `03_government_policy` を作成する
-
-これら3トピックは同じ処理フローです。
-
-1. `source_pdfs/` に元PDFを配置
-2. `scripts/02_create_registry_cvs.py` でPDFをリネームし、`0a_registry.csv` 生成
-3. `scripts/03_generate_qa.py` で Gemini を使って `0b_qa_pairs.csv` 生成
-
-例: `02_financial_results` の場合
-
-```bash
-python 02_financial_results/scripts/02_create_registry_cvs.py
-python 02_financial_results/scripts/03_generate_qa.py
-```
-
-注意:
-
-- `scripts/01_fetch_data.py` は `00_sample` / `02_financial_results` / `03_government_policy` では現状空ファイルです。
-- `02_create_registry_cvs.py` 実行時にPDFは `02_01_xxx.pdf` のようにリネームされます（トピックIDに応じて接頭辞が変化）。
-
-## 出力CSV仕様
-
-### `0a_registry.csv`
-
-- `file_name`: 保存PDF名
-- `title`: タイトル（多くのケースで元ファイル名）
-- `source_url`: 出典URL（不明時 `null`）
-- `page_count`: ページ数
-
-### `0b_qa_pairs.csv`
-
-- `q_id`: 質問ID
-- `question`: 質問文
-- `reference_answer`: 期待解答
-- `target_file`: 対象PDF名
-- `target_page`: 根拠ページ（不明時 `NULL`）
-- `evidence_text`: 根拠本文
-
-## トラブルシューティング
-
-- `GEMINI_API_KEY is not set`: `.env` が存在するか、キー名が正しいか確認
-- `zsh: command not found: brew`: Homebrewをインストールして再実行
-- OCR/ページ数取得周りで失敗: `python setup_env.py` を再実行して `poppler` / `tesseract` を確認
-- NLTK関連エラー: `python fix_nltk.py` を実行
-
-## 補足
-
-- スクリプト名は `create_registry_cvs.py`（`csv` ではなく `cvs`）です。
-- `setup_env.py` は `requirements.txt` のハッシュを `.setup_state.json` に保存し、差分がない場合は再インストールをスキップします。
+MIT License — 詳細は [LICENSE](LICENSE) を参照してください。

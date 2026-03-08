@@ -90,6 +90,10 @@ eduanimaR_Professor/tmp/
 **/source_pdfs/
 !**/source_pdfs/.gitkeep
 
+# Exclude any Source directories (Source フォルダ)
+Source/
+**/Source/
+
 # Keep examples and generated client exceptions in subprojects
 !**/.env.example
 !.env.example

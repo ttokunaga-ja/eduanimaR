@@ -32,6 +32,12 @@ tags:
     description: Material upload and management
   - name: Chats
     description: Q&A chat sessions with SSE streaming
+  - name: OpenAI-Compat
+    description: |
+      OpenAI API 互換エンドポイント（ADR 005）。
+      base_url を "http://host/api/v1/subjects/{subject_id}" に設定することで、
+      OpenAI Python / TypeScript SDK をそのまま使用できる。
+      api_key には Firebase ID Token（Phase 2）または任意の文字列（Phase 1）を指定。
   - name: Health
     description: Health check endpoints
 
@@ -421,6 +427,159 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ─────────────────────────────────────────
+  # OpenAI 互換エンドポイント（ADR 005）
+  # ─────────────────────────────────────────
+  /v1/subjects/{subject_id}/chat/completions:
+    post:
+      tags: [OpenAI-Compat]
+      summary: OpenAI Chat Completions 互換（RAG 質問応答）
+      description: |
+        OpenAI Chat Completions API 互換エンドポイント。
+        OpenAI SDK を使って eduanimaR professor に接続するには base_url を
+        "http://host/api/v1/subjects/{subject_id}" に設定する。
+
+        messages 配列の最後の role="user" メッセージが質問として使用される。
+
+        stream=true（デフォルト）の場合:
+          SSE で OpenAI delta 形式にて回答をストリーミング。
+          標準の delta.content に回答テキストを、
+          eduanima_event 拡張フィールドに thinking/searching/evidence 中間イベントを付与。
+
+        stream=false の場合:
+          全チャンクをバッファして chat.completion JSON オブジェクトを返す。
+          eduanima_sources 拡張フィールドに引用ソース情報を付与。
+
+        Python SDK 例:
+          from openai import OpenAI
+          client = OpenAI(
+              base_url="http://localhost:8080/api/v1/subjects/{subject_id}",
+              api_key="dev-token"
+          )
+          response = client.chat.completions.create(
+              model="professor",
+              messages=[{"role": "user", "content": "光合成とは?"}],
+              stream=True
+          )
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenAIChatRequest'
+      responses:
+        '200':
+          description: |
+            stream=true: SSE ストリーミング（OpenAI delta 形式）
+            stream=false: chat.completion JSON オブジェクト
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI delta chunk SSE（stream=true 時）
+              examples:
+                role_chunk:
+                  summary: 最初のチャンク（role アナウンス）
+                  value: |
+                    data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1234567890,"model":"professor","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+                thinking_chunk:
+                  summary: 中間イベント（thinking）
+                  value: |
+                    data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1234567890,"model":"professor","choices":[{"index":0,"delta":{},"finish_reason":null}],"eduanima_event":{"type":"thinking","data":{"message":"Analyzing your question..."}}}
+                content_chunk:
+                  summary: 回答テキストチャンク
+                  value: |
+                    data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1234567890,"model":"professor","choices":[{"index":0,"delta":{"content":"光合成とは"},"finish_reason":null}]}
+                done_chunk:
+                  summary: 完了チャンク + センチネル
+                  value: |
+                    data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1234567890,"model":"professor","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+                    data: [DONE]
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAIChatCompletion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/subjects/{subject_id}/files:
+    post:
+      tags: [OpenAI-Compat]
+      summary: OpenAI Files 互換アップロード
+      description: |
+        OpenAI Files API 互換のファイルアップロードエンドポイント。
+        purpose フィールドは受け取るが professor では無視される。
+        アップロード後は GET /files/{file_id} で status が "processed" になるまでポーリングする。
+
+        pageBench 用途:
+          AGENT_FILE_STATUS_READY=processed に設定してポーリング。
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: アップロードするファイル
+                purpose:
+                  type: string
+                  default: assistants
+                  description: OpenAI 互換フィールド（professor では無視される）
+      responses:
+        '200':
+          description: アップロード成功（OpenAI File オブジェクト）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAIFile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/subjects/{subject_id}/files/{file_id}:
+    get:
+      tags: [OpenAI-Compat]
+      summary: OpenAI File オブジェクト取得（ステータス確認）
+      description: |
+        OpenAI Files API 互換のファイルステータス確認エンドポイント。
+        status が "processed" になれば chat/completions で使用可能。
+
+        file_id は以下の形式を受け付ける:
+          - OpenAI 互換形式: "file-550e8400e29b41d4a716446655440000"
+          - 標準 UUID 形式: "550e8400-e29b-41d4-a716-446655440000"
+      parameters:
+        - $ref: '#/components/parameters/SubjectId'
+        - name: file_id
+          in: path
+          required: true
+          description: |
+            File ID（OpenAI 形式 "file-{hex32}" または通常の UUID）
+          schema:
+            type: string
+            example: "file-550e8400e29b41d4a716446655440000"
+      responses:
+        '200':
+          description: File オブジェクト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAIFile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
   # Health
   # ─────────────────────────────────────────
   /healthz:
@@ -626,6 +785,144 @@ components:
         created_at:
           type: string
           format: date-time
+
+    # ─── OpenAI 互換スキーマ（ADR 005）─────────────────────────
+
+    OpenAIChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+          description: |
+            professor では無視される（subject_id は URL パスから取得）。
+            任意の文字列を指定可能（例: "professor", "gpt-4o"）。
+          example: "professor"
+        messages:
+          type: array
+          description: 会話履歴。最後の role="user" メッセージが質問として使用される。
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role:
+                type: string
+                enum: [user, assistant, system]
+              content:
+                type: string
+        stream:
+          type: boolean
+          nullable: true
+          description: |
+            true（デフォルト）: SSE ストリーミング応答
+            false: バッファして chat.completion JSON を返す
+          default: true
+
+    OpenAIChatCompletion:
+      type: object
+      description: OpenAI chat.completion オブジェクト（stream=false 時）
+      required: [id, object, created, model, choices, usage]
+      properties:
+        id:
+          type: string
+          example: "chatcmpl-abc12345"
+        object:
+          type: string
+          enum: [chat.completion]
+        created:
+          type: integer
+          format: int64
+          description: Unix タイムスタンプ
+        model:
+          type: string
+          example: "professor"
+        choices:
+          type: array
+          items:
+            type: object
+            required: [index, message, finish_reason]
+            properties:
+              index:
+                type: integer
+              message:
+                type: object
+                required: [role, content]
+                properties:
+                  role:
+                    type: string
+                    enum: [assistant]
+                  content:
+                    type: string
+                    description: 完全な回答テキスト
+              finish_reason:
+                type: string
+                enum: [stop]
+        usage:
+          type: object
+          description: トークン使用量（professor では常に 0）
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+        eduanima_sources:
+          type: array
+          description: |
+            eduanimaR 固有の引用ソース情報（拡張フィールド）。
+            標準 OpenAI クライアントはこのフィールドを無視する。
+          items:
+            type: object
+            properties:
+              file_name:
+                type: string
+              excerpt:
+                type: string
+              why_relevant:
+                type: string
+
+    OpenAIFile:
+      type: object
+      description: |
+        OpenAI File オブジェクト互換。
+        ID は "file-{hex32}" 形式（例: "file-550e8400e29b41d4a716446655440000"）。
+      required: [id, object, bytes, created, filename, purpose, status]
+      properties:
+        id:
+          type: string
+          description: OpenAI 互換 File ID（"file-" + UUID ハイフンなし）
+          example: "file-550e8400e29b41d4a716446655440000"
+        object:
+          type: string
+          enum: [file]
+        bytes:
+          type: integer
+          format: int64
+          description: ファイルサイズ（バイト）
+        created:
+          type: integer
+          format: int64
+          description: Unix タイムスタンプ
+        filename:
+          type: string
+          example: "lecture01.pdf"
+        purpose:
+          type: string
+          description: アップロード時の purpose（pass-through）
+          example: "assistants"
+        status:
+          type: string
+          description: |
+            OpenAI 互換のファイル処理状態。
+            "uploaded"  → pending / processing（まだ処理中）
+            "processed" → ready（検索可能 = AGENT_FILE_STATUS_READY の値）
+            "error"     → failed（処理失敗）
+          enum: [uploaded, processed, error]
+        status_details:
+          type: string
+          nullable: true
+          description: status="error" 時のエラー詳細
 
     ErrorResponse:
       type: object

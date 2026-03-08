@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "pageBench/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "pageBench/**"
+
+defaults:
+  run:
+    working-directory: pageBench
+
+jobs:
+  test:
+    name: Test (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: pageBench/go.mod
+          cache: true
+          cache-dependency-path: pageBench/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./... -v -count=1 -race
+
+      - name: go build
+        run: go build ./cmd/pagebench

@@ -122,6 +122,16 @@ func (uc *MaterialUseCase) Upload(ctx context.Context, in UploadMaterialInput) (
 	return file, nil
 }
 
+// GetFile は教材ファイルをファイル ID とユーザー ID で取得する。
+// OpenAI Files API 互換エンドポイント（GET /subjects/:id/files/:file_id）から使用される。
+func (uc *MaterialUseCase) GetFile(ctx context.Context, subjectID, fileID, userID uuid.UUID) (*domain.File, error) {
+	// subject の所有権確認
+	if _, err := uc.subjects.GetByIDAndUserID(ctx, subjectID, userID); err != nil {
+		return nil, err
+	}
+	return uc.files.GetByIDAndUserID(ctx, fileID, userID)
+}
+
 // Delete は教材ファイルをストレージと DB から削除する。
 func (uc *MaterialUseCase) Delete(ctx context.Context, fileID, userID uuid.UUID) error {
 	file, err := uc.files.GetByIDAndUserID(ctx, fileID, userID)

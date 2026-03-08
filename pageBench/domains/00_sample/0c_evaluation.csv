@@ -1,0 +1,1 @@
+q_id,domain,question,question_type,ref_answer,ref_evidence,ref_file,ref_page,rag_answer,rag_sources,file_hit,page_hit,rouge_l,exact_match,rag_refused,latency_ms,judge_accuracy,judge_faithfulness,judge_completeness,judge_overall,judge_hallucination,judge_reasoning

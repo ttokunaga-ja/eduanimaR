@@ -169,6 +169,16 @@ func main() {
 	chatH := handlers.NewChatHandler(chatUC)
 	chatH.Register(v1.Group("/subjects/:subject_id/chats"))
 
+	// OpenAI 互換 Chat Completions API (/api/v1/subjects/:subject_id/chat/completions)
+	// base_url = "http://host/api/v1/subjects/{subject_id}" で OpenAI SDK がそのまま動作する。
+	// 参照: docs/adr/005-openai-api-compat-layer.md
+	openaiChatH := handlers.NewOpenAIChatHandler(chatUC)
+	openaiChatH.Register(v1.Group("/subjects/:subject_id/chat/completions"))
+
+	// OpenAI 互換 Files API (/api/v1/subjects/:subject_id/files)
+	openaiFilesH := handlers.NewOpenAIFilesHandler(materialUC)
+	openaiFilesH.Register(v1.Group("/subjects/:subject_id/files"))
+
 	// ─── Kafka Ingest Worker goroutine ───────────────────────
 	go func() {
 		if err := consumer.ConsumeIngestJobs(rootCtx, ingestUC.ProcessJob); err != nil {
