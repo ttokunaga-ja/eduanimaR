@@ -118,7 +118,12 @@ func (m *MockLLMClient) OCRAndChunk(ctx context.Context, fileContent []byte, mim
 	v, _ := args.Get(0).(*ports.OCRResult)
 	return v, args.Error(1)
 }
-func (m *MockLLMClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+func (m *MockLLMClient) GenerateDocumentEmbedding(ctx context.Context, text string) ([]float32, error) {
+	args := m.Called(ctx, text)
+	v, _ := args.Get(0).([]float32)
+	return v, args.Error(1)
+}
+func (m *MockLLMClient) GenerateQueryEmbedding(ctx context.Context, text string) ([]float32, error) {
 	args := m.Called(ctx, text)
 	v, _ := args.Get(0).([]float32)
 	return v, args.Error(1)
@@ -129,6 +134,10 @@ func (m *MockLLMClient) GenerateAnswer(ctx context.Context, question string, evi
 }
 func (m *MockLLMClient) GenerateAnswerStream(ctx context.Context, question string, evidences []string, onChunk func(text string) error) error {
 	args := m.Called(ctx, question, evidences, onChunk)
+	return args.Error(0)
+}
+func (m *MockLLMClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, onChunk func(text string) error) error {
+	args := m.Called(ctx, question, evidences, pdfContent, mimeType, onChunk)
 	return args.Error(0)
 }
 

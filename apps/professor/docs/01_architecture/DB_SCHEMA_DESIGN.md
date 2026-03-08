@@ -162,22 +162,33 @@ CREATE INDEX idx_files_status     ON files(status);
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE chunks (
-  chunk_id UUID PRIMARY KEY DEFAULT uuidv7(),
-  file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
-  page_number INT, -- PDFページ番号（画像の場合はNULL）
-  chunk_index INT NOT NULL, -- ファイル内での連番
-  content TEXT NOT NULL, -- OCR/抽出されたテキスト
-  embedding vector(768) NOT NULL, -- Gemini Embedding（次元数は要確認）
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  chunk_id   UUID PRIMARY KEY DEFAULT uuidv7(),
+  file_id    UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE, -- 物理絞り込み用（JOINなし検索を可能にする）
+  page_number  INT,          -- PDFページ番号（画像の場合はNULL）
+  chunk_index  INT NOT NULL, -- ファイル内での連番
+  content      TEXT NOT NULL, -- OCR/抽出されたテキスト
+  embedding    vector(1536) NOT NULL, -- gemini-embedding-001（MRL: 1536次元）
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_chunks_file_id ON chunks(file_id);
-CREATE INDEX idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_chunks_file_id    ON chunks(file_id);
+CREATE INDEX idx_chunks_subject_id ON chunks(subject_id);
+
+-- HNSW ベクトル検索インデックス
+-- gemini-embedding-001（MRL）で 1536次元を指定
+-- pgvector 0.8.1 の HNSW 上限（2000次元）以内のためインデックス有効
+CREATE INDEX idx_chunks_embedding_hnsw ON chunks
+  USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
 ```
 
 **設計意図**:
-- pgvector 0.8.1 の HNSW インデックスを使用
-- `embedding` の次元数（768）は Gemini Embedding の仕様に依存
+- `embedding` は `gemini-embedding-001`（MRL: Matryoshka Representation Learning）で 1536次元を指定
+  - 3072次元（デフォルト）は HNSW 上限（2000次元）を超えるため使用不可
+  - 1536次元は精度を保ちつつ HNSW インデックスを使用可能
+  - インジェスト時 `TaskType=RETRIEVAL_DOCUMENT`、クエリ時 `TaskType=RETRIEVAL_QUERY` を指定
+- `subject_id` を直接保持することで検索時の JOIN を排除し、インデックス効率を向上
 - `chunk_index` でファイル内の順序を保持
 
 ### ingest_jobs（非同期処理ジョブ）

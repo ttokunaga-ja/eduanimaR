@@ -1,0 +1,26 @@
+# ============================================================
+# eduanimaR — ルート compose.yml（利便性ラッパー）
+#
+# このファイルはルートディレクトリから素の `docker compose` コマンドを
+# 使えるようにするための薄いラッパーです。
+#
+# 設定の正本は ops/compose/docker-compose.yml にあります。
+# 直接編集・追加は ops/compose/docker-compose.yml に対して行ってください。
+#
+# 使い方:
+#   docker compose up -d              # 全サービス起動
+#   docker compose build --no-cache   # 全イメージ再ビルド
+#   docker compose down -v            # 全コンテナ・ボリューム削除
+#   docker compose logs -f librarian  # ログ追尾
+#
+# ※ make コマンドも引き続き利用可能（Makefile は変更不要）
+#   make dev      # 開発環境起動（マイグレーション付き）
+#   make build    # イメージビルドのみ
+# ============================================================
+
+include:
+  - path: ops/compose/docker-compose.yml
+    # project_directory: . を指定することで、インクルード先の
+    # ビルドコンテキスト（./apps/librarian 等）をルート基準で解決する。
+    # これにより素の `docker compose build` でもコンテキストエラーが発生しない。
+    project_directory: .

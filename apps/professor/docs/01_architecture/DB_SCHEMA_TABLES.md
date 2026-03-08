@@ -287,11 +287,11 @@ CREATE TABLE materials (
   content_markdown TEXT NOT NULL,
   char_count INTEGER NOT NULL,
   
-  -- ベクトル表現（pgvector: 768次元）
-  embedding vector(768) NOT NULL,
+  -- ベクトル表現（pgvector: 1536次元 / gemini-embedding-001 MRL）
+  embedding vector(1536) NOT NULL,
   
-  -- Embeddingモデル情報（固定: text-embedding-004）
-  embedding_model TEXT NOT NULL DEFAULT 'text-embedding-004',
+  -- Embeddingモデル情報（固定: gemini-embedding-001, TaskType: RETRIEVAL_DOCUMENT）
+  embedding_model TEXT NOT NULL DEFAULT 'gemini-embedding-001',
   
   -- 監査
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -309,6 +309,8 @@ CREATE INDEX idx_materials_file_seq ON materials(raw_file_id, sequence_in_file) 
 CREATE INDEX idx_materials_content_fts ON materials USING GIN (to_tsvector('english', content_markdown)) WHERE is_active;
 
 -- HNSW ベクトル検索インデックス（高速近似検索）
+-- gemini-embedding-001 の MRL により 1536次元を使用
+-- pgvector 0.8.1 の HNSW 上限（2000次元）以内のためインデックス有効
 CREATE INDEX idx_materials_embedding_vector ON materials 
   USING hnsw (embedding vector_cosine_ops) 
   WITH (m = 16, ef_construction = 64)
@@ -318,11 +320,14 @@ CREATE INDEX idx_materials_embedding_vector ON materials
 **設計メモ**:
 - **意味単位のチャンク**（高速推論モデルで分割）
 - `sequence_in_file` でファイル内の順序を保持（前後文脈の取得に使用）
-- `embedding_version` を削除（モデル固定のため）
+  - `embedding_version` を削除（モデル固定のため）
 - `generation` を削除（シンプル化）
-- `embedding_model` をデフォルト値付きに変更（text-embedding-004固定）
+- `embedding_model` をデフォルト値付きに変更（`gemini-embedding-001` 固定）
+- 次元数 **1536**（MRL: Matryoshka Representation Learning で 3072→1536 に指定）
+  - 精度は 3072 次元と遜色なし、HNSW インデックスが使用可能（上限 2000 次元以内）
+  - インジェスト時 `TaskType=RETRIEVAL_DOCUMENT`、クエリ時 `TaskType=RETRIEVAL_QUERY` で品質向上
 - **全文検索はPostgreSQL標準のGINインデックス**
-- **pgvector 0.8.1のHNSWインデックス**採用
+- **pgvector 0.8.1のHNSWインデックス**採用（1536次元は上限内）
 
 ---
 

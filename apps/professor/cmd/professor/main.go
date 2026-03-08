@@ -100,7 +100,7 @@ func main() {
 	slog.Info("kafka consumer initialized")
 
 	// ─── Gemini LLM クライアント ──────────────────────────────
-	llmClient, err := llm.NewGeminiClient(rootCtx, cfg.GeminiAPIKey)
+	llmClient, err := llm.NewGeminiClient(rootCtx, cfg.GeminiAPIKey, cfg.ModelIngestion, cfg.ModelAnswer)
 	if err != nil {
 		slog.Error("failed to create gemini client", "error", err)
 		os.Exit(1)
@@ -125,7 +125,7 @@ func main() {
 	// ─── ユースケース ─────────────────────────────────────────
 	subjectUC := usecases.NewSubjectUseCase(subjectRepo)
 	materialUC := usecases.NewMaterialUseCase(fileRepo, ingestJobRepo, objectStorage, publisher, subjectRepo)
-	chatUC := usecases.NewChatUseCase(subjectRepo, qaSessionRepo, chunkRepo, llmClient, librarianClient)
+	chatUC := usecases.NewChatUseCase(subjectRepo, qaSessionRepo, chunkRepo, fileRepo, objectStorage, llmClient, librarianClient)
 	ingestUC := usecases.NewIngestUseCase(fileRepo, ingestJobRepo, chunkRepo, objectStorage, llmClient)
 
 	// ─── Echo サーバー設定 ────────────────────────────────────

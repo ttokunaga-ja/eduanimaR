@@ -75,7 +75,7 @@ def setup_logging(log_level: str) -> None:
     structlog.configure(
         processors=[
             structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
+            # add_logger_name は PrintLoggerFactory と非互換のため除外
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,

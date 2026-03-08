@@ -16,8 +16,8 @@
 # ─────────────────────────────────────────────────────────────
 # 定数
 # ─────────────────────────────────────────────────────────────
-COMPOSE         := docker compose -f ops/compose/docker-compose.yml
-COMPOSE_PROD    := docker compose -f ops/compose/docker-compose.yml -f ops/compose/docker-compose.prod.yml
+COMPOSE         := docker compose --project-name eduanimar --project-directory . --env-file .env -f ops/compose/docker-compose.yml
+COMPOSE_PROD    := docker compose --project-name eduanimar --project-directory . --env-file .env -f ops/compose/docker-compose.yml -f ops/compose/docker-compose.prod.yml
 
 # ─────────────────────────────────────────────────────────────
 # セットアップ

@@ -34,6 +34,7 @@ func collectEvents() (func(domain.SSEEventType, any) error, *[]domain.SSEEventTy
 }
 
 // newChatUseCase はテスト用依存を注入した ChatUseCase を返す。
+// fileRepo と storage は既存テストでは使用しないため、内部で空モックを生成する。
 func newChatUseCase(
 	subjectRepo *testhelper.MockSubjectRepository,
 	qaRepo *testhelper.MockQASessionRepository,
@@ -41,7 +42,12 @@ func newChatUseCase(
 	llm *testhelper.MockLLMClient,
 	librarian *testhelper.MockLibrarianClient,
 ) *usecases.ChatUseCase {
-	return usecases.NewChatUseCase(subjectRepo, qaRepo, chunkRepo, llm, librarian)
+	return usecases.NewChatUseCase(
+		subjectRepo, qaRepo, chunkRepo,
+		&testhelper.MockFileRepository{},
+		&testhelper.MockObjectStorage{},
+		llm, librarian,
+	)
 }
 
 // ─── Ask 正常系 ──────────────────────────────────────────────────

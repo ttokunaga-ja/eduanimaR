@@ -3,7 +3,9 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,13 +19,54 @@ const (
 	chatSearchLimit   = 10 // 1クエリあたりの最大検索結果数
 	fallbackEvidenceN = 5  // Librarian がエビデンスを返さない場合のフォールバック件数
 	excerptMaxLen     = 300
+	rrfK              = 60 // RRF 定数（標準値: 60）
 )
+
+// rrfMerge は複数のランク付き検索結果リストを Reciprocal Rank Fusion でマージする。
+//
+// 各リストは上位順（rank=0 が最高スコア）で渡す。
+// 同一 ChunkID が複数リストに現れた場合、スコアを加算して昇格させる。
+// 戻り値は RRF スコア降順にソートされた重複なしスライス。
+func rrfMerge(rankedLists [][]*domain.SearchResult) []domain.SearchResult {
+	type entry struct {
+		result *domain.SearchResult
+		score  float64
+	}
+	scoreMap := make(map[uuid.UUID]float64)
+	resultMap := make(map[uuid.UUID]*domain.SearchResult)
+
+	for _, list := range rankedLists {
+		for rank, r := range list {
+			scoreMap[r.ChunkID] += 1.0 / float64(rrfK+rank+1)
+			if _, ok := resultMap[r.ChunkID]; !ok {
+				cp := *r
+				resultMap[r.ChunkID] = &cp
+			}
+		}
+	}
+
+	entries := make([]entry, 0, len(scoreMap))
+	for id, score := range scoreMap {
+		entries = append(entries, entry{result: resultMap[id], score: score})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].score > entries[j].score
+	})
+
+	merged := make([]domain.SearchResult, len(entries))
+	for i, e := range entries {
+		merged[i] = *e.result
+	}
+	return merged
+}
 
 // ChatUseCase は質問応答セッションのオーケストレーションを担う。
 type ChatUseCase struct {
 	subjectRepo   ports.SubjectRepository
 	qaSessionRepo ports.QASessionRepository
 	chunkRepo     ports.ChunkRepository
+	fileRepo      ports.FileRepository // PDF 原本取得のためのファイルメタデータ参照用
+	storage       ports.ObjectStorage  // MinIO から PDF をダウンロードするためのストレージ
 	llm           ports.LLMClient
 	librarian     ports.LibrarianClient
 }
@@ -33,6 +76,8 @@ func NewChatUseCase(
 	subjectRepo ports.SubjectRepository,
 	qaSessionRepo ports.QASessionRepository,
 	chunkRepo ports.ChunkRepository,
+	fileRepo ports.FileRepository,
+	storage ports.ObjectStorage,
 	llm ports.LLMClient,
 	librarian ports.LibrarianClient,
 ) *ChatUseCase {
@@ -40,6 +85,8 @@ func NewChatUseCase(
 		subjectRepo:   subjectRepo,
 		qaSessionRepo: qaSessionRepo,
 		chunkRepo:     chunkRepo,
+		fileRepo:      fileRepo,
+		storage:       storage,
 		llm:           llm,
 		librarian:     librarian,
 	}
@@ -112,51 +159,90 @@ func (uc *ChatUseCase) Ask(
 				return nil, evErr
 			}
 
-			// (A) 全文検索（text queries）
+			// (A) & (B) 全クエリを goroutine で並列実行 → RRF でマージ
+			//
+			// 有効クエリ数を数え、チャネルで結果を収集する。
+			// エラー時は nil を送信してチャネルのカウントを合わせる。
+			var validQueries int
+			for _, q := range req.QueriesText {
+				if q != "" {
+					validQueries++
+				}
+			}
+			for _, q := range req.QueriesVector {
+				if q != "" {
+					validQueries++
+				}
+			}
+
+			ch := make(chan []*domain.SearchResult, validQueries)
+
+			// (A) 全文検索（goroutine）
 			for _, q := range req.QueriesText {
 				if q == "" {
 					continue
 				}
-				results, searchErr := uc.chunkRepo.SearchByText(ctx, subjectID, q, chatSearchLimit)
-				if searchErr != nil {
-					slog.Warn("text search error", "query", q, "error", searchErr)
-					continue
-				}
-				for _, r := range results {
-					if _, seen := seenChunks[r.ChunkID]; !seen {
-						seenChunks[r.ChunkID] = struct{}{}
-						allResults = append(allResults, *r)
+				q := q
+				go func() {
+					results, err := uc.chunkRepo.SearchByText(ctx, subjectID, q, chatSearchLimit)
+					if err != nil {
+						slog.Warn("text search error", "query", q, "error", err)
+						ch <- nil
+						return
 					}
-				}
+					ch <- results
+				}()
 			}
 
-			// (B) ベクトル検索（vector queries: 各クエリを embed → HNSW 検索）
+			// (B) ベクトル検索（embed → HNSW、goroutine）
 			for _, q := range req.QueriesVector {
 				if q == "" {
 					continue
 				}
-				emb, embErr := uc.llm.GenerateEmbedding(ctx, q)
-				if embErr != nil {
-					slog.Warn("embedding error", "query", q, "error", embErr)
-					continue
-				}
-				vec := pgvector.NewVector(emb)
-				results, searchErr := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, chatSearchLimit)
-				if searchErr != nil {
-					slog.Warn("vector search error", "query", q, "error", searchErr)
-					continue
-				}
-				for _, r := range results {
-					if _, seen := seenChunks[r.ChunkID]; !seen {
-						seenChunks[r.ChunkID] = struct{}{}
-						allResults = append(allResults, *r)
+				q := q
+				go func() {
+					emb, err := uc.llm.GenerateQueryEmbedding(ctx, q)
+					if err != nil {
+						slog.Warn("embedding error", "query", q, "error", err)
+						ch <- nil
+						return
 					}
+					vec := pgvector.NewVector(emb)
+					results, err := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, chatSearchLimit)
+					if err != nil {
+						slog.Warn("vector search error", "query", q, "error", err)
+						ch <- nil
+						return
+					}
+					ch <- results
+				}()
+			}
+
+			// 全 goroutine の結果を収集
+			var rankedLists [][]*domain.SearchResult
+			for range validQueries {
+				list := <-ch
+				if len(list) > 0 {
+					rankedLists = append(rankedLists, list)
 				}
 			}
 
-			slog.Info("search round completed",
+			// RRF でマージ：このラウンドの結果を RRF スコア順に統合
+			roundMerged := rrfMerge(rankedLists)
+
+			// allResults に追加（TempIndex の安定性を保つため重複除去のみ）
+			for _, r := range roundMerged {
+				r := r
+				if _, seen := seenChunks[r.ChunkID]; !seen {
+					seenChunks[r.ChunkID] = struct{}{}
+					allResults = append(allResults, r)
+				}
+			}
+
+			slog.Info("search round completed (RRF)",
 				"text_queries", len(req.QueriesText),
 				"vector_queries", len(req.QueriesVector),
+				"rrf_merged", len(roundMerged),
 				"total_accumulated", len(allResults),
 			)
 
@@ -221,15 +307,47 @@ func (uc *ChatUseCase) Ask(
 		}
 	}
 
-	// 6. LLM 回答ストリーミング生成 → SSEEventAnswer
+	// 6. PDF 原本を MinIO から取得し、LLM 回答ストリーミング生成 → SSEEventAnswer
+	//
+	// sources に含まれる最初の FileID の PDF を取得する。
+	// 取得失敗時はテキストエビデンスのみでフォールバックする（エラーは継続しない）。
+	var pdfContent []byte
+	var pdfMimeType string
+	if len(sources) > 0 {
+		fileID := sources[0].FileID
+		file, fileErr := uc.fileRepo.GetByID(ctx, fileID)
+		if fileErr != nil {
+			slog.Warn("failed to get file metadata for PDF answer",
+				"file_id", fileID, "error", fileErr)
+		} else {
+			reader, dlErr := uc.storage.Download(ctx, file.StoragePath)
+			if dlErr != nil {
+				slog.Warn("failed to download PDF for answer",
+					"file_id", fileID, "storage_path", file.StoragePath, "error", dlErr)
+			} else {
+				defer reader.Close()
+				b, readErr := io.ReadAll(reader)
+				if readErr != nil {
+					slog.Warn("failed to read PDF bytes for answer",
+						"file_id", fileID, "error", readErr)
+				} else {
+					pdfContent = b
+					pdfMimeType = file.MimeType
+					slog.Info("PDF loaded for answer generation",
+						"file_id", fileID, "size_bytes", len(b))
+				}
+			}
+		}
+	}
+
 	var answerBuf strings.Builder
-	streamErr := uc.llm.GenerateAnswerStream(ctx, question, evidenceTexts, func(text string) error {
+	streamErr := uc.llm.GenerateAnswerStreamWithPDF(ctx, question, evidenceTexts, pdfContent, pdfMimeType, func(text string) error {
 		answerBuf.WriteString(text)
 		return onEvent(domain.SSEEventAnswer, map[string]any{"text": text})
 	})
 	if streamErr != nil {
 		_ = onEvent(domain.SSEEventError, map[string]any{"message": streamErr.Error()})
-		return nil, fmt.Errorf("generate answer stream: %w", streamErr)
+		return nil, fmt.Errorf("generate answer stream with pdf: %w", streamErr)
 	}
 
 	// 7. QASession.Answer / Sources を永続化

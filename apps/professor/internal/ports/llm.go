@@ -21,8 +21,13 @@ type LLMClient interface {
 	// Markdown化・意味単位チャンク分割を行う（高速推論モデル使用）
 	OCRAndChunk(ctx context.Context, fileContent []byte, mimeType string) (*OCRResult, error)
 
-	// GenerateEmbedding はテキストの埋め込みベクトル（768次元）を生成する
-	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+	// GenerateDocumentEmbedding はインジェスト用の埋め込みベクトル（1536次元）を生成する。
+	// TaskType=RETRIEVAL_DOCUMENT を指定して品質を最適化する。
+	GenerateDocumentEmbedding(ctx context.Context, text string) ([]float32, error)
+
+	// GenerateQueryEmbedding は検索クエリ用の埋め込みベクトル（1536次元）を生成する。
+	// TaskType=RETRIEVAL_QUERY を指定して品質を最適化する。
+	GenerateQueryEmbedding(ctx context.Context, text string) ([]float32, error)
 
 	// GenerateAnswer は選定済みエビデンスチャンクと質問から最終回答を生成する
 	// （高精度推論モデル使用）
@@ -31,4 +36,10 @@ type LLMClient interface {
 	// GenerateAnswerStream は GenerateAnswer のストリーミング版
 	// onChunk コールバックに回答テキストを逐次的に渡す
 	GenerateAnswerStream(ctx context.Context, question string, evidences []string, onChunk func(text string) error) error
+
+	// GenerateAnswerStreamWithPDF は PDF 原本バイト列とエビデンスチャンクを組み合わせて
+	// 回答をストリーミング生成する。Gemini に PDF を直接渡すことで原本を参照した
+	// 高精度な回答を実現する（テキスト抽出のみでは失われる表・図・数式も参照可能）。
+	// pdfContent が nil または空の場合は GenerateAnswerStream と同じ動作をする。
+	GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, onChunk func(text string) error) error
 }

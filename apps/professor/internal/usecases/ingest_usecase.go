@@ -146,7 +146,7 @@ func (uc *IngestUseCase) ProcessJob(ctx context.Context, msg ports.IngestMessage
 			continue
 		}
 
-		emb, embErr := uc.llm.GenerateEmbedding(ctx, c.Content)
+		emb, embErr := uc.llm.GenerateDocumentEmbedding(ctx, c.Content)
 		if embErr != nil {
 			// Embedding 失敗は警告のみ（そのチャンクをスキップ）
 			slog.Warn("embedding failed, skipping chunk",

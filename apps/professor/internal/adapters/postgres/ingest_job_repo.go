@@ -25,6 +25,7 @@ func (r *ingestJobRepo) Create(ctx context.Context, job *domain.IngestJob) error
 	created, err := r.q.CreateIngestJob(ctx, sqlcgen.CreateIngestJobParams{
 		JobID:      job.ID,
 		FileID:     job.FileID,
+		Status:     sqlcgen.JobStatus(job.Status),
 		MaxRetries: int32(job.MaxRetries),
 	})
 	if err != nil {

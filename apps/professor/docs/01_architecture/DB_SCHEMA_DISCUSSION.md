@@ -38,19 +38,28 @@ id UUID PRIMARY KEY DEFAULT uuidv7()
 
 ### 2. ベクトル次元数の確定
 
-**問題**:
-- Embeddingモデル（例: Vertex AI Embeddings, OpenAIなど）の選定と次元数
-- 提案では `vector(768)` としているが、実際のモデルに合わせる必要がある
+**問題（解決済み）**:
+- Embeddingモデルの選定と次元数の確定
 
-**候補**:
-- Vertex AI `textembedding-gecko@003`: 768次元
-- OpenAI `text-embedding-3-small`: 1536次元
-- OpenAI `text-embedding-3-large`: 3072次元
+**採用モデル**:
+- `gemini-embedding-001`（Google, 2025年7月 GA）
+  - 旧モデル `text-embedding-004` / `text-multilingual-embedding-002` を統合した標準モデル
+  - MRL（Matryoshka Representation Learning）により 128〜3072次元で動的に指定可能
+  - 100言語以上対応、最大入力 2048 トークン
 
-**決定事項** (要記入):
-- [ ] Embeddingモデル: ________________
-- [ ] ベクトル次元数: ________________
-- [ ] HNSWパラメータの初期値: `m=____`, `ef_construction=____`
+**次元数の決定: 1536次元**
+
+| 次元数 | HNSW | 精度 | 備考 |
+|:---:|:---:|:---:|:---|
+| 3072（デフォルト） | ❌ 不可（上限 2000） | 最高 | シーケンシャルスキャンになる |
+| **1536（採用）** | ✅ 可能 | 3072と遜色なし | OpenAI ada-002互換サイズ |
+| 768 | ✅ 可能 | やや低下 | 旧モデル互換 |
+
+**決定事項**:
+- [x] Embeddingモデル: `gemini-embedding-001`
+- [x] ベクトル次元数: `1536`（`OutputDimensionality=1536` を指定）
+- [x] HNSWパラメータ: `m=16`, `ef_construction=64`
+- [x] TaskType: インジェスト時 `RETRIEVAL_DOCUMENT`、クエリ時 `RETRIEVAL_QUERY`
 
 ---
 
@@ -215,22 +224,35 @@ INSERT INTO chunks (..., generation = :new_gen) VALUES (...);
 - 複合インデックスの順序（例: `(subject_id, user_id)` vs `(user_id, subject_id)`）
 - WHERE句でのフィルタ条件との整合性
 
-**分析**:
-```sql
--- クエリパターン1: 科目内の全ユーザー資料（管理者向け）
-SELECT * FROM materials WHERE subject_id = :subject_id;
+**方針（確定）**:
 
--- クエリパターン2: ユーザーの特定科目資料（学生向け、MVP主経路）
-SELECT * FROM materials WHERE subject_id = :subject_id AND user_id = :user_id;
+検索の物理絞り込みは **`subject_id` のみ**を使用する。
+「講義回（lecture_number）」等の属性はDBに保存せず、フィルタ対象外とする。
+
+```sql
+-- ✅ 採用: subject_id による物理絞り込み（MVPの主経路）
+SELECT c.* FROM chunks c
+WHERE c.subject_id = :subject_id
+ORDER BY c.embedding <=> :query_vector
+LIMIT :top_k;
+
+-- ✅ 全文検索も同様に subject_id のみでフィルタリング
+SELECT c.* FROM chunks c
+WHERE c.subject_id = :subject_id
+  AND to_tsvector('simple', c.content) @@ plainto_tsquery('simple', :query)
+LIMIT :top_k;
 ```
 
-**推奨**:
-- MVP: `(subject_id, user_id)` 優先（学生の個人利用想定）
-- 将来: 管理者向けクエリが増えたら `(subject_id)` 単独インデックス追加
+**chunks テーブルに `subject_id` を直接持つ理由**:
+- `chunk → file → subject` の 2段 JOIN を排除
+- `subject_id` インデックスで直接フィルタリングが可能
+- HNSW インデックスと組み合わせた高速検索に対応
 
-**決定事項** (要記入):
-- [ ] 複合インデックス順序: `(subject_id, user_id)` / `(user_id, subject_id)` / 両方
-- [ ] パーシャルインデックス: `WHERE is_active` を全インデックスに付与？
+**決定事項**:
+- [x] 物理絞り込みカラム: `subject_id` のみ（`user_id` は subjects テーブルで管理）
+- [x] 講義回（lecture_number）フィルタ: **廃止**（DBに保存しない）
+- [x] 複合インデックス順序: `(subject_id)` 単独インデックス（chunks テーブル）
+- [x] パーシャルインデックス: `WHERE is_active` は materials テーブルに適用（chunks は is_active なし）
 
 ---
 

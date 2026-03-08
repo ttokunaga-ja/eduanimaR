@@ -21,9 +21,13 @@ class Config:
 
     # Gemini API
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
+    # クエリ生成・充足度評価に使用するモデル名
+    # LIBRARIAN_MODEL_SEARCH 環境変数で上書き可能（デフォルト: gemini-3-flash-preview）
+    gemini_model: str = field(default_factory=lambda: os.getenv("LIBRARIAN_MODEL_SEARCH", "gemini-3-flash-preview"))
 
     # エージェント制約
-    max_loops: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_LOOPS", "3")))
+    # max_loops: 上限 5 回（平均 3 回で収束する設計）
+    max_loops: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_LOOPS", "5")))
     max_results: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_RESULTS", "10")))
     timeout_ms: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_TIMEOUT_MS", "30000")))
 

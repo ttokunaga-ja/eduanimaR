@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config はアプリケーション全体の設定を保持する。
@@ -32,6 +33,12 @@ type Config struct {
 	// Gemini AI
 	GeminiAPIKey string
 
+	// Gemini モデル設定
+	// Phase 1: OCR / チャンク分割
+	ModelIngestion string
+	// Phase 4: 最終回答生成
+	ModelAnswer string
+
 	// Librarian gRPC サービス
 	LibrarianAddr string
 
@@ -50,17 +57,21 @@ type Config struct {
 // Load は環境変数から Config を構築して返す。
 func Load() *Config {
 	return &Config{
-		AppEnv:            getEnv("APP_ENV", "development"),
-		Port:              getEnv("PORT", "8080"),
-		DatabaseURL:       getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
-		MinioEndpoint:     getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey:    getEnv("MINIO_ROOT_USER", "minioadmin"),
-		MinioSecretKey:    getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
-		MinioBucket:       getEnv("MINIO_BUCKET", "eduanima-materials"),
-		MinioUseSSL:       false,
-		KafkaBrokers:      getEnv("KAFKA_BROKERS", "localhost:9094"),
-		KafkaTopic:        getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
-		GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
+		AppEnv:         getEnv("APP_ENV", "development"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    getEnv("DATABASE_URL", "postgres://eduanima:eduanima_password@localhost:5432/eduanima_professor?sslmode=disable"),
+		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinioAccessKey: getEnv("MINIO_ROOT_USER", "minioadmin"),
+		MinioSecretKey: getEnv("MINIO_ROOT_PASSWORD", "minioadmin"),
+		MinioBucket:    getEnv("MINIO_BUCKET", "eduanima-materials"),
+		MinioUseSSL:    false,
+		KafkaBrokers:   getEnv("KAFKA_BROKERS", "localhost:9094"),
+		KafkaTopic:     getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
+		GeminiAPIKey:   getEnv("GEMINI_API_KEY", ""),
+		ModelIngestion: getEnv("PROFESSOR_MODEL_INGESTION", "gemini-2.0-flash-lite"),
+		// 先頭ダッシュは「本番非推奨」マーカーとして使われることがある。
+		// 実際の Gemini API 呼び出し時に不正モデル名にならないよう除去する。
+		ModelAnswer:       strings.TrimPrefix(getEnv("PROFESSOR_MODEL_ANSWER", "gemini-2.0-flash-lite"), "-"),
 		LibrarianAddr:     getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
 		FirebaseProjectID: getEnv("FIREBASE_PROJECT_ID", ""),
 		OtelEndpoint:      getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
