@@ -495,19 +495,27 @@ CREATE INDEX idx_jobs_type ON jobs(job_type);
 
 ```go
 import (
+  "crypto/rand"
     "fmt"
-    gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 // 20文字のNanoIDを生成（users, subjects, raw_files, chats用）
 func generateNanoID20() (string, error) {
-    alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
-    return gonanoid.Generate(alphabet, 20)
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+  b := make([]byte, 20)
+  if _, err := rand.Read(b); err != nil {
+    return "", err
+  }
+  for i := range b {
+    b[i] = alphabet[b[i]&63]
+  }
+  return string(b), nil
 }
 
 // 使用例
 func createUser(ctx context.Context, db *sql.DB, provider, providerUserID string) error {
-    userID := uuid.Must(uuid.NewV7())
+  // DBのDEFAULT uuidv7()を利用する前提でも、アプリ側でIDを作る場合はuuid.New()を使う
+  userID := uuid.New()
     nanoID, err := generateNanoID20()
     if err != nil {
         return fmt.Errorf("failed to generate nanoid: %w", err)
@@ -682,7 +690,7 @@ func extractUsedFileIDs(
         FROM materials 
         WHERE id = ANY($1) AND is_active = TRUE
     `
-    rows, err := db.QueryContext(ctx, query, pq.Array(materialIDs))
+    rows, err := db.QueryContext(ctx, query, materialIDs)
     if err != nil {
         return nil, fmt.Errorf("failed to extract file ids: %w", err)
     }
@@ -758,7 +766,7 @@ func saveChatResult(
     _, err = db.ExecContext(ctx, query,
         finalAnswer,
         evidenceJSON,
-        pq.Array(usedFileIDs),
+        usedFileIDs,
         terminationReason,
         chatID,
     )
@@ -788,7 +796,7 @@ func generateCitationMarkdown(
         ORDER BY rf.created_at
     `
     
-    rows, err := db.QueryContext(ctx, query, pq.Array(usedFileIDs))
+    rows, err := db.QueryContext(ctx, query, usedFileIDs)
     if err != nil {
         return "", err
     }

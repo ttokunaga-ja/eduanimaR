@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"google.golang.org/api/idtoken"
 )
 
@@ -26,7 +26,7 @@ var jwtUIDNamespace = uuid.MustParse("6ba7b814-9dad-11d1-80b4-00c04fd430c8")
 // トークンが欠如・無効な場合は HTTP 401 を返し、次のハンドラーは呼ばれない。
 func RequireJWT(audience string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			authHeader := c.Request().Header.Get("Authorization")
 			if !strings.HasPrefix(authHeader, "Bearer ") {
 				return c.JSON(http.StatusUnauthorized, map[string]string{

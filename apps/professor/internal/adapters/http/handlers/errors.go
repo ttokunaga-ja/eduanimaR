@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
@@ -15,7 +15,7 @@ type ErrorBody struct {
 }
 
 // httpError はドメインエラーを HTTP ステータスコードに変換して返す。
-func httpError(c echo.Context, err error) error {
+func httpError(c *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		return c.JSON(http.StatusNotFound, ErrorBody{Error: err.Error()})

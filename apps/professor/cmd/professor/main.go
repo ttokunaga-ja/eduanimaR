@@ -13,8 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/labstack/echo/v4"
-	echomw "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echomw "github.com/labstack/echo/v5/middleware"
 
 	grpcadapter "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/grpc"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/handlers"
@@ -130,12 +130,9 @@ func main() {
 
 	// ─── Echo サーバー設定 ────────────────────────────────────
 	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
 
 	// グローバルミドルウェア
 	e.Use(echomw.RequestID())
-	e.Use(echomw.RateLimiter(echomw.NewRateLimiterMemoryStore(20)))
 
 	// 認証ミドルウェア: 開発環境では固定 DevUser、本番では Firebase JWT 検証
 	if cfg.AppEnv == "production" {
@@ -189,10 +186,14 @@ func main() {
 	// ─── グレースフルシャットダウン ──────────────────────────
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: e,
+	}
 
 	go func() {
 		slog.Info("server starting", "port", cfg.Port)
-		if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
 			os.Exit(1)
 		}
@@ -205,7 +206,7 @@ func main() {
 	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := e.Shutdown(shutCtx); err != nil {
+	if err := srv.Shutdown(shutCtx); err != nil {
 		slog.Error("shutdown error", "error", err)
 	}
 	slog.Info("server stopped")

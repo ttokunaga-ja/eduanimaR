@@ -3,7 +3,7 @@ package middleware
 
 import (
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 )
@@ -16,7 +16,7 @@ const ctxKeyUserID = "userID"
 // Phase 2 では JWT 検証ミドルウェアに差し替える。
 func DevUser() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			c.Set(ctxKeyUserID, domain.DevUserID)
 			return next(c)
 		}
@@ -25,7 +25,7 @@ func DevUser() echo.MiddlewareFunc {
 
 // GetUserID は Echo コンテキストからユーザー ID を取得する。
 // DevUser ミドルウェアが設定していない場合は DevUserID をフォールバックとして返す。
-func GetUserID(c echo.Context) uuid.UUID {
+func GetUserID(c *echo.Context) uuid.UUID {
 	if v, ok := c.Get(ctxKeyUserID).(uuid.UUID); ok {
 		return v
 	}

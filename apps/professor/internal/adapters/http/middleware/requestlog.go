@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // RequestLog は request_id / trace_id / user_id を共通キーとしてアクセスログを出力する。
 func RequestLog() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			start := time.Now()
 			req := c.Request()
 			res := c.Response()
@@ -26,6 +26,7 @@ func RequestLog() echo.MiddlewareFunc {
 			}
 
 			err := next(c)
+			_, status := echo.ResolveResponseStatus(c.Response(), err)
 
 			userID := GetUserID(c).String()
 			attrs := []any{
@@ -34,7 +35,7 @@ func RequestLog() echo.MiddlewareFunc {
 				"user_id", userID,
 				"method", req.Method,
 				"path", req.URL.Path,
-				"status", res.Status,
+				"status", status,
 				"latency_ms", time.Since(start).Milliseconds(),
 			}
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
@@ -59,7 +59,7 @@ func toSubjectResp(s *domain.Subject) subjectResponse {
 // @Produce json
 // @Success 200 {array} subjectResponse
 // @Router /api/v1/subjects [get]
-func (h *SubjectHandler) List(c echo.Context) error {
+func (h *SubjectHandler) List(c *echo.Context) error {
 	userID := httpmw.GetUserID(c)
 	subjects, err := h.uc.ListByUser(c.Request().Context(), userID)
 	if err != nil {
@@ -79,8 +79,12 @@ func (h *SubjectHandler) List(c echo.Context) error {
 // @Param id path string true "Subject ID"
 // @Success 200 {object} subjectResponse
 // @Router /api/v1/subjects/{id} [get]
-func (h *SubjectHandler) Get(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+func (h *SubjectHandler) Get(c *echo.Context) error {
+	rawID, err := echo.PathParam[string](c, "id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
+	}
+	id, err := uuid.Parse(rawID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
 	}
@@ -100,7 +104,7 @@ func (h *SubjectHandler) Get(c echo.Context) error {
 // @Param body body createSubjectRequest true "Request body"
 // @Success 201 {object} subjectResponse
 // @Router /api/v1/subjects [post]
-func (h *SubjectHandler) Create(c echo.Context) error {
+func (h *SubjectHandler) Create(c *echo.Context) error {
 	var req struct {
 		Name        string  `json:"name"`
 		LMSCourseID *string `json:"lms_course_id"`
@@ -127,8 +131,12 @@ func (h *SubjectHandler) Create(c echo.Context) error {
 // @Param id path string true "Subject ID"
 // @Success 200 {object} subjectResponse
 // @Router /api/v1/subjects/{id} [put]
-func (h *SubjectHandler) Update(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+func (h *SubjectHandler) Update(c *echo.Context) error {
+	rawID, err := echo.PathParam[string](c, "id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
+	}
+	id, err := uuid.Parse(rawID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
 	}
@@ -152,8 +160,12 @@ func (h *SubjectHandler) Update(c echo.Context) error {
 // @Param id path string true "Subject ID"
 // @Success 204
 // @Router /api/v1/subjects/{id} [delete]
-func (h *SubjectHandler) Delete(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+func (h *SubjectHandler) Delete(c *echo.Context) error {
+	rawID, err := echo.PathParam[string](c, "id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
+	}
+	id, err := uuid.Parse(rawID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
 	}

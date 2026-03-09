@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
@@ -150,8 +150,12 @@ type openaiSource struct {
 // @Failure     400 {object} ErrorBody
 // @Failure     404 {object} ErrorBody
 // @Router      /api/v1/subjects/{subject_id}/chat/completions [post]
-func (h *OpenAIChatHandler) ChatCompletions(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *OpenAIChatHandler) ChatCompletions(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
 	}
@@ -201,12 +205,12 @@ func extractLastUserMessage(messages []openaiMessage) string {
 // ─── ストリーミング処理 ─────────────────────────────────────────────
 
 func (h *OpenAIChatHandler) handleStreaming(
-	c echo.Context,
+	c *echo.Context,
 	subjectID, userID uuid.UUID,
 	question, model, chatID string,
 	created int64,
 ) error {
-	w := c.Response().Writer
+	w := c.Response()
 	c.Response().Header().Set("Content-Type", "text/event-stream")
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	c.Response().Header().Set("Connection", "keep-alive")
@@ -315,7 +319,7 @@ func (h *OpenAIChatHandler) handleStreaming(
 // ─── 非ストリーミング処理 ──────────────────────────────────────────
 
 func (h *OpenAIChatHandler) handleNonStreaming(
-	c echo.Context,
+	c *echo.Context,
 	subjectID, userID uuid.UUID,
 	question, model, chatID string,
 	created int64,

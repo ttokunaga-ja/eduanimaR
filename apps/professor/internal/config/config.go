@@ -68,10 +68,10 @@ func Load() *Config {
 		KafkaBrokers:   getEnv("KAFKA_BROKERS", "localhost:9094"),
 		KafkaTopic:     getEnv("KAFKA_TOPIC_INGEST", "eduanima.ingest.jobs"),
 		GeminiAPIKey:   getEnv("GEMINI_API_KEY", ""),
-		ModelIngestion: getEnv("PROFESSOR_MODEL_INGESTION", "gemini-2.0-flash-lite"),
+		ModelIngestion: getEnv("PROFESSOR_MODEL_INGESTION", "gemini-3-flash-preview"),
 		// 先頭ダッシュは「本番非推奨」マーカーとして使われることがある。
 		// 実際の Gemini API 呼び出し時に不正モデル名にならないよう除去する。
-		ModelAnswer:       strings.TrimPrefix(getEnv("PROFESSOR_MODEL_ANSWER", "gemini-2.0-flash-lite"), "-"),
+		ModelAnswer:       strings.TrimPrefix(getEnv("PROFESSOR_MODEL_ANSWER", "gemini-3-flash-preview"), "-"),
 		LibrarianAddr:     getEnv("LIBRARIAN_GRPC_ADDR", "localhost:50051"),
 		FirebaseProjectID: getEnv("FIREBASE_PROJECT_ID", ""),
 		OtelEndpoint:      getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),

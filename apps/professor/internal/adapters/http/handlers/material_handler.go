@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
@@ -71,8 +72,12 @@ func toMaterialResp(f *domain.File) materialResponse {
 // @Param subject_id path string true "Subject ID"
 // @Success 200 {array} materialResponse
 // @Router /api/v1/subjects/{subject_id}/materials [get]
-func (h *MaterialHandler) List(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *MaterialHandler) List(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
 	}
@@ -97,8 +102,12 @@ func (h *MaterialHandler) List(c echo.Context) error {
 // @Param file formData file true "File to upload"
 // @Success 201 {object} materialResponse
 // @Router /api/v1/subjects/{subject_id}/materials [post]
-func (h *MaterialHandler) Upload(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *MaterialHandler) Upload(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject id"})
 	}
@@ -114,7 +123,7 @@ func (h *MaterialHandler) Upload(c echo.Context) error {
 	}
 	defer func() {
 		if err := src.Close(); err != nil {
-			c.Logger().Errorf("failed to close uploaded file stream: %v", err)
+			slog.Error("failed to close uploaded file stream", "error", err)
 		}
 	}()
 
@@ -146,8 +155,12 @@ func (h *MaterialHandler) Upload(c echo.Context) error {
 // @Param fid path string true "File ID"
 // @Success 204
 // @Router /api/v1/subjects/{subject_id}/materials/{fid} [delete]
-func (h *MaterialHandler) Delete(c echo.Context) error {
-	fileID, err := uuid.Parse(c.Param("fid"))
+func (h *MaterialHandler) Delete(c *echo.Context) error {
+	rawFileID, err := echo.PathParam[string](c, "fid")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid file id"})
+	}
+	fileID, err := uuid.Parse(rawFileID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid file id"})
 	}

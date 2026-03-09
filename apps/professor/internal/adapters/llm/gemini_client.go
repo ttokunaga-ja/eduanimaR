@@ -119,8 +119,8 @@ Preserve mathematical formulas, code snippets, and tables as text.`
 				Required: []string{"content", "page_number"},
 			},
 		},
-		// Temperature=0.0 + Seed=42: 決定論的デコード（Gemini 3 ベストエフォート）。
-		// 定型変換タスクではランダム性は不要。Seed で再現性を担保する。
+		// Temperature=0.0 + Seed=42: OCR の決定論を優先する。
+		// 構造化抽出の再現性が最優先のためこの経路のみ 0.0 を維持する。
 		Temperature: genai.Ptr(float32(0.0)),
 		Seed:        genai.Ptr(ocrSeed),
 	}
@@ -266,9 +266,8 @@ func (g *geminiClient) GenerateAnswer(ctx context.Context, question string, evid
 		},
 	}
 	config := &genai.GenerateContentConfig{
-		// Temperature=0.4: 自然な教師語調と適度な多様性を保持する。
-		// 0.0 は決定論的すぎて文章が機械的になり、1.0 はランダムすぎて一貫性が低下する。
-		Temperature: genai.Ptr(float32(0.4)),
+		// 非決定論の回答生成は Temperature=1.0 を使用する。
+		Temperature: genai.Ptr(float32(1.0)),
 	}
 
 	resp, err := g.client.Models.GenerateContent(ctx, g.modelAnswer, contents, config)
@@ -290,8 +289,8 @@ func (g *geminiClient) GenerateAnswerStream(ctx context.Context, question string
 		},
 	}
 	config := &genai.GenerateContentConfig{
-		// Temperature=0.4: 自然な教師語調と適度な多様性を保持する。
-		Temperature: genai.Ptr(float32(0.4)),
+		// 非決定論の回答生成は Temperature=1.0 を使用する。
+		Temperature: genai.Ptr(float32(1.0)),
 	}
 
 	for chunk, err := range g.client.Models.GenerateContentStream(ctx, g.modelAnswer, contents, config) {
@@ -328,8 +327,8 @@ func (g *geminiClient) GenerateAnswerStreamWithPDF(ctx context.Context, question
 		},
 	}
 	config := &genai.GenerateContentConfig{
-		// Temperature=0.4: 自然な教師語調と適度な多様性を保持する。
-		Temperature: genai.Ptr(float32(0.4)),
+		// 非決定論の回答生成は Temperature=1.0 を使用する。
+		Temperature: genai.Ptr(float32(1.0)),
 	}
 
 	for chunk, err := range g.client.Models.GenerateContentStream(ctx, g.modelAnswer, contents, config) {

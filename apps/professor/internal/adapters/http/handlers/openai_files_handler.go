@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
@@ -146,8 +147,12 @@ func toOpenAIFileObject(f *domain.File, purpose string) openaiFileObject {
 // @Failure     400 {object} ErrorBody
 // @Failure     404 {object} ErrorBody
 // @Router      /api/v1/subjects/{subject_id}/files [post]
-func (h *OpenAIFilesHandler) Upload(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *OpenAIFilesHandler) Upload(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
 	}
@@ -163,7 +168,7 @@ func (h *OpenAIFilesHandler) Upload(c echo.Context) error {
 	}
 	defer func() {
 		if err := src.Close(); err != nil {
-			c.Logger().Errorf("failed to close uploaded file stream: %v", err)
+			slog.Error("failed to close uploaded file stream", "error", err)
 		}
 	}()
 
@@ -211,13 +216,21 @@ func (h *OpenAIFilesHandler) Upload(c echo.Context) error {
 // @Failure     400 {object} ErrorBody
 // @Failure     404 {object} ErrorBody
 // @Router      /api/v1/subjects/{subject_id}/files/{file_id} [get]
-func (h *OpenAIFilesHandler) GetFile(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *OpenAIFilesHandler) GetFile(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
 	}
 
-	fileID, err := parseOpenAIFileID(c.Param("file_id"))
+	rawFileID, err := echo.PathParam[string](c, "file_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid file_id format"})
+	}
+	fileID, err := parseOpenAIFileID(rawFileID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid file_id format"})
 	}

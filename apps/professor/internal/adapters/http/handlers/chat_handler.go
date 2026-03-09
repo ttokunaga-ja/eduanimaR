@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	httpmw "github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/adapters/http/middleware"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
@@ -54,8 +54,12 @@ type askRequest struct {
 // @Failure     400 {object} ErrorBody
 // @Failure     404 {object} ErrorBody
 // @Router      /api/v1/subjects/{subject_id}/chats [post]
-func (h *ChatHandler) Ask(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *ChatHandler) Ask(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
 	}
@@ -68,7 +72,7 @@ func (h *ChatHandler) Ask(c echo.Context) error {
 	userID := httpmw.GetUserID(c)
 
 	// ─── SSE ヘッダー設定 ───────────────────────────────────────
-	w := c.Response().Writer
+	w := c.Response()
 	c.Response().Header().Set("Content-Type", "text/event-stream")
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	c.Response().Header().Set("Connection", "keep-alive")
@@ -153,8 +157,12 @@ func toQASessionResp(s *domain.QASession) qaSessionResponse {
 // @Param       offset     query int    false "オフセット（デフォルト0）"
 // @Success     200 {object} listSessionsResponse
 // @Router      /api/v1/subjects/{subject_id}/chats [get]
-func (h *ChatHandler) ListSessions(c echo.Context) error {
-	subjectID, err := uuid.Parse(c.Param("subject_id"))
+func (h *ChatHandler) ListSessions(c *echo.Context) error {
+	rawSubjectID, err := echo.PathParam[string](c, "subject_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
+	}
+	subjectID, err := uuid.Parse(rawSubjectID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid subject_id"})
 	}
@@ -214,8 +222,12 @@ type feedbackRequest struct {
 // @Param       body       body  feedbackRequest true "フィードバック"
 // @Success     200 {object} qaSessionResponse
 // @Router      /api/v1/subjects/{subject_id}/chats/{session_id}/feedback [post]
-func (h *ChatHandler) Feedback(c echo.Context) error {
-	sessionID, err := uuid.Parse(c.Param("session_id"))
+func (h *ChatHandler) Feedback(c *echo.Context) error {
+	rawSessionID, err := echo.PathParam[string](c, "session_id")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid session_id"})
+	}
+	sessionID, err := uuid.Parse(rawSessionID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorBody{Error: "invalid session_id"})
 	}

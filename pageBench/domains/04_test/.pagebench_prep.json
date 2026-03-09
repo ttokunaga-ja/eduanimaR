@@ -1,0 +1,11 @@
+{
+  "prepared_at": "2026-03-09T07:43:13.203638+09:00",
+  "domain_dir": "domains/04_test",
+  "file_ids": [
+    "file-393389f830914a548d1640bb580fc5a5",
+    "file-f5dfc0391fe14a3ba242b2d954b7ced8",
+    "file-c9cc940fb16b469f87318dc9c00b989a"
+  ],
+  "file_count": 3,
+  "index_status": "partial"
+}
