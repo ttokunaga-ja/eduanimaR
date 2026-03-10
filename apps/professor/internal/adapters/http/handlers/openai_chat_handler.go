@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,12 +29,30 @@ import (
 //
 // → POST /api/v1/subjects/:subject_id/chat/completions に転送される。
 type OpenAIChatHandler struct {
-	uc *usecases.ChatUseCase
+	uc              *usecases.ChatUseCase
+	modelAnswerPro  string
+	maxLoopsFast    int32
+	maxLoopsStd     int32
+	maxLoopsPro     int32
+	modelAnswerFast string
+	thinkingFast    string
+	thinkingStd     string
+	thinkingPro     string
 }
 
 // NewOpenAIChatHandler は OpenAIChatHandler を生成する。
 func NewOpenAIChatHandler(uc *usecases.ChatUseCase) *OpenAIChatHandler {
-	return &OpenAIChatHandler{uc: uc}
+	return &OpenAIChatHandler{
+		uc:              uc,
+		modelAnswerPro:  strings.TrimSpace(os.Getenv("PROFESSOR_MODEL_ANSWER_PRO")),
+		maxLoopsFast:    parseInt32Env("PROFESSOR_MAX_LOOPS_FAST", 3),
+		maxLoopsStd:     parseInt32Env("PROFESSOR_MAX_LOOPS_DEFAULT", 4),
+		maxLoopsPro:     parseInt32Env("PROFESSOR_MAX_LOOPS_PRO", 5),
+		modelAnswerFast: parseStringEnv("PROFESSOR_MODEL_ANSWER_FAST", "gemini-3.1-flash-lite-preview"),
+		thinkingFast:    parseStringEnv("PROFESSOR_THINKING_ANSWER_FAST", "minimal"),
+		thinkingStd:     parseStringEnv("PROFESSOR_THINKING_ANSWER_DEFAULT", "low"),
+		thinkingPro:     parseStringEnv("PROFESSOR_THINKING_ANSWER_PRO", "medium"),
+	}
 }
 
 // Register は Echo グループにルートを登録する。
@@ -103,7 +123,9 @@ type openaiChatCompletion struct {
 	Usage   openaiUsage         `json:"usage"`
 	// EduanimaSources は eduanimaR 固有のソース情報。
 	// 標準 OpenAI クライアントはこのフィールドを無視する。
-	EduanimaSources []openaiSource `json:"eduanima_sources,omitempty"`
+	EduanimaSources          []openaiSource `json:"eduanima_sources,omitempty"`
+	EduanimaCollectedSources []openaiSource `json:"eduanima_collected_sources,omitempty"`
+	EduanimaMeta             *openaiMeta    `json:"eduanima_meta,omitempty"`
 }
 
 type openaiComplChoice struct {
@@ -126,9 +148,30 @@ type openaiUsage struct {
 
 // openaiSource は非ストリーミング時のソース情報（eduanima 拡張）。
 type openaiSource struct {
+	FileID      string `json:"file_id,omitempty"`
 	FileName    string `json:"file_name"`
+	PageNumber  *int   `json:"page_number,omitempty"`
 	Excerpt     string `json:"excerpt"`
 	WhyRelevant string `json:"why_relevant,omitempty"`
+}
+
+type openaiMeta struct {
+	Answerability      string `json:"answerability,omitempty"`
+	IsUnanswerable     bool   `json:"is_unanswerable"`
+	CoverageNotes      string `json:"coverage_notes,omitempty"`
+	IsPartial          bool   `json:"is_partial"`
+	ErrorType          string `json:"error_type,omitempty"`
+	EvidenceCount      int    `json:"evidence_count"`
+	UnanswerableReason string `json:"unanswerable_reason,omitempty"`
+	LoopCount          int    `json:"loop_count,omitempty"`
+	LibrarianMS        int    `json:"librarian_ms,omitempty"`
+	AnswerGenMS        int    `json:"answer_gen_ms,omitempty"`
+}
+
+type qualityLevel struct {
+	MaxLoops            int32
+	AnswerModelOverride string
+	AnswerThinkingLevel string
 }
 
 // ─── ChatCompletions ────────────────────────────────────────────────
@@ -179,13 +222,14 @@ func (h *OpenAIChatHandler) ChatCompletions(c *echo.Context) error {
 	if model == "" {
 		model = "professor"
 	}
+	level := resolveQualityLevel(model, h.modelAnswerFast, h.modelAnswerPro, h.maxLoopsFast, h.maxLoopsStd, h.maxLoopsPro, h.thinkingFast, h.thinkingStd, h.thinkingPro)
 	chatID := fmt.Sprintf("chatcmpl-%s", uuid.New().String()[:8])
 	created := time.Now().Unix()
 
 	if useStream {
-		return h.handleStreaming(c, subjectID, userID, question, model, chatID, created)
+		return h.handleStreaming(c, subjectID, userID, question, model, chatID, level, created)
 	}
-	return h.handleNonStreaming(c, subjectID, userID, question, model, chatID, created)
+	return h.handleNonStreaming(c, subjectID, userID, question, model, chatID, level, created)
 }
 
 // extractLastUserMessage は messages 配列から最後の role="user" のコンテンツを返す。
@@ -208,6 +252,7 @@ func (h *OpenAIChatHandler) handleStreaming(
 	c *echo.Context,
 	subjectID, userID uuid.UUID,
 	question, model, chatID string,
+	level qualityLevel,
 	created int64,
 ) error {
 	w := c.Response()
@@ -308,7 +353,11 @@ func (h *OpenAIChatHandler) handleStreaming(
 		return nil
 	}
 
-	_, ucErr := h.uc.Ask(c.Request().Context(), subjectID, userID, question, onEvent)
+	_, ucErr := h.uc.AskWithOptions(c.Request().Context(), subjectID, userID, question, usecases.AskOptions{
+		MaxLoops:            level.MaxLoops,
+		AnswerModelOverride: level.AnswerModelOverride,
+		AnswerThinkingLevel: level.AnswerThinkingLevel,
+	}, onEvent)
 	if ucErr != nil {
 		// エラーは onEvent 内で既に送信済み
 		_ = onEvent(domain.SSEEventError, map[string]any{"message": ucErr.Error()})
@@ -322,10 +371,13 @@ func (h *OpenAIChatHandler) handleNonStreaming(
 	c *echo.Context,
 	subjectID, userID uuid.UUID,
 	question, model, chatID string,
+	level qualityLevel,
 	created int64,
 ) error {
 	var answerBuf strings.Builder
 	var sources []openaiSource
+	var collectedSources []openaiSource
+	var meta *openaiMeta
 
 	// すべてのイベントをバッファ
 	onEvent := func(eventType domain.SSEEventType, data any) error {
@@ -337,12 +389,19 @@ func (h *OpenAIChatHandler) handleNonStreaming(
 			if src != nil {
 				sources = append(sources, *src)
 			}
+		case domain.SSEEventDone:
+			meta = extractMeta(data)
+			collectedSources = extractCollectedSources(data)
 		}
 		// thinking/searching/done/error は非ストリーミング時は収集しない
 		return nil
 	}
 
-	_, ucErr := h.uc.Ask(c.Request().Context(), subjectID, userID, question, onEvent)
+	_, ucErr := h.uc.AskWithOptions(c.Request().Context(), subjectID, userID, question, usecases.AskOptions{
+		MaxLoops:            level.MaxLoops,
+		AnswerModelOverride: level.AnswerModelOverride,
+		AnswerThinkingLevel: level.AnswerThinkingLevel,
+	}, onEvent)
 	if ucErr != nil {
 		return httpError(c, ucErr)
 	}
@@ -360,8 +419,10 @@ func (h *OpenAIChatHandler) handleNonStreaming(
 			},
 			FinishReason: "stop",
 		}},
-		Usage:           openaiUsage{},
-		EduanimaSources: sources,
+		Usage:                    openaiUsage{},
+		EduanimaSources:          sources,
+		EduanimaCollectedSources: collectedSources,
+		EduanimaMeta:             meta,
 	})
 }
 
@@ -397,9 +458,26 @@ func extractSource(data any) *openaiSource {
 	if !ok {
 		return nil
 	}
+	return sourceFromMap(m)
+}
+
+func sourceFromMap(m map[string]any) *openaiSource {
 	src := &openaiSource{}
 	if v, ok := m["file_name"].(string); ok {
 		src.FileName = v
+	}
+	if v, ok := m["file_id"].(string); ok {
+		src.FileID = v
+	}
+	if v, ok := m["page_number"].(*int); ok {
+		src.PageNumber = v
+	}
+	if v, ok := m["page_number"].(int); ok {
+		src.PageNumber = &v
+	}
+	if v, ok := m["page_number"].(float64); ok {
+		iv := int(v)
+		src.PageNumber = &iv
 	}
 	if v, ok := m["excerpt"].(string); ok {
 		src.Excerpt = v
@@ -408,4 +486,110 @@ func extractSource(data any) *openaiSource {
 		src.WhyRelevant = v
 	}
 	return src
+}
+
+func extractMeta(data any) *openaiMeta {
+	m, ok := data.(map[string]any)
+	if !ok {
+		return nil
+	}
+	meta := &openaiMeta{}
+	if v, ok := m["answerability"].(string); ok {
+		meta.Answerability = v
+	}
+	if v, ok := m["is_unanswerable"].(bool); ok {
+		meta.IsUnanswerable = v
+	}
+	if v, ok := m["coverage_notes"].(string); ok {
+		meta.CoverageNotes = v
+	}
+	if v, ok := m["is_partial"].(bool); ok {
+		meta.IsPartial = v
+	}
+	if v, ok := m["error_type"].(string); ok {
+		meta.ErrorType = v
+	}
+	if v, ok := m["evidence_count"].(int); ok {
+		meta.EvidenceCount = v
+	}
+	if v, ok := m["evidence_count"].(float64); ok {
+		meta.EvidenceCount = int(v)
+	}
+	if v, ok := m["unanswerable_reason"].(string); ok {
+		meta.UnanswerableReason = v
+	}
+	if v, ok := m["loop_count"].(int); ok {
+		meta.LoopCount = v
+	}
+	if v, ok := m["loop_count"].(float64); ok {
+		meta.LoopCount = int(v)
+	}
+	if v, ok := m["librarian_ms"].(int); ok {
+		meta.LibrarianMS = v
+	}
+	if v, ok := m["librarian_ms"].(float64); ok {
+		meta.LibrarianMS = int(v)
+	}
+	if v, ok := m["answer_gen_ms"].(int); ok {
+		meta.AnswerGenMS = v
+	}
+	if v, ok := m["answer_gen_ms"].(float64); ok {
+		meta.AnswerGenMS = int(v)
+	}
+	return meta
+}
+
+func resolveQualityLevel(model string, modelAnswerFast string, modelAnswerPro string, maxLoopsFast int32, maxLoopsStd int32, maxLoopsPro int32, thinkingFast string, thinkingStd string, thinkingPro string) qualityLevel {
+	switch strings.TrimSpace(model) {
+	case "professor-fast", "professor-lite":
+		return qualityLevel{MaxLoops: maxLoopsFast, AnswerModelOverride: modelAnswerFast, AnswerThinkingLevel: thinkingFast}
+	case "professor-pro":
+		return qualityLevel{MaxLoops: maxLoopsPro, AnswerModelOverride: strings.TrimSpace(modelAnswerPro), AnswerThinkingLevel: thinkingPro}
+	default:
+		return qualityLevel{MaxLoops: maxLoopsStd, AnswerThinkingLevel: thinkingStd}
+	}
+}
+
+func parseInt32Env(key string, def int32) int32 {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return int32(n)
+}
+
+func parseStringEnv(key string, def string) string {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+func extractCollectedSources(data any) []openaiSource {
+	m, ok := data.(map[string]any)
+	if !ok {
+		return nil
+	}
+	raw, ok := m["collected_sources"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]openaiSource, 0, len(raw))
+	for _, item := range raw {
+		sm, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		src := sourceFromMap(sm)
+		if src == nil || src.FileName == "" {
+			continue
+		}
+		out = append(out, *src)
+	}
+	return out
 }

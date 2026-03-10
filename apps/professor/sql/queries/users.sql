@@ -1,26 +1,47 @@
 -- sql/queries/users.sql
 
 -- name: GetUserByID :one
-SELECT *
+SELECT
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 FROM users
-WHERE user_id = $1;
+WHERE id = $1
+  AND is_active = TRUE;
 
 -- name: GetUserByEmail :one
-SELECT *
+SELECT
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 FROM users
-WHERE email = $1;
+WHERE provider_user_id = $1
+  AND is_active = TRUE;
 
 -- name: CreateUser :one
-INSERT INTO users (user_id, email, provider, provider_user_id)
-VALUES ($1, $2, $3, $4)
-RETURNING *;
+INSERT INTO users (id, provider, provider_user_id)
+VALUES ($1, COALESCE($3, 'development'), COALESCE($4, $2))
+RETURNING
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at;
 
 -- name: UpdateUser :one
 UPDATE users
 SET
-    email            = COALESCE(sqlc.narg(email), email),
-    provider         = COALESCE(sqlc.narg(provider), provider),
-    provider_user_id = COALESCE(sqlc.narg(provider_user_id), provider_user_id),
-    updated_at       = NOW()
-WHERE user_id = sqlc.arg(user_id)
-RETURNING *;
+  provider = COALESCE(sqlc.narg(provider), provider),
+  provider_user_id = COALESCE(sqlc.narg(provider_user_id), provider_user_id),
+  updated_at = NOW()
+WHERE id = sqlc.arg(user_id)
+RETURNING
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at;

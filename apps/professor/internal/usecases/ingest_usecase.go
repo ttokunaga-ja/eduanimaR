@@ -50,7 +50,7 @@ func NewIngestUseCase(
 //  4. LLM.OCRAndChunk でテキスト抽出・チャンク分割
 //  5. 各チャンクの Embedding 生成（失敗チャンクはスキップ）
 //  6. ChunkRepository.BatchCreate でバルク保存
-//  7. FileStatus → "ready", IngestJob → "completed"
+//  7. FileStatus → "completed", IngestJob → "completed"
 //
 // エラー時: FileStatus → "failed", IngestJob → "failed"（defer で確実に実行）
 func (uc *IngestUseCase) ProcessJob(ctx context.Context, msg ports.IngestMessage) error {
@@ -189,9 +189,9 @@ func (uc *IngestUseCase) ProcessJob(ctx context.Context, msg ports.IngestMessage
 		"count", len(chunks),
 	)
 
-	// 7. FileStatus → "ready", IngestJob → "completed"
-	if _, err := uc.files.UpdateStatus(ctx, fileID, domain.FileStatusReady, nil); err != nil {
-		processErr = fmt.Errorf("update file ready: %w", err)
+	// 7. FileStatus → "completed", IngestJob → "completed"
+	if _, err := uc.files.UpdateStatus(ctx, fileID, domain.FileStatusCompleted, nil); err != nil {
+		processErr = fmt.Errorf("update file completed: %w", err)
 		return processErr
 	}
 	if _, err := uc.jobs.UpdateStatus(ctx, jobID, domain.JobStatusCompleted, nil); err != nil {

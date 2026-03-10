@@ -229,10 +229,22 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 		fmt.Sscanf(getField(row, idx, "exact_match"), "%d", &em)
 		var latencyMS int
 		fmt.Sscanf(getField(row, idx, "latency_ms"), "%d", &latencyMS)
+		var loopCount int
+		fmt.Sscanf(getField(row, idx, "loop_count"), "%d", &loopCount)
+		var librarianMS int
+		fmt.Sscanf(getField(row, idx, "librarian_ms"), "%d", &librarianMS)
+		var answerGenMS int
+		fmt.Sscanf(getField(row, idx, "answer_gen_ms"), "%d", &answerGenMS)
 		var fileHit int
 		fmt.Sscanf(getField(row, idx, "file_hit"), "%d", &fileHit)
 		var pageHit int
 		fmt.Sscanf(getField(row, idx, "page_hit"), "%d", &pageHit)
+		var refFileFound int
+		fmt.Sscanf(getField(row, idx, "ref_file_found"), "%d", &refFileFound)
+		var refPageFound int
+		fmt.Sscanf(getField(row, idx, "ref_page_found"), "%d", &refPageFound)
+		var refFilePageFound int
+		fmt.Sscanf(getField(row, idx, "ref_file_page_found"), "%d", &refFilePageFound)
 		var ragRefused int
 		fmt.Sscanf(getField(row, idx, "rag_refused"), "%d", &ragRefused)
 
@@ -254,10 +266,17 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 			RagSources:         getField(row, idx, "rag_sources"),
 			FileHit:            fileHit,
 			PageHit:            pageHit,
+			RetrievedFilePages: getField(row, idx, "retrieved_file_pages"),
+			RefFileFound:       refFileFound,
+			RefPageFound:       refPageFound,
+			RefFilePageFound:   refFilePageFound,
 			RougeL:             rougeL,
 			ExactMatch:         em,
 			RagRefused:         ragRefused,
 			LatencyMS:          latencyMS,
+			LoopCount:          loopCount,
+			LibrarianMS:        librarianMS,
+			AnswerGenMS:        answerGenMS,
 			JudgeAccuracy:      getField(row, idx, "judge_accuracy"),
 			JudgeFaithful:      getField(row, idx, "judge_faithfulness"),
 			JudgeComplete:      getField(row, idx, "judge_completeness"),
@@ -287,7 +306,7 @@ func WriteEvaluate(domainDir string, records []EvalRecord) error {
 		// RAG回答
 		"rag_answer", "rag_sources",
 		// LLMなし自動メトリクス
-		"file_hit", "page_hit", "rouge_l", "exact_match", "rag_refused", "latency_ms",
+		"file_hit", "page_hit", "retrieved_file_pages", "ref_file_found", "ref_page_found", "ref_file_page_found", "rouge_l", "exact_match", "rag_refused", "latency_ms", "loop_count", "librarian_ms", "answer_gen_ms",
 		// LLM-as-Judge
 		"judge_accuracy", "judge_faithfulness", "judge_completeness", "judge_overall", "judge_hallucination", "judge_reasoning",
 	})
@@ -301,9 +320,14 @@ func WriteEvaluate(domainDir string, records []EvalRecord) error {
 			r.Question, qt, r.RefAnswer, r.RefEvidence, r.RefFile, r.RefPage,
 			r.RagAnswer, r.RagSources,
 			fmt.Sprintf("%d", r.FileHit), fmt.Sprintf("%d", r.PageHit),
+			r.RetrievedFilePages,
+			fmt.Sprintf("%d", r.RefFileFound), fmt.Sprintf("%d", r.RefPageFound), fmt.Sprintf("%d", r.RefFilePageFound),
 			fmt.Sprintf("%.4f", r.RougeL), fmt.Sprintf("%d", r.ExactMatch),
 			fmt.Sprintf("%d", r.RagRefused),
 			fmt.Sprintf("%d", r.LatencyMS),
+			fmt.Sprintf("%d", r.LoopCount),
+			fmt.Sprintf("%d", r.LibrarianMS),
+			fmt.Sprintf("%d", r.AnswerGenMS),
 			r.JudgeAccuracy, r.JudgeFaithful, r.JudgeComplete, r.JudgeOverall, r.JudgeHallucination, r.JudgeReasoning,
 		})
 	}

@@ -1,57 +1,93 @@
 -- sql/queries/chunks.sql
 
 -- name: ListChunksByFileID :many
-SELECT *
-FROM chunks
-WHERE file_id = $1
-ORDER BY chunk_index;
+SELECT
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.embedding,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE m.raw_file_id = $1
+  AND m.is_active = TRUE
+ORDER BY m.sequence_in_file;
 
 -- name: InsertChunk :one
-INSERT INTO chunks (
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    embedding
+INSERT INTO materials (
+  id,
+  raw_file_id,
+  sequence_in_file,
+  page_start,
+  page_end,
+  content_markdown,
+  char_count,
+  embedding
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING *;
+VALUES (
+  sqlc.arg(chunk_id),
+  sqlc.arg(file_id),
+  sqlc.arg(chunk_index),
+  sqlc.narg(page_number),
+  sqlc.narg(page_number),
+  sqlc.arg(content),
+  char_length(sqlc.arg(content)),
+  sqlc.arg(embedding)
+)
+RETURNING
+  id AS chunk_id,
+  raw_file_id AS file_id,
+  (SELECT subject_id FROM raw_files WHERE id = raw_file_id) AS subject_id,
+  page_start AS page_number,
+  sequence_in_file AS chunk_index,
+  content_markdown AS content,
+  embedding,
+  created_at;
 
 -- name: SearchChunksByVector :many
--- コサイン類似度でのベクトル検索（HNSW インデックス使用）
--- $1: query_embedding (vector), $2: subject_id, $3: limit
 SELECT
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    created_at
-FROM chunks
-WHERE subject_id = $2
-ORDER BY embedding <=> $1::vector
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  rf.original_filename AS file_name,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE rf.subject_id = $2
+  AND rf.is_active = TRUE
+  AND m.is_active = TRUE
+ORDER BY m.embedding <=> $1::vector
 LIMIT $3;
 
 -- name: SearchChunksByText :many
--- 全文検索（simple 辞書 / plainto_tsquery）
--- $1: query_text, $2: subject_id, $3: limit
 SELECT
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    created_at
-FROM chunks
-WHERE subject_id = $2
-  AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
-ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', $1)) DESC
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  rf.original_filename AS file_name,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE rf.subject_id = $2
+  AND rf.is_active = TRUE
+  AND m.is_active = TRUE
+  AND to_tsvector('simple', m.content_markdown) @@ plainto_tsquery('simple', $1)
+ORDER BY ts_rank(to_tsvector('simple', m.content_markdown), plainto_tsquery('simple', $1)) DESC
 LIMIT $3;
 
 -- name: DeleteChunksByFileID :exec
-DELETE FROM chunks
-WHERE file_id = $1;
+UPDATE materials
+SET is_active = FALSE,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE raw_file_id = $1
+  AND is_active = TRUE;

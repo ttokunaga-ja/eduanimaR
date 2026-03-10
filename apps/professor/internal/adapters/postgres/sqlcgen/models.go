@@ -10,82 +10,78 @@ import (
 	"fmt"
 	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	pgvector "github.com/pgvector/pgvector-go"
 	"github.com/sqlc-dev/pqtype"
 )
 
-type AuthProvider string
+type ChatFeedback string
 
 const (
-	AuthProviderGoogle    AuthProvider = "google"
-	AuthProviderMeta      AuthProvider = "meta"
-	AuthProviderMicrosoft AuthProvider = "microsoft"
-	AuthProviderLine      AuthProvider = "line"
+	ChatFeedbackGood ChatFeedback = "good"
+	ChatFeedbackBad  ChatFeedback = "bad"
 )
 
-func (e *AuthProvider) Scan(src interface{}) error {
+func (e *ChatFeedback) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = AuthProvider(s)
+		*e = ChatFeedback(s)
 	case string:
-		*e = AuthProvider(s)
+		*e = ChatFeedback(s)
 	default:
-		return fmt.Errorf("unsupported scan type for AuthProvider: %T", src)
+		return fmt.Errorf("unsupported scan type for ChatFeedback: %T", src)
 	}
 	return nil
 }
 
-type NullAuthProvider struct {
-	AuthProvider AuthProvider `json:"auth_provider"`
-	Valid        bool         `json:"valid"` // Valid is true if AuthProvider is not NULL
+type NullChatFeedback struct {
+	ChatFeedback ChatFeedback `json:"chat_feedback"`
+	Valid        bool         `json:"valid"` // Valid is true if ChatFeedback is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullAuthProvider) Scan(value interface{}) error {
+func (ns *NullChatFeedback) Scan(value interface{}) error {
 	if value == nil {
-		ns.AuthProvider, ns.Valid = "", false
+		ns.ChatFeedback, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.AuthProvider.Scan(value)
+	return ns.ChatFeedback.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullAuthProvider) Value() (driver.Value, error) {
+func (ns NullChatFeedback) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.AuthProvider), nil
+	return string(ns.ChatFeedback), nil
 }
 
-func (e AuthProvider) Valid() bool {
+func (e ChatFeedback) Valid() bool {
 	switch e {
-	case AuthProviderGoogle,
-		AuthProviderMeta,
-		AuthProviderMicrosoft,
-		AuthProviderLine:
+	case ChatFeedbackGood,
+		ChatFeedbackBad:
 		return true
 	}
 	return false
 }
 
-func AllAuthProviderValues() []AuthProvider {
-	return []AuthProvider{
-		AuthProviderGoogle,
-		AuthProviderMeta,
-		AuthProviderMicrosoft,
-		AuthProviderLine,
+func AllChatFeedbackValues() []ChatFeedback {
+	return []ChatFeedback{
+		ChatFeedbackGood,
+		ChatFeedbackBad,
 	}
 }
 
 type FileStatus string
 
 const (
-	FileStatusPending    FileStatus = "pending"
+	FileStatusUploading  FileStatus = "uploading"
+	FileStatusUploaded   FileStatus = "uploaded"
 	FileStatusProcessing FileStatus = "processing"
-	FileStatusReady      FileStatus = "ready"
+	FileStatusCompleted  FileStatus = "completed"
 	FileStatusFailed     FileStatus = "failed"
+	FileStatusArchived   FileStatus = "archived"
 )
 
 func (e *FileStatus) Scan(src interface{}) error {
@@ -125,10 +121,12 @@ func (ns NullFileStatus) Value() (driver.Value, error) {
 
 func (e FileStatus) Valid() bool {
 	switch e {
-	case FileStatusPending,
+	case FileStatusUploading,
+		FileStatusUploaded,
 		FileStatusProcessing,
-		FileStatusReady,
-		FileStatusFailed:
+		FileStatusCompleted,
+		FileStatusFailed,
+		FileStatusArchived:
 		return true
 	}
 	return false
@@ -136,10 +134,194 @@ func (e FileStatus) Valid() bool {
 
 func AllFileStatusValues() []FileStatus {
 	return []FileStatus{
-		FileStatusPending,
+		FileStatusUploading,
+		FileStatusUploaded,
 		FileStatusProcessing,
-		FileStatusReady,
+		FileStatusCompleted,
 		FileStatusFailed,
+		FileStatusArchived,
+	}
+}
+
+type FileType string
+
+const (
+	FileTypePdf          FileType = "pdf"
+	FileTypeText         FileType = "text"
+	FileTypePython       FileType = "python"
+	FileTypeGo           FileType = "go"
+	FileTypeJavascript   FileType = "javascript"
+	FileTypeHtml         FileType = "html"
+	FileTypeCss          FileType = "css"
+	FileTypeJson         FileType = "json"
+	FileTypeMarkdown     FileType = "markdown"
+	FileTypeCsv          FileType = "csv"
+	FileTypePng          FileType = "png"
+	FileTypeJpeg         FileType = "jpeg"
+	FileTypeWebp         FileType = "webp"
+	FileTypeHeic         FileType = "heic"
+	FileTypeHeif         FileType = "heif"
+	FileTypeDocx         FileType = "docx"
+	FileTypeXlsx         FileType = "xlsx"
+	FileTypePptx         FileType = "pptx"
+	FileTypeGoogleDocs   FileType = "google_docs"
+	FileTypeGoogleSheets FileType = "google_sheets"
+	FileTypeGoogleSlides FileType = "google_slides"
+	FileTypeOther        FileType = "other"
+)
+
+func (e *FileType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = FileType(s)
+	case string:
+		*e = FileType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for FileType: %T", src)
+	}
+	return nil
+}
+
+type NullFileType struct {
+	FileType FileType `json:"file_type"`
+	Valid    bool     `json:"valid"` // Valid is true if FileType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFileType) Scan(value interface{}) error {
+	if value == nil {
+		ns.FileType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.FileType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFileType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.FileType), nil
+}
+
+func (e FileType) Valid() bool {
+	switch e {
+	case FileTypePdf,
+		FileTypeText,
+		FileTypePython,
+		FileTypeGo,
+		FileTypeJavascript,
+		FileTypeHtml,
+		FileTypeCss,
+		FileTypeJson,
+		FileTypeMarkdown,
+		FileTypeCsv,
+		FileTypePng,
+		FileTypeJpeg,
+		FileTypeWebp,
+		FileTypeHeic,
+		FileTypeHeif,
+		FileTypeDocx,
+		FileTypeXlsx,
+		FileTypePptx,
+		FileTypeGoogleDocs,
+		FileTypeGoogleSheets,
+		FileTypeGoogleSlides,
+		FileTypeOther:
+		return true
+	}
+	return false
+}
+
+func AllFileTypeValues() []FileType {
+	return []FileType{
+		FileTypePdf,
+		FileTypeText,
+		FileTypePython,
+		FileTypeGo,
+		FileTypeJavascript,
+		FileTypeHtml,
+		FileTypeCss,
+		FileTypeJson,
+		FileTypeMarkdown,
+		FileTypeCsv,
+		FileTypePng,
+		FileTypeJpeg,
+		FileTypeWebp,
+		FileTypeHeic,
+		FileTypeHeif,
+		FileTypeDocx,
+		FileTypeXlsx,
+		FileTypePptx,
+		FileTypeGoogleDocs,
+		FileTypeGoogleSheets,
+		FileTypeGoogleSlides,
+		FileTypeOther,
+	}
+}
+
+type GeminiPhase string
+
+const (
+	GeminiPhaseIngestion GeminiPhase = "ingestion"
+	GeminiPhasePlanning  GeminiPhase = "planning"
+	GeminiPhaseSearch    GeminiPhase = "search"
+	GeminiPhaseAnswer    GeminiPhase = "answer"
+)
+
+func (e *GeminiPhase) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GeminiPhase(s)
+	case string:
+		*e = GeminiPhase(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GeminiPhase: %T", src)
+	}
+	return nil
+}
+
+type NullGeminiPhase struct {
+	GeminiPhase GeminiPhase `json:"gemini_phase"`
+	Valid       bool        `json:"valid"` // Valid is true if GeminiPhase is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGeminiPhase) Scan(value interface{}) error {
+	if value == nil {
+		ns.GeminiPhase, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GeminiPhase.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGeminiPhase) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GeminiPhase), nil
+}
+
+func (e GeminiPhase) Valid() bool {
+	switch e {
+	case GeminiPhaseIngestion,
+		GeminiPhasePlanning,
+		GeminiPhaseSearch,
+		GeminiPhaseAnswer:
+		return true
+	}
+	return false
+}
+
+func AllGeminiPhaseValues() []GeminiPhase {
+	return []GeminiPhase{
+		GeminiPhaseIngestion,
+		GeminiPhasePlanning,
+		GeminiPhaseSearch,
+		GeminiPhaseAnswer,
 	}
 }
 
@@ -150,6 +332,7 @@ const (
 	JobStatusProcessing JobStatus = "processing"
 	JobStatusCompleted  JobStatus = "completed"
 	JobStatusFailed     JobStatus = "failed"
+	JobStatusCancelled  JobStatus = "cancelled"
 )
 
 func (e *JobStatus) Scan(src interface{}) error {
@@ -192,7 +375,8 @@ func (e JobStatus) Valid() bool {
 	case JobStatusPending,
 		JobStatusProcessing,
 		JobStatusCompleted,
-		JobStatusFailed:
+		JobStatusFailed,
+		JobStatusCancelled:
 		return true
 	}
 	return false
@@ -204,72 +388,302 @@ func AllJobStatusValues() []JobStatus {
 		JobStatusProcessing,
 		JobStatusCompleted,
 		JobStatusFailed,
+		JobStatusCancelled,
 	}
 }
 
-type Chunk struct {
-	ChunkID    uuid.UUID       `json:"chunk_id"`
-	FileID     uuid.UUID       `json:"file_id"`
-	SubjectID  uuid.UUID       `json:"subject_id"`
-	PageNumber sql.NullInt32   `json:"page_number"`
-	ChunkIndex int32           `json:"chunk_index"`
-	Content    string          `json:"content"`
-	Embedding  pgvector.Vector `json:"embedding"`
-	CreatedAt  time.Time       `json:"created_at"`
+type JobType string
+
+const (
+	JobTypeFileIngestion      JobType = "file_ingestion"
+	JobTypeAiBatchProcessing  JobType = "ai_batch_processing"
+	JobTypeSearchOptimization JobType = "search_optimization"
+	JobTypeMaintenance        JobType = "maintenance"
+)
+
+func (e *JobType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = JobType(s)
+	case string:
+		*e = JobType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for JobType: %T", src)
+	}
+	return nil
 }
 
-type File struct {
-	FileID       uuid.UUID      `json:"file_id"`
-	SubjectID    uuid.UUID      `json:"subject_id"`
-	UserID       uuid.UUID      `json:"user_id"`
-	Name         string         `json:"name"`
-	StoragePath  string         `json:"storage_path"`
-	MimeType     string         `json:"mime_type"`
-	SizeBytes    int64          `json:"size_bytes"`
-	Status       FileStatus     `json:"status"`
-	ErrorMessage sql.NullString `json:"error_message"`
-	UploadedAt   time.Time      `json:"uploaded_at"`
-	ProcessedAt  sql.NullTime   `json:"processed_at"`
+type NullJobType struct {
+	JobType JobType `json:"job_type"`
+	Valid   bool    `json:"valid"` // Valid is true if JobType is not NULL
 }
 
-type IngestJob struct {
-	JobID        uuid.UUID      `json:"job_id"`
-	FileID       uuid.UUID      `json:"file_id"`
-	Status       JobStatus      `json:"status"`
-	RetryCount   int32          `json:"retry_count"`
-	MaxRetries   int32          `json:"max_retries"`
-	ErrorMessage sql.NullString `json:"error_message"`
-	CreatedAt    time.Time      `json:"created_at"`
-	StartedAt    sql.NullTime   `json:"started_at"`
-	CompletedAt  sql.NullTime   `json:"completed_at"`
+// Scan implements the Scanner interface.
+func (ns *NullJobType) Scan(value interface{}) error {
+	if value == nil {
+		ns.JobType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.JobType.Scan(value)
 }
 
-type QaSession struct {
-	SessionID  uuid.UUID             `json:"session_id"`
-	UserID     uuid.UUID             `json:"user_id"`
-	SubjectID  uuid.UUID             `json:"subject_id"`
-	Question   string                `json:"question"`
-	Answer     sql.NullString        `json:"answer"`
-	Sources    pqtype.NullRawMessage `json:"sources"`
-	Feedback   sql.NullInt16         `json:"feedback"`
-	CreatedAt  time.Time             `json:"created_at"`
-	AnsweredAt sql.NullTime          `json:"answered_at"`
+// Value implements the driver Valuer interface.
+func (ns NullJobType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.JobType), nil
+}
+
+func (e JobType) Valid() bool {
+	switch e {
+	case JobTypeFileIngestion,
+		JobTypeAiBatchProcessing,
+		JobTypeSearchOptimization,
+		JobTypeMaintenance:
+		return true
+	}
+	return false
+}
+
+func AllJobTypeValues() []JobType {
+	return []JobType{
+		JobTypeFileIngestion,
+		JobTypeAiBatchProcessing,
+		JobTypeSearchOptimization,
+		JobTypeMaintenance,
+	}
+}
+
+type SearchMode string
+
+const (
+	SearchModeKeyword SearchMode = "keyword"
+	SearchModeVector  SearchMode = "vector"
+	SearchModeHybrid  SearchMode = "hybrid"
+)
+
+func (e *SearchMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SearchMode(s)
+	case string:
+		*e = SearchMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SearchMode: %T", src)
+	}
+	return nil
+}
+
+type NullSearchMode struct {
+	SearchMode SearchMode `json:"search_mode"`
+	Valid      bool       `json:"valid"` // Valid is true if SearchMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSearchMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.SearchMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SearchMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSearchMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SearchMode), nil
+}
+
+func (e SearchMode) Valid() bool {
+	switch e {
+	case SearchModeKeyword,
+		SearchModeVector,
+		SearchModeHybrid:
+		return true
+	}
+	return false
+}
+
+func AllSearchModeValues() []SearchMode {
+	return []SearchMode{
+		SearchModeKeyword,
+		SearchModeVector,
+		SearchModeHybrid,
+	}
+}
+
+type UserRole string
+
+const (
+	UserRoleStudent    UserRole = "student"
+	UserRoleInstructor UserRole = "instructor"
+	UserRoleAdmin      UserRole = "admin"
+)
+
+func (e *UserRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserRole(s)
+	case string:
+		*e = UserRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
+	}
+	return nil
+}
+
+type NullUserRole struct {
+	UserRole UserRole `json:"user_role"`
+	Valid    bool     `json:"valid"` // Valid is true if UserRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserRole), nil
+}
+
+func (e UserRole) Valid() bool {
+	switch e {
+	case UserRoleStudent,
+		UserRoleInstructor,
+		UserRoleAdmin:
+		return true
+	}
+	return false
+}
+
+func AllUserRoleValues() []UserRole {
+	return []UserRole{
+		UserRoleStudent,
+		UserRoleInstructor,
+		UserRoleAdmin,
+	}
+}
+
+type Chat struct {
+	ID                        uuid.UUID             `json:"id"`
+	Nanoid                    string                `json:"nanoid"`
+	UserID                    uuid.UUID             `json:"user_id"`
+	SubjectID                 uuid.UUID             `json:"subject_id"`
+	ParentChatID              uuid.NullUUID         `json:"parent_chat_id"`
+	Question                  string                `json:"question"`
+	PlanJson                  pqtype.NullRawMessage `json:"plan_json"`
+	TerminationReason         sql.NullString        `json:"termination_reason"`
+	FinalAnswerMarkdown       sql.NullString        `json:"final_answer_markdown"`
+	Feedback                  NullChatFeedback      `json:"feedback"`
+	FeedbackAt                sql.NullTime          `json:"feedback_at"`
+	ActualSearchSteps         int32                 `json:"actual_search_steps"`
+	SearchStep1HitMaterialIds []uuid.UUID           `json:"search_step_1_hit_material_ids"`
+	SearchStep2HitMaterialIds []uuid.UUID           `json:"search_step_2_hit_material_ids"`
+	SearchStep3HitMaterialIds []uuid.UUID           `json:"search_step_3_hit_material_ids"`
+	SearchStep4HitMaterialIds []uuid.UUID           `json:"search_step_4_hit_material_ids"`
+	SearchStep5HitMaterialIds []uuid.UUID           `json:"search_step_5_hit_material_ids"`
+	EvidenceSnippets          pqtype.NullRawMessage `json:"evidence_snippets"`
+	UsedRawFileIds            []uuid.UUID           `json:"used_raw_file_ids"`
+	CreatedAt                 time.Time             `json:"created_at"`
+	UpdatedAt                 time.Time             `json:"updated_at"`
+	CompletedAt               sql.NullTime          `json:"completed_at"`
+	IsActive                  bool                  `json:"is_active"`
+	DeletedAt                 sql.NullTime          `json:"deleted_at"`
+}
+
+type Job struct {
+	ID              uuid.UUID       `json:"id"`
+	JobType         JobType         `json:"job_type"`
+	TargetRawFileID uuid.NullUUID   `json:"target_raw_file_id"`
+	IdempotencyKey  string          `json:"idempotency_key"`
+	Status          JobStatus       `json:"status"`
+	GeminiModel     sql.NullString  `json:"gemini_model"`
+	GeminiPhase     NullGeminiPhase `json:"gemini_phase"`
+	ErrorMessage    sql.NullString  `json:"error_message"`
+	RetryCount      int32           `json:"retry_count"`
+	MaxRetries      int32           `json:"max_retries"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+	StartedAt       sql.NullTime    `json:"started_at"`
+	CompletedAt     sql.NullTime    `json:"completed_at"`
+}
+
+type Material struct {
+	ID              uuid.UUID       `json:"id"`
+	RawFileID       uuid.UUID       `json:"raw_file_id"`
+	SequenceInFile  int32           `json:"sequence_in_file"`
+	PageStart       sql.NullInt32   `json:"page_start"`
+	PageEnd         sql.NullInt32   `json:"page_end"`
+	ContentMarkdown string          `json:"content_markdown"`
+	CharCount       int32           `json:"char_count"`
+	Embedding       pgvector.Vector `json:"embedding"`
+	EmbeddingModel  string          `json:"embedding_model"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+	IsActive        bool            `json:"is_active"`
+	DeletedAt       sql.NullTime    `json:"deleted_at"`
+}
+
+type RawFile struct {
+	ID                    uuid.UUID      `json:"id"`
+	Nanoid                string         `json:"nanoid"`
+	UserID                uuid.UUID      `json:"user_id"`
+	SubjectID             uuid.UUID      `json:"subject_id"`
+	OriginalFilename      string         `json:"original_filename"`
+	FileType              FileType       `json:"file_type"`
+	FileSizeBytes         int64          `json:"file_size_bytes"`
+	SourceUrl             sql.NullString `json:"source_url"`
+	GcsBucket             string         `json:"gcs_bucket"`
+	GcsObjectPath         string         `json:"gcs_object_path"`
+	GcsSignedUrlExpiresAt sql.NullTime   `json:"gcs_signed_url_expires_at"`
+	Status                FileStatus     `json:"status"`
+	TotalPages            sql.NullInt32  `json:"total_pages"`
+	MimeType              sql.NullString `json:"mime_type"`
+	ProcessedAt           sql.NullTime   `json:"processed_at"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
+	IsActive              bool           `json:"is_active"`
+	DeletedAt             sql.NullTime   `json:"deleted_at"`
 }
 
 type Subject struct {
-	SubjectID   uuid.UUID      `json:"subject_id"`
-	UserID      uuid.UUID      `json:"user_id"`
-	Name        string         `json:"name"`
-	LmsCourseID sql.NullString `json:"lms_course_id"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID           uuid.UUID      `json:"id"`
+	Nanoid       string         `json:"nanoid"`
+	OwnerUserID  uuid.UUID      `json:"owner_user_id"`
+	Title        string         `json:"title"`
+	Description  sql.NullString `json:"description"`
+	AcademicYear sql.NullString `json:"academic_year"`
+	Semester     sql.NullString `json:"semester"`
+	CourseCode   sql.NullString `json:"course_code"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	IsActive     bool           `json:"is_active"`
+	DeletedAt    sql.NullTime   `json:"deleted_at"`
 }
 
 type User struct {
-	UserID         uuid.UUID        `json:"user_id"`
-	Email          string           `json:"email"`
-	Provider       NullAuthProvider `json:"provider"`
-	ProviderUserID sql.NullString   `json:"provider_user_id"`
-	CreatedAt      time.Time        `json:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at"`
+	ID             uuid.UUID    `json:"id"`
+	Nanoid         string       `json:"nanoid"`
+	Provider       string       `json:"provider"`
+	ProviderUserID string       `json:"provider_user_id"`
+	Role           UserRole     `json:"role"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
+	LastLoginAt    sql.NullTime `json:"last_login_at"`
+	IsActive       bool         `json:"is_active"`
+	DeletedAt      sql.NullTime `json:"deleted_at"`
 }

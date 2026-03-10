@@ -42,7 +42,6 @@ func (r *chunkRepo) BatchCreate(ctx context.Context, chunks []*domain.Chunk) err
 		_, err := r.q.InsertChunk(ctx, sqlcgen.InsertChunkParams{
 			ChunkID:    c.ID,
 			FileID:     c.FileID,
-			SubjectID:  c.SubjectID,
 			PageNumber: pageNum,
 			ChunkIndex: int32(c.ChunkIndex),
 			Content:    c.Content,
@@ -96,7 +95,7 @@ func (r *chunkRepo) DeleteByFileID(ctx context.Context, fileID uuid.UUID) error 
 
 // ─── 変換ヘルパー ─────────────────────────────────────────────────
 
-func sqlcChunkToDomainChunk(row sqlcgen.Chunk) *domain.Chunk {
+func sqlcChunkToDomainChunk(row sqlcgen.ListChunksByFileIDRow) *domain.Chunk {
 	c := &domain.Chunk{
 		ID:         row.ChunkID,
 		FileID:     row.FileID,
@@ -118,6 +117,7 @@ func sqlcVectorRowToSearchResult(row sqlcgen.SearchChunksByVectorRow) *domain.Se
 		ChunkID:    row.ChunkID,
 		FileID:     row.FileID,
 		SubjectID:  row.SubjectID,
+		FileName:   row.FileName,
 		ChunkIndex: int(row.ChunkIndex),
 		Content:    row.Content,
 		CreatedAt:  row.CreatedAt,
@@ -134,6 +134,7 @@ func sqlcTextRowToSearchResult(row sqlcgen.SearchChunksByTextRow) *domain.Search
 		ChunkID:    row.ChunkID,
 		FileID:     row.FileID,
 		SubjectID:  row.SubjectID,
+		FileName:   row.FileName,
 		ChunkIndex: int(row.ChunkIndex),
 		Content:    row.Content,
 		CreatedAt:  row.CreatedAt,

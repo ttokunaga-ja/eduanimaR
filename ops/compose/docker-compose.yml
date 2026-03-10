@@ -185,6 +185,24 @@ services:
 
   # ── Professor（Go バックエンド）──────────────────────────────
   # dev モード: air ホットリロード（.air.toml 必須）
+  professor-migrate:
+    image: arigaio/atlas:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/professor/schema/migrations:/migrations:ro
+    command:
+      - migrate
+      - apply
+      - --dir
+      - file:///migrations
+      - --url
+      - postgres://${POSTGRES_USER:-eduanima}:${POSTGRES_PASSWORD:-eduanima_password}@postgres:5432/${POSTGRES_DB:-eduanima_professor}?sslmode=disable
+    networks:
+      - eduanima_net
+    restart: "no"
+
   professor:
     build:
       context: ./apps/professor
@@ -212,6 +230,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      professor-migrate:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
       kafka:

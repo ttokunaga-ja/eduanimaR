@@ -8,48 +8,91 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 const createFile = `-- name: CreateFile :one
-INSERT INTO files (
-    file_id,
-    subject_id,
-    user_id,
-    name,
-    storage_path,
-    mime_type,
-    size_bytes,
-    status
+INSERT INTO raw_files (
+  id,
+  subject_id,
+  user_id,
+  original_filename,
+  file_type,
+  file_size_bytes,
+  gcs_bucket,
+  gcs_object_path,
+  mime_type,
+  status
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING file_id, subject_id, user_id, name, storage_path, mime_type, size_bytes, status, error_message, uploaded_at, processed_at
+VALUES (
+  $1,
+  $2,
+  $3,
+  $4,
+  CASE
+    WHEN lower($5) LIKE 'application/pdf%' THEN 'pdf'::file_type
+    WHEN lower($5) LIKE 'text/%' THEN 'text'::file_type
+    ELSE 'other'::file_type
+  END,
+  $6,
+  'materials',
+  $7,
+  $5,
+  $8::file_status
+)
+RETURNING
+  id AS file_id,
+  subject_id,
+  user_id,
+  original_filename AS name,
+  gcs_object_path AS storage_path,
+  mime_type,
+  file_size_bytes AS size_bytes,
+  status,
+  NULL::text AS error_message,
+  created_at AS uploaded_at,
+  processed_at
 `
 
 type CreateFileParams struct {
-	FileID      uuid.UUID  `json:"file_id"`
-	SubjectID   uuid.UUID  `json:"subject_id"`
-	UserID      uuid.UUID  `json:"user_id"`
-	Name        string     `json:"name"`
-	StoragePath string     `json:"storage_path"`
-	MimeType    string     `json:"mime_type"`
-	SizeBytes   int64      `json:"size_bytes"`
-	Status      FileStatus `json:"status"`
+	FileID      uuid.UUID      `json:"file_id"`
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	MimeType    sql.NullString `json:"mime_type"`
+	SizeBytes   int64          `json:"size_bytes"`
+	StoragePath string         `json:"storage_path"`
+	Status      FileStatus     `json:"status"`
 }
 
-func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, error) {
+type CreateFileRow struct {
+	FileID       uuid.UUID      `json:"file_id"`
+	SubjectID    uuid.UUID      `json:"subject_id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Name         string         `json:"name"`
+	StoragePath  string         `json:"storage_path"`
+	MimeType     sql.NullString `json:"mime_type"`
+	SizeBytes    int64          `json:"size_bytes"`
+	Status       FileStatus     `json:"status"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	UploadedAt   time.Time      `json:"uploaded_at"`
+	ProcessedAt  sql.NullTime   `json:"processed_at"`
+}
+
+func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (CreateFileRow, error) {
 	row := q.db.QueryRowContext(ctx, createFile,
 		arg.FileID,
 		arg.SubjectID,
 		arg.UserID,
 		arg.Name,
-		arg.StoragePath,
 		arg.MimeType,
 		arg.SizeBytes,
+		arg.StoragePath,
 		arg.Status,
 	)
-	var i File
+	var i CreateFileRow
 	err := row.Scan(
 		&i.FileID,
 		&i.SubjectID,
@@ -67,9 +110,13 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, e
 }
 
 const deleteFile = `-- name: DeleteFile :exec
-DELETE FROM files
-WHERE file_id = $1
+UPDATE raw_files
+SET is_active = FALSE,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
   AND user_id = $2
+  AND is_active = TRUE
 `
 
 type DeleteFileParams struct {
@@ -84,15 +131,41 @@ func (q *Queries) DeleteFile(ctx context.Context, arg DeleteFileParams) error {
 
 const getFileByID = `-- name: GetFileByID :one
 
-SELECT file_id, subject_id, user_id, name, storage_path, mime_type, size_bytes, status, error_message, uploaded_at, processed_at
-FROM files
-WHERE file_id = $1
+SELECT
+  id AS file_id,
+  subject_id,
+  user_id,
+  original_filename AS name,
+  gcs_object_path AS storage_path,
+  mime_type,
+  file_size_bytes AS size_bytes,
+  status,
+  NULL::text AS error_message,
+  created_at AS uploaded_at,
+  processed_at
+FROM raw_files
+WHERE id = $1
+  AND is_active = TRUE
 `
 
+type GetFileByIDRow struct {
+	FileID       uuid.UUID      `json:"file_id"`
+	SubjectID    uuid.UUID      `json:"subject_id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Name         string         `json:"name"`
+	StoragePath  string         `json:"storage_path"`
+	MimeType     sql.NullString `json:"mime_type"`
+	SizeBytes    int64          `json:"size_bytes"`
+	Status       FileStatus     `json:"status"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	UploadedAt   time.Time      `json:"uploaded_at"`
+	ProcessedAt  sql.NullTime   `json:"processed_at"`
+}
+
 // sql/queries/files.sql
-func (q *Queries) GetFileByID(ctx context.Context, fileID uuid.UUID) (File, error) {
-	row := q.db.QueryRowContext(ctx, getFileByID, fileID)
-	var i File
+func (q *Queries) GetFileByID(ctx context.Context, id uuid.UUID) (GetFileByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getFileByID, id)
+	var i GetFileByIDRow
 	err := row.Scan(
 		&i.FileID,
 		&i.SubjectID,
@@ -110,20 +183,46 @@ func (q *Queries) GetFileByID(ctx context.Context, fileID uuid.UUID) (File, erro
 }
 
 const getFileByIDAndUserID = `-- name: GetFileByIDAndUserID :one
-SELECT file_id, subject_id, user_id, name, storage_path, mime_type, size_bytes, status, error_message, uploaded_at, processed_at
-FROM files
-WHERE file_id = $1
+SELECT
+  id AS file_id,
+  subject_id,
+  user_id,
+  original_filename AS name,
+  gcs_object_path AS storage_path,
+  mime_type,
+  file_size_bytes AS size_bytes,
+  status,
+  NULL::text AS error_message,
+  created_at AS uploaded_at,
+  processed_at
+FROM raw_files
+WHERE id = $1
   AND user_id = $2
+  AND is_active = TRUE
 `
 
 type GetFileByIDAndUserIDParams struct {
-	FileID uuid.UUID `json:"file_id"`
+	ID     uuid.UUID `json:"id"`
 	UserID uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (File, error) {
-	row := q.db.QueryRowContext(ctx, getFileByIDAndUserID, arg.FileID, arg.UserID)
-	var i File
+type GetFileByIDAndUserIDRow struct {
+	FileID       uuid.UUID      `json:"file_id"`
+	SubjectID    uuid.UUID      `json:"subject_id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Name         string         `json:"name"`
+	StoragePath  string         `json:"storage_path"`
+	MimeType     sql.NullString `json:"mime_type"`
+	SizeBytes    int64          `json:"size_bytes"`
+	Status       FileStatus     `json:"status"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	UploadedAt   time.Time      `json:"uploaded_at"`
+	ProcessedAt  sql.NullTime   `json:"processed_at"`
+}
+
+func (q *Queries) GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (GetFileByIDAndUserIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getFileByIDAndUserID, arg.ID, arg.UserID)
+	var i GetFileByIDAndUserIDRow
 	err := row.Scan(
 		&i.FileID,
 		&i.SubjectID,
@@ -141,21 +240,47 @@ func (q *Queries) GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUs
 }
 
 const listFilesBySubjectID = `-- name: ListFilesBySubjectID :many
-SELECT file_id, subject_id, user_id, name, storage_path, mime_type, size_bytes, status, error_message, uploaded_at, processed_at
-FROM files
+SELECT
+  id AS file_id,
+  subject_id,
+  user_id,
+  original_filename AS name,
+  gcs_object_path AS storage_path,
+  mime_type,
+  file_size_bytes AS size_bytes,
+  status,
+  NULL::text AS error_message,
+  created_at AS uploaded_at,
+  processed_at
+FROM raw_files
 WHERE subject_id = $1
-ORDER BY uploaded_at DESC
+  AND is_active = TRUE
+ORDER BY created_at DESC
 `
 
-func (q *Queries) ListFilesBySubjectID(ctx context.Context, subjectID uuid.UUID) ([]File, error) {
+type ListFilesBySubjectIDRow struct {
+	FileID       uuid.UUID      `json:"file_id"`
+	SubjectID    uuid.UUID      `json:"subject_id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Name         string         `json:"name"`
+	StoragePath  string         `json:"storage_path"`
+	MimeType     sql.NullString `json:"mime_type"`
+	SizeBytes    int64          `json:"size_bytes"`
+	Status       FileStatus     `json:"status"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	UploadedAt   time.Time      `json:"uploaded_at"`
+	ProcessedAt  sql.NullTime   `json:"processed_at"`
+}
+
+func (q *Queries) ListFilesBySubjectID(ctx context.Context, subjectID uuid.UUID) ([]ListFilesBySubjectIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFilesBySubjectID, subjectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []File
+	var items []ListFilesBySubjectIDRow
 	for rows.Next() {
-		var i File
+		var i ListFilesBySubjectIDRow
 		if err := rows.Scan(
 			&i.FileID,
 			&i.SubjectID,
@@ -183,27 +308,52 @@ func (q *Queries) ListFilesBySubjectID(ctx context.Context, subjectID uuid.UUID)
 }
 
 const updateFileStatus = `-- name: UpdateFileStatus :one
-UPDATE files
+UPDATE raw_files
 SET
-    status        = $2,
-    error_message = $3,
-    processed_at  = CASE
-                        WHEN $2::file_status = 'ready' THEN NOW()
-                        ELSE processed_at
-                    END
-WHERE file_id = $1
-RETURNING file_id, subject_id, user_id, name, storage_path, mime_type, size_bytes, status, error_message, uploaded_at, processed_at
+  status = $1::file_status,
+  processed_at = CASE
+    WHEN $1::file_status = 'completed' THEN NOW()
+    ELSE processed_at
+  END,
+  updated_at = NOW()
+WHERE id = $2
+  AND is_active = TRUE
+RETURNING
+  id AS file_id,
+  subject_id,
+  user_id,
+  original_filename AS name,
+  gcs_object_path AS storage_path,
+  mime_type,
+  file_size_bytes AS size_bytes,
+  status,
+  NULL::text AS error_message,
+  created_at AS uploaded_at,
+  processed_at
 `
 
 type UpdateFileStatusParams struct {
-	FileID       uuid.UUID      `json:"file_id"`
-	Status       FileStatus     `json:"status"`
-	ErrorMessage sql.NullString `json:"error_message"`
+	Status FileStatus `json:"status"`
+	FileID uuid.UUID  `json:"file_id"`
 }
 
-func (q *Queries) UpdateFileStatus(ctx context.Context, arg UpdateFileStatusParams) (File, error) {
-	row := q.db.QueryRowContext(ctx, updateFileStatus, arg.FileID, arg.Status, arg.ErrorMessage)
-	var i File
+type UpdateFileStatusRow struct {
+	FileID       uuid.UUID      `json:"file_id"`
+	SubjectID    uuid.UUID      `json:"subject_id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Name         string         `json:"name"`
+	StoragePath  string         `json:"storage_path"`
+	MimeType     sql.NullString `json:"mime_type"`
+	SizeBytes    int64          `json:"size_bytes"`
+	Status       FileStatus     `json:"status"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	UploadedAt   time.Time      `json:"uploaded_at"`
+	ProcessedAt  sql.NullTime   `json:"processed_at"`
+}
+
+func (q *Queries) UpdateFileStatus(ctx context.Context, arg UpdateFileStatusParams) (UpdateFileStatusRow, error) {
+	row := q.db.QueryRowContext(ctx, updateFileStatus, arg.Status, arg.FileID)
+	var i UpdateFileStatusRow
 	err := row.Scan(
 		&i.FileID,
 		&i.SubjectID,

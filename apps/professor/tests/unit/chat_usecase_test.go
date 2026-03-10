@@ -83,17 +83,22 @@ func TestChatUseCase_Ask_Success(t *testing.T) {
 		question,
 		subjectID,
 		userID,
+		mock.Anything, // maxLoops
 		mock.Anything, // onSearchRequest func
 	).Return(thinkResult, nil)
 
 	// LLM ストリーミング: "テスト回答" を1チャンクで返す
-	llmClient.On("GenerateAnswerStream",
+	llmClient.On("GenerateAnswerStreamWithPDF",
 		ctx,
 		question,
 		mock.Anything, // []string（空スライス）
+		mock.Anything, // []byte
+		mock.Anything, // mime type
+		mock.Anything, // model override
+		mock.Anything, // thinking level
 		mock.Anything, // func(string) error
 	).Return(nil).Run(func(args mock.Arguments) {
-		onChunk := args.Get(3).(func(string) error)
+		onChunk := args.Get(7).(func(string) error)
 		_ = onChunk("テスト回答")
 	})
 
@@ -204,7 +209,7 @@ func TestChatUseCase_Ask_LibrarianError_SendsSSEError(t *testing.T) {
 
 	librarianErr := errors.New("librarian unavailable")
 	librarianClient.On("Think",
-		ctx, mock.Anything, "質問", subjectID, userID, mock.Anything,
+		ctx, mock.Anything, "質問", subjectID, userID, mock.Anything, mock.Anything,
 	).Return((*ports.LibrarianThinkResult)(nil), librarianErr)
 
 	var gotErrorEvent bool
@@ -223,7 +228,7 @@ func TestChatUseCase_Ask_LibrarianError_SendsSSEError(t *testing.T) {
 	assert.True(t, gotErrorEvent, "SSEEventError が送信されるべき")
 
 	librarianClient.AssertExpectations(t)
-	llmClient.AssertNotCalled(t, "GenerateAnswerStream")
+	llmClient.AssertNotCalled(t, "GenerateAnswerStreamWithPDF")
 }
 
 // ─── Ask: LLM ストリームエラー時 SSEEventError を送信 ──────────────
@@ -249,12 +254,12 @@ func TestChatUseCase_Ask_LLMStreamError_SendsSSEError(t *testing.T) {
 		CoverageNotes: "推論",
 	}
 	librarianClient.On("Think",
-		ctx, mock.Anything, question, subjectID, userID, mock.Anything,
+		ctx, mock.Anything, question, subjectID, userID, mock.Anything, mock.Anything,
 	).Return(thinkResult, nil)
 
 	streamErr := errors.New("LLM stream broken")
-	llmClient.On("GenerateAnswerStream",
-		ctx, question, mock.Anything, mock.Anything,
+	llmClient.On("GenerateAnswerStreamWithPDF",
+		ctx, question, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 	).Return(streamErr)
 
 	var gotErrorEvent bool

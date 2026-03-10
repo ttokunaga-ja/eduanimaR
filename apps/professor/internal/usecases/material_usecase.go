@@ -71,7 +71,7 @@ func (uc *MaterialUseCase) Upload(ctx context.Context, in UploadMaterialInput) (
 
 	storagePath, err := uc.storage.Upload(ctx, key, in.Reader, in.Size, in.MimeType)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("storage upload: %w", err)
 	}
 
 	file := &domain.File{
@@ -82,11 +82,11 @@ func (uc *MaterialUseCase) Upload(ctx context.Context, in UploadMaterialInput) (
 		StoragePath: storagePath,
 		MimeType:    in.MimeType,
 		SizeBytes:   in.Size,
-		Status:      domain.FileStatusPending,
+		Status:      domain.FileStatusUploaded,
 		UploadedAt:  time.Now().UTC(),
 	}
 	if err := uc.files.Create(ctx, file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create file record: %w", err)
 	}
 
 	// 非同期 OCR/Embedding ジョブを作成
@@ -99,7 +99,7 @@ func (uc *MaterialUseCase) Upload(ctx context.Context, in UploadMaterialInput) (
 		CreatedAt:  time.Now().UTC(),
 	}
 	if err := uc.jobs.Create(ctx, job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create ingest job: %w", err)
 	}
 
 	// Kafka メッセージ送信（失敗してもユーザーにはエラーを返さない）

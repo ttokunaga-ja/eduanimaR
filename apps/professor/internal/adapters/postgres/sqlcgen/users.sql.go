@@ -8,34 +8,47 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (user_id, email, provider, provider_user_id)
-VALUES ($1, $2, $3, $4)
-RETURNING user_id, email, provider, provider_user_id, created_at, updated_at
+INSERT INTO users (id, provider, provider_user_id)
+VALUES ($1, COALESCE($3, 'development'), COALESCE($4, $2))
+RETURNING
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 `
 
 type CreateUserParams struct {
-	UserID         uuid.UUID        `json:"user_id"`
-	Email          string           `json:"email"`
-	Provider       NullAuthProvider `json:"provider"`
-	ProviderUserID sql.NullString   `json:"provider_user_id"`
+	ID      uuid.UUID   `json:"id"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+type CreateUserRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRowContext(ctx, createUser,
-		arg.UserID,
-		arg.Email,
-		arg.Provider,
-		arg.ProviderUserID,
+		arg.ID,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
 	)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Email,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.CreatedAt,
@@ -45,17 +58,30 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT user_id, email, provider, provider_user_id, created_at, updated_at
+SELECT
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 FROM users
-WHERE email = $1
+WHERE provider_user_id = $1
+  AND is_active = TRUE
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
-	var i User
+type GetUserByEmailRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, providerUserID string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, providerUserID)
+	var i GetUserByEmailRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Email,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.CreatedAt,
@@ -66,18 +92,31 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 
 const getUserByID = `-- name: GetUserByID :one
 
-SELECT user_id, email, provider, provider_user_id, created_at, updated_at
+SELECT
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 FROM users
-WHERE user_id = $1
+WHERE id = $1
+  AND is_active = TRUE
 `
 
+type GetUserByIDRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 // sql/queries/users.sql
-func (q *Queries) GetUserByID(ctx context.Context, userID uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, userID)
-	var i User
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	var i GetUserByIDRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Email,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.CreatedAt,
@@ -89,32 +128,37 @@ func (q *Queries) GetUserByID(ctx context.Context, userID uuid.UUID) (User, erro
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET
-    email            = COALESCE($1, email),
-    provider         = COALESCE($2, provider),
-    provider_user_id = COALESCE($3, provider_user_id),
-    updated_at       = NOW()
-WHERE user_id = $4
-RETURNING user_id, email, provider, provider_user_id, created_at, updated_at
+  provider = COALESCE($1, provider),
+  provider_user_id = COALESCE($2, provider_user_id),
+  updated_at = NOW()
+WHERE id = $3
+RETURNING
+  id AS user_id,
+  provider,
+  provider_user_id,
+  created_at,
+  updated_at
 `
 
 type UpdateUserParams struct {
-	Email          sql.NullString   `json:"email"`
-	Provider       NullAuthProvider `json:"provider"`
-	ProviderUserID sql.NullString   `json:"provider_user_id"`
-	UserID         uuid.UUID        `json:"user_id"`
+	Provider       sql.NullString `json:"provider"`
+	ProviderUserID sql.NullString `json:"provider_user_id"`
+	UserID         uuid.UUID      `json:"user_id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser,
-		arg.Email,
-		arg.Provider,
-		arg.ProviderUserID,
-		arg.UserID,
-	)
-	var i User
+type UpdateUserRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
+	row := q.db.QueryRowContext(ctx, updateUser, arg.Provider, arg.ProviderUserID, arg.UserID)
+	var i UpdateUserRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Email,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.CreatedAt,

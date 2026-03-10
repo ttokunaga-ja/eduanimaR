@@ -312,9 +312,39 @@ func (g *geminiClient) GenerateAnswerStream(ctx context.Context, question string
 // GenerateAnswerStreamWithPDF は PDF 原本バイト列とエビデンスチャンクを組み合わせて
 // 回答をストリーミング生成する。Gemini に PDF を直接渡すことで原本を参照した
 // 高精度な回答を実現する。pdfContent が空の場合は GenerateAnswerStream にフォールバックする。
-func (g *geminiClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, onChunk func(text string) error) error {
+func (g *geminiClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, modelOverride string, thinkingLevel string, onChunk func(text string) error) error {
+	model := g.modelAnswer
+	if strings.TrimSpace(modelOverride) != "" {
+		model = strings.TrimSpace(modelOverride)
+	}
+	tl := toThinkingLevel(thinkingLevel)
+
 	if len(pdfContent) == 0 {
-		return g.GenerateAnswerStream(ctx, question, evidences, onChunk)
+		contents := []*genai.Content{
+			{
+				Parts: []*genai.Part{{Text: buildAnswerPrompt(question, evidences)}},
+				Role:  "user",
+			},
+		}
+		config := &genai.GenerateContentConfig{
+			// 非決定論の回答生成は Temperature=1.0 を使用する。
+			Temperature: genai.Ptr(float32(1.0)),
+			// 思考テキストを回答チャンクへ混入させない。
+			ThinkingConfig: &genai.ThinkingConfig{ThinkingLevel: tl, IncludeThoughts: false},
+		}
+
+		for chunk, err := range g.client.Models.GenerateContentStream(ctx, model, contents, config) {
+			if err != nil {
+				return fmt.Errorf("gemini: stream answer: %w", err)
+			}
+			text := chunk.Text()
+			if text != "" {
+				if err := onChunk(text); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	}
 
 	contents := []*genai.Content{
@@ -329,9 +359,11 @@ func (g *geminiClient) GenerateAnswerStreamWithPDF(ctx context.Context, question
 	config := &genai.GenerateContentConfig{
 		// 非決定論の回答生成は Temperature=1.0 を使用する。
 		Temperature: genai.Ptr(float32(1.0)),
+		// 思考テキストを回答チャンクへ混入させない。
+		ThinkingConfig: &genai.ThinkingConfig{ThinkingLevel: tl, IncludeThoughts: false},
 	}
 
-	for chunk, err := range g.client.Models.GenerateContentStream(ctx, g.modelAnswer, contents, config) {
+	for chunk, err := range g.client.Models.GenerateContentStream(ctx, model, contents, config) {
 		if err != nil {
 			return fmt.Errorf("gemini: stream answer with pdf: %w", err)
 		}
@@ -343,6 +375,19 @@ func (g *geminiClient) GenerateAnswerStreamWithPDF(ctx context.Context, question
 		}
 	}
 	return nil
+}
+
+func toThinkingLevel(level string) genai.ThinkingLevel {
+	switch strings.TrimSpace(level) {
+	case "high":
+		return genai.ThinkingLevelHigh
+	case "medium":
+		return genai.ThinkingLevelMedium
+	case "low":
+		return genai.ThinkingLevelLow
+	default:
+		return genai.ThinkingLevelMinimal
+	}
 }
 
 // ─── ヘルパー ─────────────────────────────────────────────────────

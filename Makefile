@@ -54,16 +54,14 @@ infra:
 ## dev: 全サービス起動（開発モード・ホットリロード）
 dev: setup
 	@echo "==> 開発環境を起動中..."
-	# infra を先に起動してマイグレーションを確実に適用する
+	# infra を先に起動（DB初期化は compose の professor-migrate が自動適用）
 	$(COMPOSE) up postgres minio minio-init kafka kafka-init -d
-	@$(MAKE) migrate
 	$(COMPOSE) up --build
 # ※ -d を付けるとデタッチモード（バックグラウンド）で起動する
 
 ## dev-d: 全サービスをバックグラウンドで起動
 dev-d: setup
 	$(COMPOSE) up --build -d
-	@$(MAKE) migrate
 	@echo "✅ バックグラウンド起動完了"
 	@echo "   Frontend  : http://localhost:3000"
 	@echo "   Professor : http://localhost:8080"

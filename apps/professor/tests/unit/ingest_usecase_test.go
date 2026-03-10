@@ -84,15 +84,15 @@ func TestIngestUseCase_ProcessJob_Success(t *testing.T) {
 	// 5. Embedding 生成（各チャンクに対して）
 	emb1 := make([]float32, 768)
 	emb2 := make([]float32, 768)
-	llmClient.On("GenerateEmbedding", ctx, "チャンク1のテキスト").Return(emb1, nil)
-	llmClient.On("GenerateEmbedding", ctx, "チャンク2のテキスト").Return(emb2, nil)
+	llmClient.On("GenerateDocumentEmbedding", ctx, "チャンク1のテキスト").Return(emb1, nil)
+	llmClient.On("GenerateDocumentEmbedding", ctx, "チャンク2のテキスト").Return(emb2, nil)
 
 	// 6. DB バルク保存
 	chunks.On("BatchCreate", ctx, mock.Anything).Return(nil)
 
 	// 7. FileStatus → ready
-	files.On("UpdateStatus", ctx, fileID, domain.FileStatusReady, (*string)(nil)).
-		Return(testhelper.NewFile(domain.FileStatusReady), nil)
+	files.On("UpdateStatus", ctx, fileID, domain.FileStatusCompleted, (*string)(nil)).
+		Return(testhelper.NewFile(domain.FileStatusCompleted), nil)
 
 	// 7. IngestJob → completed
 	jobs.On("UpdateStatus", ctx, jobID, domain.JobStatusCompleted, (*string)(nil)).
@@ -266,7 +266,7 @@ func TestIngestUseCase_ProcessJob_AllEmbeddingsFail(t *testing.T) {
 
 	// Embedding が全チャンクで失敗
 	embErr := errors.New("embedding API timeout")
-	llmClient.On("GenerateEmbedding", ctx, "チャンクA").Return(([]float32)(nil), embErr)
+	llmClient.On("GenerateDocumentEmbedding", ctx, "チャンクA").Return(([]float32)(nil), embErr)
 
 	// defer: job → failed, file → failed
 	jobs.On("UpdateStatus", ctx, jobID, domain.JobStatusFailed, mock.Anything).
@@ -311,7 +311,7 @@ func TestIngestUseCase_ProcessJob_BatchCreateFails(t *testing.T) {
 		},
 	}
 	llmClient.On("OCRAndChunk", ctx, fakePDFContent, msg.MimeType).Return(ocrResult, nil)
-	llmClient.On("GenerateEmbedding", ctx, "チャンクX").Return(make([]float32, 768), nil)
+	llmClient.On("GenerateDocumentEmbedding", ctx, "チャンクX").Return(make([]float32, 768), nil)
 
 	// DB バルク保存が失敗
 	dbErr := errors.New("db write error")

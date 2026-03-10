@@ -10,10 +10,12 @@ import (
 type FileStatus string
 
 const (
-	FileStatusPending    FileStatus = "pending"    // アップロード受付済み・OCR待ち
-	FileStatusProcessing FileStatus = "processing" // OCR/Embedding 処理中
-	FileStatusReady      FileStatus = "ready"      // 検索可能な状態
-	FileStatusFailed     FileStatus = "failed"     // 処理失敗
+	FileStatusUploading  FileStatus = "uploading"
+	FileStatusUploaded   FileStatus = "uploaded"
+	FileStatusProcessing FileStatus = "processing"
+	FileStatusCompleted  FileStatus = "completed"
+	FileStatusFailed     FileStatus = "failed"
+	FileStatusArchived   FileStatus = "archived"
 )
 
 // File はアップロードファイルエンティティ
@@ -29,5 +31,5 @@ type File struct {
 	Status       FileStatus
 	ErrorMessage *string // status=failed 時のエラー詳細
 	UploadedAt   time.Time
-	ProcessedAt  *time.Time // status=ready になった時刻
+	ProcessedAt  *time.Time // status=completed になった時刻
 }

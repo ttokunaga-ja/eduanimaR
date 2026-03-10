@@ -5,9 +5,12 @@ import "io"
 
 // QueryResult は RAG バックエンドからのクエリ結果。
 type QueryResult struct {
-	Answer    string
-	LatencyMS int
-	Sources   []Source
+	Answer      string
+	LatencyMS   int
+	Sources     []Source
+	LoopCount   int
+	LibrarianMS int
+	AnswerGenMS int
 }
 
 // Source はクエリ結果に含まれるソース参照。

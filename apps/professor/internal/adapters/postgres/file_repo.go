@@ -30,12 +30,12 @@ func (r *fileRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.File, err
 		}
 		return nil, err
 	}
-	return toFileDomain(row), nil
+	return toFileDomainFromGet(row), nil
 }
 
 func (r *fileRepo) GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID) (*domain.File, error) {
 	row, err := r.q.GetFileByIDAndUserID(ctx, sqlcgen.GetFileByIDAndUserIDParams{
-		FileID: id,
+		ID:     id,
 		UserID: userID,
 	})
 	if err != nil {
@@ -44,7 +44,7 @@ func (r *fileRepo) GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID) (
 		}
 		return nil, err
 	}
-	return toFileDomain(row), nil
+	return toFileDomainFromGetByUser(row), nil
 }
 
 func (r *fileRepo) ListBySubjectID(ctx context.Context, subjectID uuid.UUID) ([]*domain.File, error) {
@@ -54,7 +54,7 @@ func (r *fileRepo) ListBySubjectID(ctx context.Context, subjectID uuid.UUID) ([]
 	}
 	out := make([]*domain.File, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toFileDomain(row))
+		out = append(out, toFileDomainFromList(row))
 	}
 	return out, nil
 }
@@ -66,7 +66,7 @@ func (r *fileRepo) Create(ctx context.Context, f *domain.File) error {
 		UserID:      f.UserID,
 		Name:        f.Name,
 		StoragePath: f.StoragePath,
-		MimeType:    f.MimeType,
+		MimeType:    sql.NullString{String: f.MimeType, Valid: f.MimeType != ""},
 		SizeBytes:   f.SizeBytes,
 		Status:      sqlcgen.FileStatus(f.Status),
 	})
@@ -78,14 +78,9 @@ func (r *fileRepo) Create(ctx context.Context, f *domain.File) error {
 }
 
 func (r *fileRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.FileStatus, errMsg *string) (*domain.File, error) {
-	ns := sql.NullString{}
-	if errMsg != nil {
-		ns = sql.NullString{String: *errMsg, Valid: true}
-	}
 	row, err := r.q.UpdateFileStatus(ctx, sqlcgen.UpdateFileStatusParams{
-		FileID:       id,
-		Status:       sqlcgen.FileStatus(status),
-		ErrorMessage: ns,
+		FileID: id,
+		Status: sqlcgen.FileStatus(status),
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -93,7 +88,7 @@ func (r *fileRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status domain
 		}
 		return nil, err
 	}
-	return toFileDomain(row), nil
+	return toFileDomainFromUpdate(row), nil
 }
 
 func (r *fileRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
@@ -103,25 +98,52 @@ func (r *fileRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
 	})
 }
 
-func toFileDomain(row sqlcgen.File) *domain.File {
+func toFileDomainCore(
+	fileID, subjectID, userID uuid.UUID,
+	name, storagePath string,
+	mimeType sql.NullString,
+	sizeBytes int64,
+	status sqlcgen.FileStatus,
+	errorMessage sql.NullString,
+	uploadedAt time.Time,
+	processedAt sql.NullTime,
+) *domain.File {
 	f := &domain.File{
-		ID:          row.FileID,
-		SubjectID:   row.SubjectID,
-		UserID:      row.UserID,
-		Name:        row.Name,
-		StoragePath: row.StoragePath,
-		MimeType:    row.MimeType,
-		SizeBytes:   row.SizeBytes,
-		Status:      domain.FileStatus(row.Status),
-		UploadedAt:  row.UploadedAt,
+		ID:          fileID,
+		SubjectID:   subjectID,
+		UserID:      userID,
+		Name:        name,
+		StoragePath: storagePath,
+		SizeBytes:   sizeBytes,
+		Status:      domain.FileStatus(status),
+		UploadedAt:  uploadedAt,
 	}
-	if row.ErrorMessage.Valid {
-		f.ErrorMessage = &row.ErrorMessage.String
+	if mimeType.Valid {
+		f.MimeType = mimeType.String
 	}
-	if row.ProcessedAt.Valid {
-		t := row.ProcessedAt.Time
+	if errorMessage.Valid {
+		f.ErrorMessage = &errorMessage.String
+	}
+	if processedAt.Valid {
+		t := processedAt.Time
 		f.ProcessedAt = &t
 	}
 	_ = time.Time{} // suppress unused import if needed
 	return f
+}
+
+func toFileDomainFromGet(row sqlcgen.GetFileByIDRow) *domain.File {
+	return toFileDomainCore(row.FileID, row.SubjectID, row.UserID, row.Name, row.StoragePath, row.MimeType, row.SizeBytes, row.Status, row.ErrorMessage, row.UploadedAt, row.ProcessedAt)
+}
+
+func toFileDomainFromGetByUser(row sqlcgen.GetFileByIDAndUserIDRow) *domain.File {
+	return toFileDomainCore(row.FileID, row.SubjectID, row.UserID, row.Name, row.StoragePath, row.MimeType, row.SizeBytes, row.Status, row.ErrorMessage, row.UploadedAt, row.ProcessedAt)
+}
+
+func toFileDomainFromList(row sqlcgen.ListFilesBySubjectIDRow) *domain.File {
+	return toFileDomainCore(row.FileID, row.SubjectID, row.UserID, row.Name, row.StoragePath, row.MimeType, row.SizeBytes, row.Status, row.ErrorMessage, row.UploadedAt, row.ProcessedAt)
+}
+
+func toFileDomainFromUpdate(row sqlcgen.UpdateFileStatusRow) *domain.File {
+	return toFileDomainCore(row.FileID, row.SubjectID, row.UserID, row.Name, row.StoragePath, row.MimeType, row.SizeBytes, row.Status, row.ErrorMessage, row.UploadedAt, row.ProcessedAt)
 }

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultMaxLoops   = 3
+	defaultMaxLoops   = 4
 	defaultMaxResults = 10
 	defaultTimeoutMs  = 30000
 )
@@ -55,8 +55,12 @@ func (c *librarianClient) Think(
 	userQuery string,
 	subjectID uuid.UUID,
 	userID uuid.UUID,
+	maxLoops int32,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
+	if maxLoops <= 0 {
+		maxLoops = defaultMaxLoops
+	}
 
 	stream, err := c.client.Think(ctx)
 	if err != nil {
@@ -69,7 +73,7 @@ func (c *librarianClient) Think(
 		UserQuery: userQuery,
 		SubjectId: subjectID.String(),
 		Constraints: &librarianv1.Constraints{
-			MaxLoops:   defaultMaxLoops,
+			MaxLoops:   maxLoops,
 			MaxResults: defaultMaxResults,
 			TimeoutMs:  defaultTimeoutMs,
 		},

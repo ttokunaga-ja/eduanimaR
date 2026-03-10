@@ -41,5 +41,5 @@ type LLMClient interface {
 	// 回答をストリーミング生成する。Gemini に PDF を直接渡すことで原本を参照した
 	// 高精度な回答を実現する（テキスト抽出のみでは失われる表・図・数式も参照可能）。
 	// pdfContent が nil または空の場合は GenerateAnswerStream と同じ動作をする。
-	GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, onChunk func(text string) error) error
+	GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, modelOverride string, thinkingLevel string, onChunk func(text string) error) error
 }

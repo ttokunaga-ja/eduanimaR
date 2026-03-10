@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	pgvector "github.com/pgvector/pgvector-go"
@@ -18,6 +19,7 @@ import (
 const (
 	chatSearchLimit   = 10 // 1クエリあたりの最大検索結果数
 	fallbackEvidenceN = 5  // Librarian がエビデンスを返さない場合のフォールバック件数
+	unanswerableTopN  = 10 // 回答不能時に返す収集ソース件数
 	excerptMaxLen     = 300
 	rrfK              = 60 // RRF 定数（標準値: 60）
 )
@@ -71,6 +73,16 @@ type ChatUseCase struct {
 	librarian     ports.LibrarianClient
 }
 
+// AskOptions は質問応答の実行オプション。
+type AskOptions struct {
+	// MaxLoops は Librarian 検索ループ上限。0 以下はデフォルト値を使用。
+	MaxLoops int32
+	// AnswerModelOverride は回答生成モデルの上書き名。空文字はデフォルト。
+	AnswerModelOverride string
+	// AnswerThinkingLevel は回答生成時の thinking_level（minimal/low/medium/high）。
+	AnswerThinkingLevel string
+}
+
 // NewChatUseCase は ChatUseCase を生成する。
 func NewChatUseCase(
 	subjectRepo ports.SubjectRepository,
@@ -113,6 +125,17 @@ func (uc *ChatUseCase) Ask(
 	question string,
 	onEvent func(eventType domain.SSEEventType, data any) error,
 ) (*domain.QASession, error) {
+	return uc.AskWithOptions(ctx, subjectID, userID, question, AskOptions{}, onEvent)
+}
+
+// AskWithOptions は Ask の拡張版で、品質レベルに応じたループ回数とモデル切替を受け付ける。
+func (uc *ChatUseCase) AskWithOptions(
+	ctx context.Context,
+	subjectID, userID uuid.UUID,
+	question string,
+	opts AskOptions,
+	onEvent func(eventType domain.SSEEventType, data any) error,
+) (*domain.QASession, error) {
 	// 1. subject 所有権確認
 	if _, err := uc.subjectRepo.GetByIDAndUserID(ctx, subjectID, userID); err != nil {
 		return nil, fmt.Errorf("get subject: %w", err)
@@ -141,15 +164,19 @@ func (uc *ChatUseCase) Ask(
 	// 累積検索結果（Librarian の TempIndex はこの配列のインデックスを指す）
 	var allResults []domain.SearchResult
 	seenChunks := make(map[uuid.UUID]struct{})
+	searchRounds := 0
 
 	// 4. Librarian Think（双方向ストリーミング）
+	librarianStarted := time.Now()
 	thinkResult, err := uc.librarian.Think(
 		ctx,
 		session.ID.String(),
 		question,
 		subjectID,
 		userID,
+		opts.MaxLoops,
 		func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error) {
+			searchRounds++
 			// 検索開始通知
 			if evErr := onEvent(domain.SSEEventSearching, map[string]any{
 				"queries_text":   req.QueriesText,
@@ -250,6 +277,7 @@ func (uc *ChatUseCase) Ask(
 			return &ports.LibrarianSearchResponse{Results: allResults}, nil
 		},
 	)
+	librarianMS := int(time.Since(librarianStarted).Milliseconds())
 	if err != nil {
 		_ = onEvent(domain.SSEEventError, map[string]any{"message": err.Error()})
 		return nil, fmt.Errorf("librarian think: %w", err)
@@ -286,7 +314,9 @@ func (uc *ChatUseCase) Ask(
 
 		_ = onEvent(domain.SSEEventEvidence, map[string]any{
 			"chunk_id":     r.ChunkID.String(),
+			"file_id":      r.FileID.String(),
 			"file_name":    r.FileName,
+			"page_number":  r.PageNumber,
 			"why_relevant": ev.WhyRelevant,
 			"excerpt":      excerpt,
 		})
@@ -341,10 +371,12 @@ func (uc *ChatUseCase) Ask(
 	}
 
 	var answerBuf strings.Builder
-	streamErr := uc.llm.GenerateAnswerStreamWithPDF(ctx, question, evidenceTexts, pdfContent, pdfMimeType, func(text string) error {
+	answerGenStarted := time.Now()
+	streamErr := uc.llm.GenerateAnswerStreamWithPDF(ctx, question, evidenceTexts, pdfContent, pdfMimeType, opts.AnswerModelOverride, opts.AnswerThinkingLevel, func(text string) error {
 		answerBuf.WriteString(text)
 		return onEvent(domain.SSEEventAnswer, map[string]any{"text": text})
 	})
+	answerGenMS := int(time.Since(answerGenStarted).Milliseconds())
 	if streamErr != nil {
 		_ = onEvent(domain.SSEEventError, map[string]any{"message": streamErr.Error()})
 		return nil, fmt.Errorf("generate answer stream with pdf: %w", streamErr)
@@ -363,9 +395,31 @@ func (uc *ChatUseCase) Ask(
 	}
 
 	// 8. 完了通知
-	_ = onEvent(domain.SSEEventDone, map[string]any{
-		"session_id": session.ID.String(),
-	})
+	isUnanswerable := len(evidenceTexts) == 0 || thinkResult.ErrorType != ""
+	answerability := "answerable"
+	if isUnanswerable {
+		answerability = "unanswerable"
+	}
+	donePayload := map[string]any{
+		"session_id":      session.ID.String(),
+		"coverage_notes":  thinkResult.CoverageNotes,
+		"is_partial":      thinkResult.IsPartial,
+		"error_type":      thinkResult.ErrorType,
+		"evidence_count":  len(evidenceTexts),
+		"is_unanswerable": isUnanswerable,
+		"answerability":   answerability,
+		"loop_count":      searchRounds,
+		"librarian_ms":    librarianMS,
+		"answer_gen_ms":   answerGenMS,
+	}
+	if isUnanswerable {
+		donePayload["unanswerable_reason"] = summarizeUnanswerableReason(thinkResult.CoverageNotes, thinkResult.ErrorType)
+		collected := buildCollectedSources(allResults, unanswerableTopN)
+		if len(collected) > 0 {
+			donePayload["collected_sources"] = collected
+		}
+	}
+	_ = onEvent(domain.SSEEventDone, donePayload)
 
 	return session, nil
 }
@@ -402,4 +456,42 @@ func (uc *ChatUseCase) UpdateFeedback(
 	feedback int,
 ) (*domain.QASession, error) {
 	return uc.qaSessionRepo.UpdateFeedback(ctx, sessionID, userID, feedback)
+}
+
+func summarizeUnanswerableReason(coverageNotes, errorType string) string {
+	if strings.TrimSpace(errorType) != "" {
+		return strings.TrimSpace(errorType)
+	}
+	if strings.TrimSpace(coverageNotes) != "" {
+		return strings.TrimSpace(coverageNotes)
+	}
+	return "insufficient_evidence"
+}
+
+func buildCollectedSources(results []domain.SearchResult, limit int) []map[string]any {
+	if len(results) == 0 || limit <= 0 {
+		return nil
+	}
+	if len(results) < limit {
+		limit = len(results)
+	}
+	out := make([]map[string]any, 0, limit)
+	for i, r := range results[:limit] {
+		excerpt := r.Content
+		if len([]rune(excerpt)) > excerptMaxLen {
+			runes := []rune(excerpt)
+			excerpt = string(runes[:excerptMaxLen])
+		}
+		item := map[string]any{
+			"file_id":      r.FileID.String(),
+			"file_name":    r.FileName,
+			"excerpt":      excerpt,
+			"why_relevant": fmt.Sprintf("retrieved candidate #%d", i+1),
+		}
+		if r.PageNumber != nil {
+			item["page_number"] = *r.PageNumber
+		}
+		out = append(out, item)
+	}
+	return out
 }

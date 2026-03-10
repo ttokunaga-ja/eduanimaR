@@ -3,7 +3,9 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -69,7 +71,7 @@ type openaiFileObject struct {
 // toOpenAIStatus は domain.FileStatus を OpenAI Files API 互換のステータス文字列に変換する。
 func toOpenAIStatus(s domain.FileStatus) string {
 	switch s {
-	case domain.FileStatusReady:
+	case domain.FileStatusCompleted:
 		return "processed"
 	case domain.FileStatusFailed:
 		return "error"
@@ -179,6 +181,11 @@ func (h *OpenAIFilesHandler) Upload(c *echo.Context) error {
 	}
 
 	mimeType := fh.Header.Get("Content-Type")
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		if inferred := mime.TypeByExtension(strings.ToLower(filepath.Ext(fh.Filename))); inferred != "" {
+			mimeType = inferred
+		}
+	}
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}

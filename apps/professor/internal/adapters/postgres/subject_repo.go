@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -29,7 +30,7 @@ func (r *subjectRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]*do
 	}
 	out := make([]*domain.Subject, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toSubjectDomain(row))
+		out = append(out, toSubjectDomainFromList(row))
 	}
 	return out, nil
 }
@@ -42,13 +43,13 @@ func (r *subjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Subjec
 		}
 		return nil, err
 	}
-	return toSubjectDomain(row), nil
+	return toSubjectDomainFromGet(row), nil
 }
 
 func (r *subjectRepo) GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID) (*domain.Subject, error) {
 	row, err := r.q.GetSubjectByIDAndUserID(ctx, sqlcgen.GetSubjectByIDAndUserIDParams{
-		SubjectID: id,
-		UserID:    userID,
+		ID:          id,
+		OwnerUserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -56,7 +57,7 @@ func (r *subjectRepo) GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID
 		}
 		return nil, err
 	}
-	return toSubjectDomain(row), nil
+	return toSubjectDomainFromGetByUser(row), nil
 }
 
 func (r *subjectRepo) Create(ctx context.Context, s *domain.Subject) error {
@@ -80,9 +81,9 @@ func (r *subjectRepo) Create(ctx context.Context, s *domain.Subject) error {
 
 func (r *subjectRepo) UpdateName(ctx context.Context, id, userID uuid.UUID, name string) (*domain.Subject, error) {
 	row, err := r.q.UpdateSubjectName(ctx, sqlcgen.UpdateSubjectNameParams{
+		Name:      name,
 		SubjectID: id,
 		UserID:    userID,
-		Name:      name,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -90,7 +91,7 @@ func (r *subjectRepo) UpdateName(ctx context.Context, id, userID uuid.UUID, name
 		}
 		return nil, err
 	}
-	return toSubjectDomain(row), nil
+	return toSubjectDomainFromUpdate(row), nil
 }
 
 func (r *subjectRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
@@ -100,16 +101,32 @@ func (r *subjectRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
 	})
 }
 
-func toSubjectDomain(row sqlcgen.Subject) *domain.Subject {
+func toSubjectDomainCore(subjectID, userID uuid.UUID, name string, lmsCourseID sql.NullString, createdAt, updatedAt time.Time) *domain.Subject {
 	s := &domain.Subject{
-		ID:        row.SubjectID,
-		UserID:    row.UserID,
-		Name:      row.Name,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:        subjectID,
+		UserID:    userID,
+		Name:      name,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
 	}
-	if row.LmsCourseID.Valid {
-		s.LMSCourseID = &row.LmsCourseID.String
+	if lmsCourseID.Valid {
+		s.LMSCourseID = &lmsCourseID.String
 	}
 	return s
+}
+
+func toSubjectDomainFromList(row sqlcgen.ListSubjectsByUserIDRow) *domain.Subject {
+	return toSubjectDomainCore(row.SubjectID, row.UserID, row.Name, row.LmsCourseID, row.CreatedAt, row.UpdatedAt)
+}
+
+func toSubjectDomainFromGet(row sqlcgen.GetSubjectByIDRow) *domain.Subject {
+	return toSubjectDomainCore(row.SubjectID, row.UserID, row.Name, row.LmsCourseID, row.CreatedAt, row.UpdatedAt)
+}
+
+func toSubjectDomainFromGetByUser(row sqlcgen.GetSubjectByIDAndUserIDRow) *domain.Subject {
+	return toSubjectDomainCore(row.SubjectID, row.UserID, row.Name, row.LmsCourseID, row.CreatedAt, row.UpdatedAt)
+}
+
+func toSubjectDomainFromUpdate(row sqlcgen.UpdateSubjectNameRow) *domain.Subject {
+	return toSubjectDomainCore(row.SubjectID, row.UserID, row.Name, row.LmsCourseID, row.CreatedAt, row.UpdatedAt)
 }

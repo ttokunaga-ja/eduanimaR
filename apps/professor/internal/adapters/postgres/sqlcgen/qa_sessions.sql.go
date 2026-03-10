@@ -8,16 +8,18 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
 )
 
 const countQASessionsBySubjectID = `-- name: CountQASessionsBySubjectID :one
 SELECT COUNT(*)
-FROM qa_sessions
+FROM chats
 WHERE subject_id = $1
-  AND user_id    = $2
+  AND user_id = $2
+  AND is_active = TRUE
 `
 
 type CountQASessionsBySubjectIDParams struct {
@@ -34,27 +36,48 @@ func (q *Queries) CountQASessionsBySubjectID(ctx context.Context, arg CountQASes
 
 const createQASession = `-- name: CreateQASession :one
 
-INSERT INTO qa_sessions (session_id, user_id, subject_id, question)
+INSERT INTO chats (id, user_id, subject_id, question)
 VALUES ($1, $2, $3, $4)
-RETURNING session_id, user_id, subject_id, question, answer, sources, feedback, created_at, answered_at
+RETURNING
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
 `
 
 type CreateQASessionParams struct {
-	SessionID uuid.UUID `json:"session_id"`
+	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
 	SubjectID uuid.UUID `json:"subject_id"`
 	Question  string    `json:"question"`
 }
 
+type CreateQASessionRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
 // sql/queries/qa_sessions.sql
-func (q *Queries) CreateQASession(ctx context.Context, arg CreateQASessionParams) (QaSession, error) {
+func (q *Queries) CreateQASession(ctx context.Context, arg CreateQASessionParams) (CreateQASessionRow, error) {
 	row := q.db.QueryRowContext(ctx, createQASession,
-		arg.SessionID,
+		arg.ID,
 		arg.UserID,
 		arg.SubjectID,
 		arg.Question,
 	)
-	var i QaSession
+	var i CreateQASessionRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.UserID,
@@ -70,14 +93,36 @@ func (q *Queries) CreateQASession(ctx context.Context, arg CreateQASessionParams
 }
 
 const getQASessionByID = `-- name: GetQASessionByID :one
-SELECT session_id, user_id, subject_id, question, answer, sources, feedback, created_at, answered_at
-FROM qa_sessions
-WHERE session_id = $1
+SELECT
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
+FROM chats
+WHERE id = $1
+  AND is_active = TRUE
 `
 
-func (q *Queries) GetQASessionByID(ctx context.Context, sessionID uuid.UUID) (QaSession, error) {
-	row := q.db.QueryRowContext(ctx, getQASessionByID, sessionID)
-	var i QaSession
+type GetQASessionByIDRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
+func (q *Queries) GetQASessionByID(ctx context.Context, id uuid.UUID) (GetQASessionByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getQASessionByID, id)
+	var i GetQASessionByIDRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.UserID,
@@ -93,20 +138,42 @@ func (q *Queries) GetQASessionByID(ctx context.Context, sessionID uuid.UUID) (Qa
 }
 
 const getQASessionByIDAndUserID = `-- name: GetQASessionByIDAndUserID :one
-SELECT session_id, user_id, subject_id, question, answer, sources, feedback, created_at, answered_at
-FROM qa_sessions
-WHERE session_id = $1
-  AND user_id    = $2
+SELECT
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
+FROM chats
+WHERE id = $1
+  AND user_id = $2
+  AND is_active = TRUE
 `
 
 type GetQASessionByIDAndUserIDParams struct {
-	SessionID uuid.UUID `json:"session_id"`
-	UserID    uuid.UUID `json:"user_id"`
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) GetQASessionByIDAndUserID(ctx context.Context, arg GetQASessionByIDAndUserIDParams) (QaSession, error) {
-	row := q.db.QueryRowContext(ctx, getQASessionByIDAndUserID, arg.SessionID, arg.UserID)
-	var i QaSession
+type GetQASessionByIDAndUserIDRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
+func (q *Queries) GetQASessionByIDAndUserID(ctx context.Context, arg GetQASessionByIDAndUserIDParams) (GetQASessionByIDAndUserIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getQASessionByIDAndUserID, arg.ID, arg.UserID)
+	var i GetQASessionByIDAndUserIDRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.UserID,
@@ -123,14 +190,21 @@ func (q *Queries) GetQASessionByIDAndUserID(ctx context.Context, arg GetQASessio
 
 const listQASessionsBySubjectID = `-- name: ListQASessionsBySubjectID :many
 SELECT
-    session_id, user_id, subject_id,
-    question, answer, sources, feedback,
-    created_at, answered_at
-FROM qa_sessions
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
+FROM chats
 WHERE subject_id = $1
-  AND user_id    = $2
+  AND user_id = $2
+  AND is_active = TRUE
 ORDER BY created_at DESC
-LIMIT  $3
+LIMIT $3
 OFFSET $4
 `
 
@@ -141,7 +215,19 @@ type ListQASessionsBySubjectIDParams struct {
 	Offset    int32     `json:"offset"`
 }
 
-func (q *Queries) ListQASessionsBySubjectID(ctx context.Context, arg ListQASessionsBySubjectIDParams) ([]QaSession, error) {
+type ListQASessionsBySubjectIDRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
+func (q *Queries) ListQASessionsBySubjectID(ctx context.Context, arg ListQASessionsBySubjectIDParams) ([]ListQASessionsBySubjectIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, listQASessionsBySubjectID,
 		arg.SubjectID,
 		arg.UserID,
@@ -152,9 +238,9 @@ func (q *Queries) ListQASessionsBySubjectID(ctx context.Context, arg ListQASessi
 		return nil, err
 	}
 	defer rows.Close()
-	var items []QaSession
+	var items []ListQASessionsBySubjectIDRow
 	for rows.Next() {
-		var i QaSession
+		var i ListQASessionsBySubjectIDRow
 		if err := rows.Scan(
 			&i.SessionID,
 			&i.UserID,
@@ -180,24 +266,47 @@ func (q *Queries) ListQASessionsBySubjectID(ctx context.Context, arg ListQASessi
 }
 
 const updateQASessionAnswer = `-- name: UpdateQASessionAnswer :one
-UPDATE qa_sessions
+UPDATE chats
 SET
-    answer      = $2,
-    sources     = $3,
-    answered_at = NOW()
-WHERE session_id = $1
-RETURNING session_id, user_id, subject_id, question, answer, sources, feedback, created_at, answered_at
+  final_answer_markdown = $2,
+  evidence_snippets = $3,
+  completed_at = NOW(),
+  updated_at = NOW()
+WHERE id = $1
+  AND is_active = TRUE
+RETURNING
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
 `
 
 type UpdateQASessionAnswerParams struct {
-	SessionID uuid.UUID             `json:"session_id"`
-	Answer    sql.NullString        `json:"answer"`
-	Sources   pqtype.NullRawMessage `json:"sources"`
+	ID                  uuid.UUID             `json:"id"`
+	FinalAnswerMarkdown sql.NullString        `json:"final_answer_markdown"`
+	EvidenceSnippets    pqtype.NullRawMessage `json:"evidence_snippets"`
 }
 
-func (q *Queries) UpdateQASessionAnswer(ctx context.Context, arg UpdateQASessionAnswerParams) (QaSession, error) {
-	row := q.db.QueryRowContext(ctx, updateQASessionAnswer, arg.SessionID, arg.Answer, arg.Sources)
-	var i QaSession
+type UpdateQASessionAnswerRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
+func (q *Queries) UpdateQASessionAnswer(ctx context.Context, arg UpdateQASessionAnswerParams) (UpdateQASessionAnswerRow, error) {
+	row := q.db.QueryRowContext(ctx, updateQASessionAnswer, arg.ID, arg.FinalAnswerMarkdown, arg.EvidenceSnippets)
+	var i UpdateQASessionAnswerRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.UserID,
@@ -213,22 +322,51 @@ func (q *Queries) UpdateQASessionAnswer(ctx context.Context, arg UpdateQASession
 }
 
 const updateQASessionFeedback = `-- name: UpdateQASessionFeedback :one
-UPDATE qa_sessions
-SET feedback = $2
-WHERE session_id = $1
-  AND user_id    = $3
-RETURNING session_id, user_id, subject_id, question, answer, sources, feedback, created_at, answered_at
+UPDATE chats
+SET
+  feedback = CASE
+    WHEN $2 = 1 THEN 'good'::chat_feedback
+    WHEN $2 = -1 THEN 'bad'::chat_feedback
+    ELSE feedback
+  END,
+  feedback_at = NOW(),
+  updated_at = NOW()
+WHERE id = $1
+  AND user_id = $3
+  AND is_active = TRUE
+RETURNING
+  id AS session_id,
+  user_id,
+  subject_id,
+  question,
+  final_answer_markdown AS answer,
+  evidence_snippets AS sources,
+  COALESCE(CASE feedback WHEN 'good' THEN 1 WHEN 'bad' THEN -1 END, 0)::smallint AS feedback,
+  created_at,
+  completed_at AS answered_at
 `
 
 type UpdateQASessionFeedbackParams struct {
-	SessionID uuid.UUID     `json:"session_id"`
-	Feedback  sql.NullInt16 `json:"feedback"`
-	UserID    uuid.UUID     `json:"user_id"`
+	ID      uuid.UUID   `json:"id"`
+	Column2 interface{} `json:"column_2"`
+	UserID  uuid.UUID   `json:"user_id"`
 }
 
-func (q *Queries) UpdateQASessionFeedback(ctx context.Context, arg UpdateQASessionFeedbackParams) (QaSession, error) {
-	row := q.db.QueryRowContext(ctx, updateQASessionFeedback, arg.SessionID, arg.Feedback, arg.UserID)
-	var i QaSession
+type UpdateQASessionFeedbackRow struct {
+	SessionID  uuid.UUID             `json:"session_id"`
+	UserID     uuid.UUID             `json:"user_id"`
+	SubjectID  uuid.UUID             `json:"subject_id"`
+	Question   string                `json:"question"`
+	Answer     sql.NullString        `json:"answer"`
+	Sources    pqtype.NullRawMessage `json:"sources"`
+	Feedback   int16                 `json:"feedback"`
+	CreatedAt  time.Time             `json:"created_at"`
+	AnsweredAt sql.NullTime          `json:"answered_at"`
+}
+
+func (q *Queries) UpdateQASessionFeedback(ctx context.Context, arg UpdateQASessionFeedbackParams) (UpdateQASessionFeedbackRow, error) {
+	row := q.db.QueryRowContext(ctx, updateQASessionFeedback, arg.ID, arg.Column2, arg.UserID)
+	var i UpdateQASessionFeedbackRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.UserID,

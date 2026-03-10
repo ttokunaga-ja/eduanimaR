@@ -8,33 +8,57 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 const createIngestJob = `-- name: CreateIngestJob :one
 
-INSERT INTO ingest_jobs (job_id, file_id, status, max_retries)
-VALUES ($1, $2, $3, $4)
-RETURNING job_id, file_id, status, retry_count, max_retries, error_message, created_at, started_at, completed_at
+INSERT INTO jobs (id, target_raw_file_id, status, max_retries, idempotency_key, job_type)
+VALUES ($1, $2, $3, $4, $5, 'file_ingestion')
+RETURNING
+  id AS job_id,
+  target_raw_file_id AS file_id,
+  status,
+  retry_count,
+  max_retries,
+  error_message,
+  created_at,
+  started_at,
+  completed_at
 `
 
 type CreateIngestJobParams struct {
-	JobID      uuid.UUID `json:"job_id"`
-	FileID     uuid.UUID `json:"file_id"`
-	Status     JobStatus `json:"status"`
-	MaxRetries int32     `json:"max_retries"`
+	ID              uuid.UUID     `json:"id"`
+	TargetRawFileID uuid.NullUUID `json:"target_raw_file_id"`
+	Status          JobStatus     `json:"status"`
+	MaxRetries      int32         `json:"max_retries"`
+	IdempotencyKey  string        `json:"idempotency_key"`
+}
+
+type CreateIngestJobRow struct {
+	JobID        uuid.UUID      `json:"job_id"`
+	FileID       uuid.NullUUID  `json:"file_id"`
+	Status       JobStatus      `json:"status"`
+	RetryCount   int32          `json:"retry_count"`
+	MaxRetries   int32          `json:"max_retries"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    sql.NullTime   `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
 }
 
 // sql/queries/ingest_jobs.sql
-func (q *Queries) CreateIngestJob(ctx context.Context, arg CreateIngestJobParams) (IngestJob, error) {
+func (q *Queries) CreateIngestJob(ctx context.Context, arg CreateIngestJobParams) (CreateIngestJobRow, error) {
 	row := q.db.QueryRowContext(ctx, createIngestJob,
-		arg.JobID,
-		arg.FileID,
+		arg.ID,
+		arg.TargetRawFileID,
 		arg.Status,
 		arg.MaxRetries,
+		arg.IdempotencyKey,
 	)
-	var i IngestJob
+	var i CreateIngestJobRow
 	err := row.Scan(
 		&i.JobID,
 		&i.FileID,
@@ -50,17 +74,37 @@ func (q *Queries) CreateIngestJob(ctx context.Context, arg CreateIngestJobParams
 }
 
 const getIngestJobByFileID = `-- name: GetIngestJobByFileID :one
-SELECT job_id, file_id, status, retry_count, max_retries, error_message, created_at, started_at, completed_at
-FROM ingest_jobs
-WHERE file_id = $1
+SELECT
+  id AS job_id,
+  target_raw_file_id AS file_id,
+  status,
+  retry_count,
+  max_retries,
+  error_message,
+  created_at,
+  started_at,
+  completed_at
+FROM jobs
+WHERE target_raw_file_id = $1
 ORDER BY created_at DESC
 LIMIT 1
 `
 
-// 最新の ingest_job を取得（ファイルのステータス確認用）
-func (q *Queries) GetIngestJobByFileID(ctx context.Context, fileID uuid.UUID) (IngestJob, error) {
-	row := q.db.QueryRowContext(ctx, getIngestJobByFileID, fileID)
-	var i IngestJob
+type GetIngestJobByFileIDRow struct {
+	JobID        uuid.UUID      `json:"job_id"`
+	FileID       uuid.NullUUID  `json:"file_id"`
+	Status       JobStatus      `json:"status"`
+	RetryCount   int32          `json:"retry_count"`
+	MaxRetries   int32          `json:"max_retries"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    sql.NullTime   `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
+}
+
+func (q *Queries) GetIngestJobByFileID(ctx context.Context, targetRawFileID uuid.NullUUID) (GetIngestJobByFileIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getIngestJobByFileID, targetRawFileID)
+	var i GetIngestJobByFileIDRow
 	err := row.Scan(
 		&i.JobID,
 		&i.FileID,
@@ -76,14 +120,35 @@ func (q *Queries) GetIngestJobByFileID(ctx context.Context, fileID uuid.UUID) (I
 }
 
 const getIngestJobByID = `-- name: GetIngestJobByID :one
-SELECT job_id, file_id, status, retry_count, max_retries, error_message, created_at, started_at, completed_at
-FROM ingest_jobs
-WHERE job_id = $1
+SELECT
+  id AS job_id,
+  target_raw_file_id AS file_id,
+  status,
+  retry_count,
+  max_retries,
+  error_message,
+  created_at,
+  started_at,
+  completed_at
+FROM jobs
+WHERE id = $1
 `
 
-func (q *Queries) GetIngestJobByID(ctx context.Context, jobID uuid.UUID) (IngestJob, error) {
-	row := q.db.QueryRowContext(ctx, getIngestJobByID, jobID)
-	var i IngestJob
+type GetIngestJobByIDRow struct {
+	JobID        uuid.UUID      `json:"job_id"`
+	FileID       uuid.NullUUID  `json:"file_id"`
+	Status       JobStatus      `json:"status"`
+	RetryCount   int32          `json:"retry_count"`
+	MaxRetries   int32          `json:"max_retries"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    sql.NullTime   `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
+}
+
+func (q *Queries) GetIngestJobByID(ctx context.Context, id uuid.UUID) (GetIngestJobByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getIngestJobByID, id)
+	var i GetIngestJobByIDRow
 	err := row.Scan(
 		&i.JobID,
 		&i.FileID,
@@ -99,35 +164,48 @@ func (q *Queries) GetIngestJobByID(ctx context.Context, jobID uuid.UUID) (Ingest
 }
 
 const updateIngestJobStatus = `-- name: UpdateIngestJobStatus :one
-UPDATE ingest_jobs
+UPDATE jobs
 SET
-    status        = $2,
-    error_message = $3,
-    started_at    = CASE
-                        WHEN $2::job_status = 'processing' THEN NOW()
-                        ELSE started_at
-                    END,
-    completed_at  = CASE
-                        WHEN $2::job_status IN ('completed', 'failed') THEN NOW()
-                        ELSE completed_at
-                    END,
-    retry_count   = CASE
-                        WHEN $2::job_status = 'failed' THEN retry_count + 1
-                        ELSE retry_count
-                    END
-WHERE job_id = $1
-RETURNING job_id, file_id, status, retry_count, max_retries, error_message, created_at, started_at, completed_at
+  status = $2,
+  error_message = $3,
+  started_at = CASE WHEN $2::job_status = 'processing' THEN NOW() ELSE started_at END,
+  completed_at = CASE WHEN $2::job_status IN ('completed', 'failed', 'cancelled') THEN NOW() ELSE completed_at END,
+  retry_count = CASE WHEN $2::job_status = 'failed' THEN retry_count + 1 ELSE retry_count END,
+  updated_at = NOW()
+WHERE id = $1
+RETURNING
+  id AS job_id,
+  target_raw_file_id AS file_id,
+  status,
+  retry_count,
+  max_retries,
+  error_message,
+  created_at,
+  started_at,
+  completed_at
 `
 
 type UpdateIngestJobStatusParams struct {
-	JobID        uuid.UUID      `json:"job_id"`
+	ID           uuid.UUID      `json:"id"`
 	Status       JobStatus      `json:"status"`
 	ErrorMessage sql.NullString `json:"error_message"`
 }
 
-func (q *Queries) UpdateIngestJobStatus(ctx context.Context, arg UpdateIngestJobStatusParams) (IngestJob, error) {
-	row := q.db.QueryRowContext(ctx, updateIngestJobStatus, arg.JobID, arg.Status, arg.ErrorMessage)
-	var i IngestJob
+type UpdateIngestJobStatusRow struct {
+	JobID        uuid.UUID      `json:"job_id"`
+	FileID       uuid.NullUUID  `json:"file_id"`
+	Status       JobStatus      `json:"status"`
+	RetryCount   int32          `json:"retry_count"`
+	MaxRetries   int32          `json:"max_retries"`
+	ErrorMessage sql.NullString `json:"error_message"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    sql.NullTime   `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
+}
+
+func (q *Queries) UpdateIngestJobStatus(ctx context.Context, arg UpdateIngestJobStatusParams) (UpdateIngestJobStatusRow, error) {
+	row := q.db.QueryRowContext(ctx, updateIngestJobStatus, arg.ID, arg.Status, arg.ErrorMessage)
+	var i UpdateIngestJobStatusRow
 	err := row.Scan(
 		&i.JobID,
 		&i.FileID,

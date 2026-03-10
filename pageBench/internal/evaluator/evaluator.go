@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -94,6 +95,7 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 	b := backend.NewAgentBackend(
 		opts.Cfg.Agent.APIBase,
 		opts.Cfg.Agent.APIKey,
+		opts.Cfg.Agent.Model,
 	)
 
 	// Evaluation Preparation state の確認
@@ -199,6 +201,8 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 		var latencyMS int
 		var ragSourcesStr string
 		var fileHit, pageHit int
+		var retrievedFilePages string
+		var refFileFound, refPageFound, refFilePageFound int
 
 		qResult, err := b.Query(collectionID, qa.Question)
 		if err != nil {
@@ -211,15 +215,12 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			fmt.Printf("          回答取得完了 (%d ms) | 文字数: %d\n", latencyMS, len(ragAnswer))
 
 			// ファイル・ページ一致検証（LLM なし）
-			for _, src := range qResult.Sources {
-				if strings.EqualFold(src.Name, qa.RefFile) {
-					fileHit = 1
-					if qa.RefPage != "" && src.Page == qa.RefPage {
-						pageHit = 1
-					}
-				}
-			}
-			fmt.Printf("          file_hit=%d  page_hit=%d\n", fileHit, pageHit)
+			retrievedFilePages, refFileFound, refPageFound, refFilePageFound = evaluateRetrievedSources(qResult.Sources, qa.RefFile, qa.RefPage)
+			fileHit = refFileFound
+			pageHit = refFilePageFound
+			fmt.Printf("          file_hit=%d  page_hit=%d  ref_file_found=%d  ref_page_found=%d  ref_file_page_found=%d\n",
+				fileHit, pageHit, refFileFound, refPageFound, refFilePageFound)
+			fmt.Printf("          retrieved=%s\n", truncate(retrievedFilePages, 220))
 		}
 
 		// rag_refused 検知（unanswerable 専用）
@@ -278,10 +279,17 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			RagSources:         ragSourcesStr,
 			FileHit:            fileHit,
 			PageHit:            pageHit,
+			RetrievedFilePages: retrievedFilePages,
+			RefFileFound:       refFileFound,
+			RefPageFound:       refPageFound,
+			RefFilePageFound:   refFilePageFound,
 			RougeL:             rougeL,
 			ExactMatch:         em,
 			RagRefused:         ragRefused,
 			LatencyMS:          latencyMS,
+			LoopCount:          qResult.LoopCount,
+			LibrarianMS:        qResult.LibrarianMS,
+			AnswerGenMS:        qResult.AnswerGenMS,
 			JudgeAccuracy:      judgeAccuracy,
 			JudgeFaithful:      judgeFaithful,
 			JudgeComplete:      judgeComplete,
@@ -332,10 +340,12 @@ func detectRefusal(answer string) int {
 	lower := strings.ToLower(answer)
 	refusalPhrases := []string{
 		"わかりません", "分かりません",
-		"情報がありません", "情報がない", "記載されていません", "記載がありません",
+		"情報がありません", "情報がない", "記載されていません", "記載がありません", "記載はありません",
+		"掲載されていません", "掲載されておりません", "明記されていません",
+		"確認できません", "ございません", "含まれておりません",
 		"答えられません", "回答できません", "お答えできません",
 		"見つかりません", "見つからない",
-		"提供された文書には", "文書に", "資料に",
+		"提供された文書には", "文書に", "資料に", "ご質問の件については",
 		"not found", "no information", "cannot answer", "don't know", "do not know",
 		"not available", "not mentioned", "not provided",
 	}
@@ -360,4 +370,73 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+type retrievedFilePagesEntry struct {
+	FileName string   `json:"file_name"`
+	Pages    []string `json:"pages,omitempty"`
+}
+
+func evaluateRetrievedSources(sources []backend.Source, refFile, refPage string) (string, int, int, int) {
+	pageSetByFile := make(map[string]map[string]struct{}, len(sources))
+	refFileFound := 0
+	refPageFound := 0
+	refFilePageFound := 0
+
+	refFileNorm := normalizeFileNameForMatch(refFile)
+	refPageNorm := strings.TrimSpace(refPage)
+
+	for _, src := range sources {
+		name := strings.TrimSpace(src.Name)
+		if name == "" {
+			continue
+		}
+		page := strings.TrimSpace(src.Page)
+
+		if _, ok := pageSetByFile[name]; !ok {
+			pageSetByFile[name] = map[string]struct{}{}
+		}
+		if page != "" {
+			pageSetByFile[name][page] = struct{}{}
+		}
+
+		if refFileNorm != "" && normalizeFileNameForMatch(name) == refFileNorm {
+			refFileFound = 1
+			if refPageNorm != "" && page == refPageNorm {
+				refFilePageFound = 1
+			}
+		}
+		if refPageNorm != "" && page == refPageNorm {
+			refPageFound = 1
+		}
+	}
+
+	entries := make([]retrievedFilePagesEntry, 0, len(pageSetByFile))
+	fileNames := make([]string, 0, len(pageSetByFile))
+	for fileName := range pageSetByFile {
+		fileNames = append(fileNames, fileName)
+	}
+	sort.Strings(fileNames)
+
+	for _, fileName := range fileNames {
+		pages := make([]string, 0, len(pageSetByFile[fileName]))
+		for page := range pageSetByFile[fileName] {
+			pages = append(pages, page)
+		}
+		sort.Strings(pages)
+		entries = append(entries, retrievedFilePagesEntry{FileName: fileName, Pages: pages})
+	}
+
+	b, err := json.Marshal(entries)
+	if err != nil {
+		return "[]", refFileFound, refPageFound, refFilePageFound
+	}
+	return string(b), refFileFound, refPageFound, refFilePageFound
+}
+
+func normalizeFileNameForMatch(name string) string {
+	replaced := strings.ReplaceAll(name, "\u3000", " ")
+	trimmed := strings.TrimSpace(replaced)
+	compact := strings.Join(strings.Fields(trimmed), " ")
+	return strings.ToLower(compact)
 }

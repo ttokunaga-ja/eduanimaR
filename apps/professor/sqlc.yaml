@@ -13,10 +13,7 @@ sql:
         emit_all_enum_values: true
         overrides:
           - db_type: "uuid"
-            go_type:
-              import: "github.com/google/uuid"
-              package: "uuid"
-              type: "UUID"
+            go_type: "github.com/google/uuid.UUID"
           - db_type: "vector"
             go_type:
               import: "github.com/pgvector/pgvector-go"

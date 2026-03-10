@@ -8,14 +8,21 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 const createSubject = `-- name: CreateSubject :one
-INSERT INTO subjects (subject_id, user_id, name, lms_course_id)
+INSERT INTO subjects (id, owner_user_id, title, course_code)
 VALUES ($1, $2, $3, $4)
-RETURNING subject_id, user_id, name, lms_course_id, created_at, updated_at
+RETURNING
+  id AS subject_id,
+  owner_user_id AS user_id,
+  title AS name,
+  course_code AS lms_course_id,
+  created_at,
+  updated_at
 `
 
 type CreateSubjectParams struct {
@@ -25,14 +32,23 @@ type CreateSubjectParams struct {
 	LmsCourseID sql.NullString `json:"lms_course_id"`
 }
 
-func (q *Queries) CreateSubject(ctx context.Context, arg CreateSubjectParams) (Subject, error) {
+type CreateSubjectRow struct {
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	LmsCourseID sql.NullString `json:"lms_course_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) CreateSubject(ctx context.Context, arg CreateSubjectParams) (CreateSubjectRow, error) {
 	row := q.db.QueryRowContext(ctx, createSubject,
 		arg.SubjectID,
 		arg.UserID,
 		arg.Name,
 		arg.LmsCourseID,
 	)
-	var i Subject
+	var i CreateSubjectRow
 	err := row.Scan(
 		&i.SubjectID,
 		&i.UserID,
@@ -45,9 +61,13 @@ func (q *Queries) CreateSubject(ctx context.Context, arg CreateSubjectParams) (S
 }
 
 const deleteSubject = `-- name: DeleteSubject :exec
-DELETE FROM subjects
-WHERE subject_id = $1
-  AND user_id    = $2
+UPDATE subjects
+SET is_active = FALSE,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+  AND owner_user_id = $2
+  AND is_active = TRUE
 `
 
 type DeleteSubjectParams struct {
@@ -61,14 +81,30 @@ func (q *Queries) DeleteSubject(ctx context.Context, arg DeleteSubjectParams) er
 }
 
 const getSubjectByID = `-- name: GetSubjectByID :one
-SELECT subject_id, user_id, name, lms_course_id, created_at, updated_at
+SELECT
+  id AS subject_id,
+  owner_user_id AS user_id,
+  title AS name,
+  course_code AS lms_course_id,
+  created_at,
+  updated_at
 FROM subjects
-WHERE subject_id = $1
+WHERE id = $1
+  AND is_active = TRUE
 `
 
-func (q *Queries) GetSubjectByID(ctx context.Context, subjectID uuid.UUID) (Subject, error) {
-	row := q.db.QueryRowContext(ctx, getSubjectByID, subjectID)
-	var i Subject
+type GetSubjectByIDRow struct {
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	LmsCourseID sql.NullString `json:"lms_course_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) GetSubjectByID(ctx context.Context, id uuid.UUID) (GetSubjectByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSubjectByID, id)
+	var i GetSubjectByIDRow
 	err := row.Scan(
 		&i.SubjectID,
 		&i.UserID,
@@ -81,20 +117,36 @@ func (q *Queries) GetSubjectByID(ctx context.Context, subjectID uuid.UUID) (Subj
 }
 
 const getSubjectByIDAndUserID = `-- name: GetSubjectByIDAndUserID :one
-SELECT subject_id, user_id, name, lms_course_id, created_at, updated_at
+SELECT
+  id AS subject_id,
+  owner_user_id AS user_id,
+  title AS name,
+  course_code AS lms_course_id,
+  created_at,
+  updated_at
 FROM subjects
-WHERE subject_id = $1
-  AND user_id    = $2
+WHERE id = $1
+  AND owner_user_id = $2
+  AND is_active = TRUE
 `
 
 type GetSubjectByIDAndUserIDParams struct {
-	SubjectID uuid.UUID `json:"subject_id"`
-	UserID    uuid.UUID `json:"user_id"`
+	ID          uuid.UUID `json:"id"`
+	OwnerUserID uuid.UUID `json:"owner_user_id"`
 }
 
-func (q *Queries) GetSubjectByIDAndUserID(ctx context.Context, arg GetSubjectByIDAndUserIDParams) (Subject, error) {
-	row := q.db.QueryRowContext(ctx, getSubjectByIDAndUserID, arg.SubjectID, arg.UserID)
-	var i Subject
+type GetSubjectByIDAndUserIDRow struct {
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	LmsCourseID sql.NullString `json:"lms_course_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) GetSubjectByIDAndUserID(ctx context.Context, arg GetSubjectByIDAndUserIDParams) (GetSubjectByIDAndUserIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSubjectByIDAndUserID, arg.ID, arg.OwnerUserID)
+	var i GetSubjectByIDAndUserIDRow
 	err := row.Scan(
 		&i.SubjectID,
 		&i.UserID,
@@ -108,22 +160,38 @@ func (q *Queries) GetSubjectByIDAndUserID(ctx context.Context, arg GetSubjectByI
 
 const listSubjectsByUserID = `-- name: ListSubjectsByUserID :many
 
-SELECT subject_id, user_id, name, lms_course_id, created_at, updated_at
+SELECT
+  id AS subject_id,
+  owner_user_id AS user_id,
+  title AS name,
+  course_code AS lms_course_id,
+  created_at,
+  updated_at
 FROM subjects
-WHERE user_id = $1
+WHERE owner_user_id = $1
+  AND is_active = TRUE
 ORDER BY created_at DESC
 `
 
+type ListSubjectsByUserIDRow struct {
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	LmsCourseID sql.NullString `json:"lms_course_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
 // sql/queries/subjects.sql
-func (q *Queries) ListSubjectsByUserID(ctx context.Context, userID uuid.UUID) ([]Subject, error) {
-	rows, err := q.db.QueryContext(ctx, listSubjectsByUserID, userID)
+func (q *Queries) ListSubjectsByUserID(ctx context.Context, ownerUserID uuid.UUID) ([]ListSubjectsByUserIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSubjectsByUserID, ownerUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Subject
+	var items []ListSubjectsByUserIDRow
 	for rows.Next() {
-		var i Subject
+		var i ListSubjectsByUserIDRow
 		if err := rows.Scan(
 			&i.SubjectID,
 			&i.UserID,
@@ -147,22 +215,38 @@ func (q *Queries) ListSubjectsByUserID(ctx context.Context, userID uuid.UUID) ([
 
 const updateSubjectName = `-- name: UpdateSubjectName :one
 UPDATE subjects
-SET name       = $2,
+SET title = $1,
     updated_at = NOW()
-WHERE subject_id = $1
-  AND user_id    = $3
-RETURNING subject_id, user_id, name, lms_course_id, created_at, updated_at
+WHERE id = $2
+  AND owner_user_id = $3
+  AND is_active = TRUE
+RETURNING
+  id AS subject_id,
+  owner_user_id AS user_id,
+  title AS name,
+  course_code AS lms_course_id,
+  created_at,
+  updated_at
 `
 
 type UpdateSubjectNameParams struct {
-	SubjectID uuid.UUID `json:"subject_id"`
 	Name      string    `json:"name"`
+	SubjectID uuid.UUID `json:"subject_id"`
 	UserID    uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) UpdateSubjectName(ctx context.Context, arg UpdateSubjectNameParams) (Subject, error) {
-	row := q.db.QueryRowContext(ctx, updateSubjectName, arg.SubjectID, arg.Name, arg.UserID)
-	var i Subject
+type UpdateSubjectNameRow struct {
+	SubjectID   uuid.UUID      `json:"subject_id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Name        string         `json:"name"`
+	LmsCourseID sql.NullString `json:"lms_course_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) UpdateSubjectName(ctx context.Context, arg UpdateSubjectNameParams) (UpdateSubjectNameRow, error) {
+	row := q.db.QueryRowContext(ctx, updateSubjectName, arg.Name, arg.SubjectID, arg.UserID)
+	var i UpdateSubjectNameRow
 	err := row.Scan(
 		&i.SubjectID,
 		&i.UserID,

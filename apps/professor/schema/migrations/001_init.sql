@@ -1,174 +1,184 @@
 -- ===================================================================
 -- 001_init.sql
--- eduanima-professor Phase 1 初期スキーマ
+-- eduanima-professor pre-release canonical schema (SSOT: DB_SCHEMA_TABLES.md)
 -- 前提: PostgreSQL 18 + pgvector 0.8.1
--- 適用方法: atlas migrate apply --dir "file://schema/migrations" --url $DATABASE_URL
 -- ===================================================================
 
--- ── 拡張機能 ────────────────────────────────────────────────────────
--- pgvector: HNSW インデックス・vector 型・<=> 演算子（コサイン類似度）に必要
--- PG18 でも pgvector は引き続き必要（HNSW / IVFFlat の実装は pgvector が提供）
-CREATE EXTENSION IF NOT EXISTS "vector";      -- pgvector 0.8.1 (pg18 対応)
+CREATE EXTENSION IF NOT EXISTS "vector";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- UUIDv7: PG18 組み込みネイティブ関数 uuidv7() を使用（拡張インストール不要）
--- 時系列ソート可能・B-tree インデックス効率が UUID v4 より優れる
+CREATE OR REPLACE FUNCTION nanoid20() RETURNS TEXT AS $$
+  SELECT substring(translate(encode(gen_random_bytes(20), 'base64'), E'+/=\n', '____') for 20);
+$$ LANGUAGE SQL;
 
--- ── ENUM 型定義 ──────────────────────────────────────────────────────
-CREATE TYPE auth_provider AS ENUM (
-    'google',
-    'meta',
-    'microsoft',
-    'line'
+CREATE TYPE user_role AS ENUM ('student', 'instructor', 'admin');
+
+CREATE TYPE file_type AS ENUM (
+  'pdf', 'text',
+  'python', 'go', 'javascript', 'html', 'css', 'json', 'markdown', 'csv',
+  'png', 'jpeg', 'webp', 'heic', 'heif',
+  'docx', 'xlsx', 'pptx',
+  'google_docs', 'google_sheets', 'google_slides',
+  'other'
 );
 
 CREATE TYPE file_status AS ENUM (
-    'pending',
-    'processing',
-    'ready',
-    'failed'
+  'uploading', 'uploaded', 'processing', 'completed', 'failed', 'archived'
 );
 
-CREATE TYPE job_status AS ENUM (
-    'pending',
-    'processing',
-    'completed',
-    'failed'
+CREATE TYPE job_type AS ENUM (
+  'file_ingestion', 'ai_batch_processing', 'search_optimization', 'maintenance'
 );
 
--- ── users ────────────────────────────────────────────────────────────
--- SSO カラム (provider, provider_user_id) は Phase 1 で NULLABLE として先行定義。
--- Phase 2 (SSO) 移行時に ALTER TABLE 不要。
+CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
+CREATE TYPE search_mode AS ENUM ('keyword', 'vector', 'hybrid');
+CREATE TYPE chat_feedback AS ENUM ('good', 'bad');
+CREATE TYPE gemini_phase AS ENUM ('ingestion', 'planning', 'search', 'answer');
+
 CREATE TABLE users (
-    user_id          UUID         NOT NULL DEFAULT uuidv7(),
-    email            TEXT         NOT NULL,
-    -- Phase 2 で使用（SSOプロバイダー識別）
-    provider         auth_provider         NULL,
-    provider_user_id TEXT                  NULL,
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT users_pkey            PRIMARY KEY (user_id),
-    CONSTRAINT users_email_unique    UNIQUE (email),
-    -- provider が両方 NOT NULL の場合のみ一意制約を適用（NULL同士は除外）
-    CONSTRAINT users_provider_unique UNIQUE NULLS NOT DISTINCT (provider, provider_user_id)
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  nanoid TEXT NOT NULL UNIQUE DEFAULT nanoid20() CHECK (length(nanoid) = 20),
+  provider TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  role user_role NOT NULL DEFAULT 'student',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ,
+  UNIQUE (provider, provider_user_id)
 );
 
--- Phase 1 固定開発ユーザー（X-Dev-User: dev-user-001 ヘッダーに対応）
-INSERT INTO users (user_id, email)
-VALUES ('00000000-0000-0000-0000-000000000001', 'dev@example.com')
+CREATE INDEX idx_users_provider ON users(provider, provider_user_id) WHERE is_active;
+CREATE INDEX idx_users_nanoid ON users(nanoid);
+
+INSERT INTO users (id, nanoid, provider, provider_user_id, role)
+VALUES ('00000000-0000-0000-0000-000000000001', 'devuser0000000000000', 'development', 'dev-user-001', 'student')
 ON CONFLICT DO NOTHING;
 
--- ── subjects ─────────────────────────────────────────────────────────
 CREATE TABLE subjects (
-    subject_id    UUID        NOT NULL DEFAULT uuidv7(),
-    user_id       UUID        NOT NULL,
-    name          TEXT        NOT NULL,
-    lms_course_id TEXT        NULL,    -- 将来の LMS 連携用（Phase 1 未使用）
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT subjects_pkey    PRIMARY KEY (subject_id),
-    CONSTRAINT subjects_user_fk FOREIGN KEY (user_id)
-        REFERENCES users (user_id) ON DELETE CASCADE
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  nanoid TEXT NOT NULL UNIQUE DEFAULT nanoid20() CHECK (length(nanoid) = 20),
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  academic_year TEXT,
+  semester TEXT,
+  course_code TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_subjects_user_id ON subjects (user_id);
+CREATE INDEX idx_subjects_owner ON subjects(owner_user_id) WHERE is_active;
+CREATE INDEX idx_subjects_nanoid ON subjects(nanoid);
+CREATE INDEX idx_subjects_course_code ON subjects(course_code) WHERE is_active;
 
--- ── files ─────────────────────────────────────────────────────────────
--- storage_path: Phase 1 は MinIO パス / Phase 2 は GCS パス
-CREATE TABLE files (
-    file_id       UUID        NOT NULL DEFAULT uuidv7(),
-    subject_id    UUID        NOT NULL,
-    user_id       UUID        NOT NULL,
-    name          TEXT        NOT NULL,
-    storage_path  TEXT        NOT NULL,   -- minio://bucket/path (Phase 1)
-    mime_type     TEXT        NOT NULL,
-    size_bytes    BIGINT      NOT NULL,
-    status        file_status NOT NULL DEFAULT 'pending',
-    error_message TEXT        NULL,
-    uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    processed_at  TIMESTAMPTZ NULL,
-
-    CONSTRAINT files_pkey       PRIMARY KEY (file_id),
-    CONSTRAINT files_subject_fk FOREIGN KEY (subject_id)
-        REFERENCES subjects (subject_id) ON DELETE CASCADE,
-    CONSTRAINT files_user_fk    FOREIGN KEY (user_id)
-        REFERENCES users (user_id) ON DELETE CASCADE
+CREATE TABLE raw_files (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  nanoid TEXT NOT NULL UNIQUE DEFAULT nanoid20() CHECK (length(nanoid) = 20),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  original_filename TEXT NOT NULL,
+  file_type file_type NOT NULL,
+  file_size_bytes BIGINT NOT NULL,
+  source_url TEXT,
+  gcs_bucket TEXT NOT NULL,
+  gcs_object_path TEXT NOT NULL,
+  gcs_signed_url_expires_at TIMESTAMPTZ,
+  status file_status NOT NULL DEFAULT 'uploading',
+  total_pages INTEGER,
+  mime_type TEXT,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ,
+  UNIQUE (gcs_bucket, gcs_object_path)
 );
 
-CREATE INDEX idx_files_subject_id ON files (subject_id);
-CREATE INDEX idx_files_user_id    ON files (user_id);
-CREATE INDEX idx_files_status     ON files (status);
+CREATE INDEX idx_raw_files_subject_user ON raw_files(subject_id, user_id) WHERE is_active;
+CREATE INDEX idx_raw_files_nanoid ON raw_files(nanoid);
+CREATE INDEX idx_raw_files_status ON raw_files(status) WHERE is_active;
+CREATE INDEX idx_raw_files_processed ON raw_files(processed_at DESC) WHERE is_active;
+CREATE INDEX idx_raw_files_source_url ON raw_files(source_url) WHERE source_url IS NOT NULL;
 
--- ── chunks ────────────────────────────────────────────────────────────
--- pgvector HNSW インデックス（コサイン類似度検索）
--- embedding 次元数: 768（Gemini Embedding）
-CREATE TABLE chunks (
-    chunk_id    UUID         NOT NULL DEFAULT uuidv7(),
-    file_id     UUID         NOT NULL,
-    subject_id  UUID         NOT NULL,
-    page_number INT          NULL,     -- PDF ページ番号（画像スライドは NULL）
-    chunk_index INT          NOT NULL, -- ファイル内連番
-    content     TEXT         NOT NULL, -- OCR/抽出テキスト
-    embedding   vector(768)  NOT NULL, -- Gemini Embedding（768次元）
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT chunks_pkey       PRIMARY KEY (chunk_id),
-    CONSTRAINT chunks_file_fk    FOREIGN KEY (file_id)
-        REFERENCES files (file_id) ON DELETE CASCADE,
-    CONSTRAINT chunks_subject_fk FOREIGN KEY (subject_id)
-        REFERENCES subjects (subject_id) ON DELETE CASCADE
+CREATE TABLE materials (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  raw_file_id UUID NOT NULL REFERENCES raw_files(id) ON DELETE CASCADE,
+  sequence_in_file INTEGER NOT NULL,
+  page_start INTEGER,
+  page_end INTEGER,
+  content_markdown TEXT NOT NULL,
+  char_count INTEGER NOT NULL,
+  embedding vector(1536) NOT NULL,
+  embedding_model TEXT NOT NULL DEFAULT 'gemini-embedding-001',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_chunks_file_id    ON chunks (file_id);
-CREATE INDEX idx_chunks_subject_id ON chunks (subject_id);
--- HNSW インデックス（m=16, ef_construction=64 はデフォルト推奨値）
-CREATE INDEX idx_chunks_embedding_hnsw
-    ON chunks USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
+CREATE INDEX idx_materials_file_seq ON materials(raw_file_id, sequence_in_file) WHERE is_active;
+CREATE INDEX idx_materials_content_fts ON materials USING GIN (to_tsvector('english', content_markdown)) WHERE is_active;
+CREATE INDEX idx_materials_embedding_vector ON materials USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64) WHERE is_active;
 
--- ── ingest_jobs ───────────────────────────────────────────────────────
--- Kafka 非同期パイプライン（OCR/Embedding）のジョブ管理テーブル
-CREATE TABLE ingest_jobs (
-    job_id        UUID       NOT NULL DEFAULT uuidv7(),
-    file_id       UUID       NOT NULL,
-    status        job_status NOT NULL DEFAULT 'pending',
-    retry_count   INT        NOT NULL DEFAULT 0,
-    max_retries   INT        NOT NULL DEFAULT 3,
-    error_message TEXT       NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    started_at    TIMESTAMPTZ NULL,
-    completed_at  TIMESTAMPTZ NULL,
-
-    CONSTRAINT ingest_jobs_pkey    PRIMARY KEY (job_id),
-    CONSTRAINT ingest_jobs_file_fk FOREIGN KEY (file_id)
-        REFERENCES files (file_id) ON DELETE CASCADE
+CREATE TABLE chats (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  nanoid TEXT NOT NULL UNIQUE DEFAULT nanoid20() CHECK (length(nanoid) = 20),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  parent_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
+  question TEXT NOT NULL,
+  plan_json JSONB,
+  termination_reason TEXT,
+  final_answer_markdown TEXT,
+  feedback chat_feedback,
+  feedback_at TIMESTAMPTZ,
+  actual_search_steps INTEGER NOT NULL DEFAULT 0,
+  search_step_1_hit_material_ids UUID[],
+  search_step_2_hit_material_ids UUID[],
+  search_step_3_hit_material_ids UUID[],
+  search_step_4_hit_material_ids UUID[],
+  search_step_5_hit_material_ids UUID[],
+  evidence_snippets JSONB,
+  used_raw_file_ids UUID[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_ingest_jobs_status  ON ingest_jobs (status);
-CREATE INDEX idx_ingest_jobs_file_id ON ingest_jobs (file_id);
+CREATE INDEX idx_chats_subject_user ON chats(subject_id, user_id) WHERE is_active;
+CREATE INDEX idx_chats_nanoid ON chats(nanoid);
+CREATE INDEX idx_chats_created ON chats(created_at DESC) WHERE is_active;
+CREATE INDEX idx_chats_feedback ON chats(feedback) WHERE is_active AND feedback IS NOT NULL;
+CREATE INDEX idx_chats_used_raw_files ON chats USING GIN (used_raw_file_ids) WHERE is_active;
+CREATE INDEX idx_chats_evidence_snippets ON chats USING GIN (evidence_snippets);
+CREATE INDEX idx_chats_termination ON chats(termination_reason) WHERE is_active AND termination_reason IS NOT NULL;
+CREATE INDEX idx_chats_parent ON chats(parent_chat_id) WHERE is_active;
 
--- ── qa_sessions ───────────────────────────────────────────────────────
--- Q&A セッション（SSE ストリーミング完了後に answer を永続化）
-CREATE TABLE qa_sessions (
-    session_id  UUID        NOT NULL DEFAULT uuidv7(),
-    user_id     UUID        NOT NULL,
-    subject_id  UUID        NOT NULL,
-    question    TEXT        NOT NULL,
-    answer      TEXT        NULL,    -- SSE 完了後に保存
-    sources     JSONB       NULL,    -- [{file_id, chunk_id, page_number, excerpt}]
-    feedback    SMALLINT    NULL,    -- -1: bad, 1: good (NULL: 未評価)
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    answered_at TIMESTAMPTZ NULL,
-
-    CONSTRAINT qa_sessions_pkey          PRIMARY KEY (session_id),
-    CONSTRAINT qa_sessions_user_fk       FOREIGN KEY (user_id)
-        REFERENCES users (user_id) ON DELETE CASCADE,
-    CONSTRAINT qa_sessions_subject_fk    FOREIGN KEY (subject_id)
-        REFERENCES subjects (subject_id) ON DELETE CASCADE,
-    CONSTRAINT qa_sessions_feedback_chk  CHECK (feedback IS NULL OR feedback IN (-1, 1))
+CREATE TABLE jobs (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  job_type job_type NOT NULL DEFAULT 'file_ingestion',
+  target_raw_file_id UUID REFERENCES raw_files(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  status job_status NOT NULL DEFAULT 'pending',
+  gemini_model TEXT,
+  gemini_phase gemini_phase,
+  error_message TEXT,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  max_retries INTEGER NOT NULL DEFAULT 3,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_qa_sessions_user_id    ON qa_sessions (user_id);
-CREATE INDEX idx_qa_sessions_subject_id ON qa_sessions (subject_id);
-CREATE INDEX idx_qa_sessions_created_at ON qa_sessions (created_at DESC);
+CREATE INDEX idx_jobs_target_file ON jobs(target_raw_file_id);
+CREATE INDEX idx_jobs_status ON jobs(status);
+CREATE INDEX idx_jobs_idempotency ON jobs(idempotency_key);
+CREATE INDEX idx_jobs_created ON jobs(created_at DESC);
+CREATE INDEX idx_jobs_type ON jobs(job_type);

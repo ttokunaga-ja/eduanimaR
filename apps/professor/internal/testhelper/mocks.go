@@ -136,8 +136,8 @@ func (m *MockLLMClient) GenerateAnswerStream(ctx context.Context, question strin
 	args := m.Called(ctx, question, evidences, onChunk)
 	return args.Error(0)
 }
-func (m *MockLLMClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, onChunk func(text string) error) error {
-	args := m.Called(ctx, question, evidences, pdfContent, mimeType, onChunk)
+func (m *MockLLMClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, modelOverride string, thinkingLevel string, onChunk func(text string) error) error {
+	args := m.Called(ctx, question, evidences, pdfContent, mimeType, modelOverride, thinkingLevel, onChunk)
 	return args.Error(0)
 }
 
@@ -151,9 +151,10 @@ func (m *MockLibrarianClient) Think(
 	userQuery string,
 	subjectID uuid.UUID,
 	userID uuid.UUID,
+	maxLoops int32,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
-	args := m.Called(ctx, requestID, userQuery, subjectID, userID, onSearchRequest)
+	args := m.Called(ctx, requestID, userQuery, subjectID, userID, maxLoops, onSearchRequest)
 	v, _ := args.Get(0).(*ports.LibrarianThinkResult)
 	return v, args.Error(1)
 }

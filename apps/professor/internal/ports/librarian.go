@@ -45,6 +45,7 @@ type LibrarianClient interface {
 		userQuery string,
 		subjectID uuid.UUID,
 		userID uuid.UUID,
+		maxLoops int32,
 		onSearchRequest func(req LibrarianSearchRequest) (*LibrarianSearchResponse, error),
 	) (*LibrarianThinkResult, error)
 }

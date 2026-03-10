@@ -144,7 +144,17 @@ func main() {
 	}
 	e.Use(httpmw.RequestLog())
 	e.Use(echomw.Recover())
-	e.Use(echomw.CORS())
+	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+	}))
 
 	// ─── ルーティング ─────────────────────────────────────────
 	// ヘルスチェック (認証不要)

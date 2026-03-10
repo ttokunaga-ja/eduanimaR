@@ -9,10 +9,11 @@ import (
 )
 
 // AgentConfig は Agent システム（RAG バックエンド）の接続設定。
-// モデル指定はエージェント側で固定されているため、エンドポイントと APIキーのみ設定する。
+// OpenAI互換 model フィールドで品質レベル（professor-fast/professor/professor-pro）を指定できる。
 type AgentConfig struct {
 	APIBase string
 	APIKey  string
+	Model   string
 }
 
 // UploadConfig は Evaluation Preparation（RAG インデックス作成）の設定。
@@ -138,6 +139,7 @@ func Load() (*Config, error) {
 		Agent: AgentConfig{
 			APIBase: getEnvDefault("AGENT_API_BASE", ""),
 			APIKey:  os.Getenv("AGENT_API_KEY"),
+			Model:   getEnvDefault("PAGEBENCH_MODEL", "professor"),
 		},
 		Upload: UploadConfig{
 			Purpose:          getEnvDefault("AGENT_UPLOAD_PURPOSE", "assistants"),

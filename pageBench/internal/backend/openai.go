@@ -1,6 +1,6 @@
 // Package backend provides the Agent RAG backend implementation.
-// モデル指定はエージェント側で固定されているため、エンドポイントへの
-// シンプルな HTTP POST のみを行う。
+// OpenAI互換の model フィールドで品質レベルを指定し、
+// エンドポイントへシンプルな HTTP POST を行う。
 package backend
 
 import (
@@ -9,24 +9,31 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // AgentBackend は Agent システム（RAG バックエンド）の実装。
-// OpenAI chat completions 互換形式でリクエストを送信するが、
-// モデル指定は行わない（エージェント側で固定）。
+// OpenAI chat completions 互換形式でリクエストを送信する。
+// model フィールドには professor-fast/professor/professor-pro などを指定できる。
 type AgentBackend struct {
 	apiBase    string
 	apiKey     string
+	model      string
 	httpClient *http.Client
 }
 
 // NewAgentBackend は AgentBackend を構築する。
-func NewAgentBackend(apiBase, apiKey string) *AgentBackend {
+func NewAgentBackend(apiBase, apiKey string, model ...string) *AgentBackend {
+	backendModel := "professor"
+	if len(model) > 0 && strings.TrimSpace(model[0]) != "" {
+		backendModel = strings.TrimSpace(model[0])
+	}
 	return &AgentBackend{
 		apiBase:    strings.TrimRight(apiBase, "/"),
 		apiKey:     apiKey,
+		model:      backendModel,
 		httpClient: &http.Client{Timeout: 180 * time.Second},
 	}
 }
@@ -47,9 +54,10 @@ func (b *AgentBackend) WaitForReady(collectionID string, timeoutSecs int, pollIn
 }
 
 // Query はエージェントエンドポイントに質問を送信して QueryResult を返す。
-// リクエストは OpenAI chat completions 互換形式（model フィールドなし）。
+// リクエストは OpenAI chat completions 互換形式（model フィールドあり）。
 func (b *AgentBackend) Query(collectionID string, question string) (*QueryResult, error) {
 	body, _ := json.Marshal(map[string]any{
+		"model": b.model,
 		"messages": []map[string]string{
 			{"role": "user", "content": question},
 		},
@@ -90,24 +98,58 @@ func (b *AgentBackend) Query(collectionID string, question string) (*QueryResult
 	msg, _ := choices[0].(map[string]any)["message"].(map[string]any)
 	answer, _ := msg["content"].(string)
 
-	// sources: レスポンスに含まれる場合は抽出（エージェント実装依存）
+	// sources: 互換のため legacy("sources") と eduanima 拡張("eduanima_sources") の両方を受ける。
 	var sources []Source
-	if rawSources, ok := result["sources"].([]any); ok {
+	rawSources, ok := result["sources"].([]any)
+	if !ok {
+		rawSources, _ = result["eduanima_sources"].([]any)
+	}
+	if len(rawSources) > 0 {
 		for _, s := range rawSources {
 			if sm, ok := s.(map[string]any); ok {
 				src := Source{}
 				if n, ok := sm["name"].(string); ok {
 					src.Name = n
+				} else if n, ok := sm["file_name"].(string); ok {
+					src.Name = n
 				}
 				if p, ok := sm["page"].(string); ok {
 					src.Page = p
+				} else if p, ok := sm["page_number"].(string); ok {
+					src.Page = p
+				} else if p, ok := sm["page_number"].(float64); ok {
+					src.Page = strconv.Itoa(int(p))
+				} else if p, ok := sm["page_number"].(int); ok {
+					src.Page = strconv.Itoa(p)
 				}
 				sources = append(sources, src)
 			}
 		}
 	}
 
-	return &QueryResult{Answer: answer, LatencyMS: latencyMS, Sources: sources}, nil
+	qr := &QueryResult{Answer: answer, LatencyMS: latencyMS, Sources: sources}
+	if meta, ok := result["eduanima_meta"].(map[string]any); ok {
+		if v, ok := meta["loop_count"].(float64); ok {
+			qr.LoopCount = int(v)
+		}
+		if v, ok := meta["loop_count"].(int); ok {
+			qr.LoopCount = v
+		}
+		if v, ok := meta["librarian_ms"].(float64); ok {
+			qr.LibrarianMS = int(v)
+		}
+		if v, ok := meta["librarian_ms"].(int); ok {
+			qr.LibrarianMS = v
+		}
+		if v, ok := meta["answer_gen_ms"].(float64); ok {
+			qr.AnswerGenMS = int(v)
+		}
+		if v, ok := meta["answer_gen_ms"].(int); ok {
+			qr.AnswerGenMS = v
+		}
+	}
+
+	return qr, nil
 }
 
 // Cleanup は chat_completions モードでは no-op。

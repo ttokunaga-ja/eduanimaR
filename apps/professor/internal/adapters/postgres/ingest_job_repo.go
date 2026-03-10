@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -11,6 +13,10 @@ import (
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
 )
+
+func nullUUID(id uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{UUID: id, Valid: true}
+}
 
 type ingestJobRepo struct {
 	q *sqlcgen.Queries
@@ -23,10 +29,11 @@ func NewIngestJobRepo(db *sql.DB) ports.IngestJobRepository {
 
 func (r *ingestJobRepo) Create(ctx context.Context, job *domain.IngestJob) error {
 	created, err := r.q.CreateIngestJob(ctx, sqlcgen.CreateIngestJobParams{
-		JobID:      job.ID,
-		FileID:     job.FileID,
-		Status:     sqlcgen.JobStatus(job.Status),
-		MaxRetries: int32(job.MaxRetries),
+		ID:              job.ID,
+		TargetRawFileID: nullUUID(job.FileID),
+		Status:          sqlcgen.JobStatus(job.Status),
+		MaxRetries:      int32(job.MaxRetries),
+		IdempotencyKey:  fmt.Sprintf("ingest:%s:%s", job.FileID, job.ID),
 	})
 	if err != nil {
 		return err
@@ -43,18 +50,18 @@ func (r *ingestJobRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Inge
 		}
 		return nil, err
 	}
-	return toIngestJobDomain(row), nil
+	return toIngestJobDomainFromGetByID(row), nil
 }
 
 func (r *ingestJobRepo) GetByFileID(ctx context.Context, fileID uuid.UUID) (*domain.IngestJob, error) {
-	row, err := r.q.GetIngestJobByFileID(ctx, fileID)
+	row, err := r.q.GetIngestJobByFileID(ctx, nullUUID(fileID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	return toIngestJobDomain(row), nil
+	return toIngestJobDomainFromGetByFile(row), nil
 }
 
 func (r *ingestJobRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.JobStatus, errMsg *string) (*domain.IngestJob, error) {
@@ -63,7 +70,7 @@ func (r *ingestJobRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status d
 		ns = sql.NullString{String: *errMsg, Valid: true}
 	}
 	row, err := r.q.UpdateIngestJobStatus(ctx, sqlcgen.UpdateIngestJobStatusParams{
-		JobID:        id,
+		ID:           id,
 		Status:       sqlcgen.JobStatus(status),
 		ErrorMessage: ns,
 	})
@@ -73,28 +80,42 @@ func (r *ingestJobRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status d
 		}
 		return nil, err
 	}
-	return toIngestJobDomain(row), nil
+	return toIngestJobDomainFromUpdate(row), nil
 }
 
-func toIngestJobDomain(row sqlcgen.IngestJob) *domain.IngestJob {
+func toIngestJobDomainCore(jobID uuid.UUID, fileID uuid.NullUUID, status sqlcgen.JobStatus, retryCount, maxRetries int32, errorMessage sql.NullString, createdAt time.Time, startedAt, completedAt sql.NullTime) *domain.IngestJob {
 	job := &domain.IngestJob{
-		ID:         row.JobID,
-		FileID:     row.FileID,
-		Status:     domain.JobStatus(row.Status),
-		RetryCount: int(row.RetryCount),
-		MaxRetries: int(row.MaxRetries),
-		CreatedAt:  row.CreatedAt,
+		ID:         jobID,
+		Status:     domain.JobStatus(status),
+		RetryCount: int(retryCount),
+		MaxRetries: int(maxRetries),
+		CreatedAt:  createdAt,
 	}
-	if row.ErrorMessage.Valid {
-		job.ErrorMessage = &row.ErrorMessage.String
+	if fileID.Valid {
+		job.FileID = fileID.UUID
 	}
-	if row.StartedAt.Valid {
-		t := row.StartedAt.Time
+	if errorMessage.Valid {
+		job.ErrorMessage = &errorMessage.String
+	}
+	if startedAt.Valid {
+		t := startedAt.Time
 		job.StartedAt = &t
 	}
-	if row.CompletedAt.Valid {
-		t := row.CompletedAt.Time
+	if completedAt.Valid {
+		t := completedAt.Time
 		job.CompletedAt = &t
 	}
 	return job
+}
+
+func toIngestJobDomainFromGetByID(row sqlcgen.GetIngestJobByIDRow) *domain.IngestJob {
+	return toIngestJobDomainCore(row.JobID, row.FileID, row.Status, row.RetryCount, row.MaxRetries, row.ErrorMessage, row.CreatedAt, row.StartedAt, row.CompletedAt)
+}
+
+func toIngestJobDomainFromGetByFile(row sqlcgen.GetIngestJobByFileIDRow) *domain.IngestJob {
+	return toIngestJobDomainCore(row.JobID, row.FileID, row.Status, row.RetryCount, row.MaxRetries, row.ErrorMessage, row.CreatedAt, row.StartedAt, row.CompletedAt)
+}
+
+func toIngestJobDomainFromUpdate(row sqlcgen.UpdateIngestJobStatusRow) *domain.IngestJob {
+	return toIngestJobDomainCore(row.JobID, row.FileID, row.Status, row.RetryCount, row.MaxRetries, row.ErrorMessage, row.CreatedAt, row.StartedAt, row.CompletedAt)
 }

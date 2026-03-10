@@ -45,9 +45,9 @@ func lcsLength(a, b []string) int {
 	return prev[n]
 }
 
-// tokenize は CJK主体なら文字レベル、それ以外は単語レベルに分割する。
-func tokenize(text string) []string {
-	if isCJKDominant(text, 0.3) {
+// tokenizeWithMode は文字/単語レベルを明示して分割する。
+func tokenizeWithMode(text string, charLevel bool) []string {
+	if charLevel {
 		runes := []rune(text)
 		tokens := make([]string, len(runes))
 		for i, r := range runes {
@@ -63,8 +63,10 @@ func RougeL(prediction, reference string) float64 {
 	if prediction == "" || reference == "" {
 		return 0.0
 	}
-	predTokens := tokenize(prediction)
-	refTokens := tokenize(reference)
+	// 片側だけ CJK 主体でもトークン化方式を統一して語彙一致を正しく拾う。
+	charLevel := isCJKDominant(prediction, 0.3) || isCJKDominant(reference, 0.3)
+	predTokens := tokenizeWithMode(prediction, charLevel)
+	refTokens := tokenizeWithMode(reference, charLevel)
 	if len(predTokens) == 0 || len(refTokens) == 0 {
 		return 0.0
 	}
@@ -109,14 +111,20 @@ func ExactMatch(prediction, reference string) int {
 // Summary は評価結果の集計値。
 type Summary struct {
 	// ── answerable 質問のメトリクス ──────────────────────────
-	Total           int
-	Answered        int
-	AvgRougeL       float64
-	AvgExactMatch   float64
-	AvgJudgeOverall float64 // -1 = N/A（Judge スキップ）
-	AvgLatencyMS    int
-	FileHitRate     float64 // file_hit の平均（0.0〜1.0）、-1 = N/A（rag_sources なし）
-	PageHitRate     float64 // page_hit の平均（0.0〜1.0）、-1 = N/A（rag_sources なし）
+	Total                int
+	Answered             int
+	AvgRougeL            float64
+	AvgExactMatch        float64
+	AvgJudgeOverall      float64 // -1 = N/A（Judge スキップ）
+	AvgLatencyMS         int
+	AvgLoopCount         float64
+	AvgLibrarianMS       int
+	AvgAnswerGenMS       int
+	FileHitRate          float64 // file_hit の平均（0.0〜1.0）、-1 = N/A（rag_sources なし）
+	PageHitRate          float64 // page_hit の平均（0.0〜1.0）、-1 = N/A（rag_sources なし）
+	RefFileFoundRate     float64 // ref_file_found の平均（0.0〜1.0）、-1 = N/A
+	RefPageFoundRate     float64 // ref_page_found の平均（0.0〜1.0）、-1 = N/A
+	RefFilePageFoundRate float64 // ref_file_page_found の平均（0.0〜1.0）、-1 = N/A
 
 	// ── unanswerable 質問のメトリクス（ハルシネーション検査） ──
 	TotalUnanswerable     int     // unanswerable 質問の総数

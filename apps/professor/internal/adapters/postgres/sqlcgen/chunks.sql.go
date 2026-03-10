@@ -10,35 +10,66 @@ import (
 	"database/sql"
 	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	pgvector "github.com/pgvector/pgvector-go"
 )
 
 const deleteChunksByFileID = `-- name: DeleteChunksByFileID :exec
-DELETE FROM chunks
-WHERE file_id = $1
+UPDATE materials
+SET is_active = FALSE,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE raw_file_id = $1
+  AND is_active = TRUE
 `
 
-func (q *Queries) DeleteChunksByFileID(ctx context.Context, fileID uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteChunksByFileID, fileID)
+func (q *Queries) DeleteChunksByFileID(ctx context.Context, rawFileID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteChunksByFileID, rawFileID)
 	return err
 }
 
 const insertChunk = `-- name: InsertChunk :one
-INSERT INTO chunks (
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    embedding
+INSERT INTO materials (
+  id,
+  raw_file_id,
+  sequence_in_file,
+  page_start,
+  page_end,
+  content_markdown,
+  char_count,
+  embedding
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING chunk_id, file_id, subject_id, page_number, chunk_index, content, embedding, created_at
+VALUES (
+  $1,
+  $2,
+  $3,
+  $4,
+  $4,
+  $5,
+  char_length($5),
+  $6
+)
+RETURNING
+  id AS chunk_id,
+  raw_file_id AS file_id,
+  (SELECT subject_id FROM raw_files WHERE id = raw_file_id) AS subject_id,
+  page_start AS page_number,
+  sequence_in_file AS chunk_index,
+  content_markdown AS content,
+  embedding,
+  created_at
 `
 
 type InsertChunkParams struct {
+	ChunkID    uuid.UUID       `json:"chunk_id"`
+	FileID     uuid.UUID       `json:"file_id"`
+	ChunkIndex int32           `json:"chunk_index"`
+	PageNumber sql.NullInt32   `json:"page_number"`
+	Content    string          `json:"content"`
+	Embedding  pgvector.Vector `json:"embedding"`
+}
+
+type InsertChunkRow struct {
 	ChunkID    uuid.UUID       `json:"chunk_id"`
 	FileID     uuid.UUID       `json:"file_id"`
 	SubjectID  uuid.UUID       `json:"subject_id"`
@@ -46,19 +77,19 @@ type InsertChunkParams struct {
 	ChunkIndex int32           `json:"chunk_index"`
 	Content    string          `json:"content"`
 	Embedding  pgvector.Vector `json:"embedding"`
+	CreatedAt  time.Time       `json:"created_at"`
 }
 
-func (q *Queries) InsertChunk(ctx context.Context, arg InsertChunkParams) (Chunk, error) {
+func (q *Queries) InsertChunk(ctx context.Context, arg InsertChunkParams) (InsertChunkRow, error) {
 	row := q.db.QueryRowContext(ctx, insertChunk,
 		arg.ChunkID,
 		arg.FileID,
-		arg.SubjectID,
-		arg.PageNumber,
 		arg.ChunkIndex,
+		arg.PageNumber,
 		arg.Content,
 		arg.Embedding,
 	)
-	var i Chunk
+	var i InsertChunkRow
 	err := row.Scan(
 		&i.ChunkID,
 		&i.FileID,
@@ -74,22 +105,43 @@ func (q *Queries) InsertChunk(ctx context.Context, arg InsertChunkParams) (Chunk
 
 const listChunksByFileID = `-- name: ListChunksByFileID :many
 
-SELECT chunk_id, file_id, subject_id, page_number, chunk_index, content, embedding, created_at
-FROM chunks
-WHERE file_id = $1
-ORDER BY chunk_index
+SELECT
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.embedding,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE m.raw_file_id = $1
+  AND m.is_active = TRUE
+ORDER BY m.sequence_in_file
 `
 
+type ListChunksByFileIDRow struct {
+	ChunkID    uuid.UUID       `json:"chunk_id"`
+	FileID     uuid.UUID       `json:"file_id"`
+	SubjectID  uuid.UUID       `json:"subject_id"`
+	PageNumber sql.NullInt32   `json:"page_number"`
+	ChunkIndex int32           `json:"chunk_index"`
+	Content    string          `json:"content"`
+	Embedding  pgvector.Vector `json:"embedding"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
 // sql/queries/chunks.sql
-func (q *Queries) ListChunksByFileID(ctx context.Context, fileID uuid.UUID) ([]Chunk, error) {
-	rows, err := q.db.QueryContext(ctx, listChunksByFileID, fileID)
+func (q *Queries) ListChunksByFileID(ctx context.Context, rawFileID uuid.UUID) ([]ListChunksByFileIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, listChunksByFileID, rawFileID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Chunk
+	var items []ListChunksByFileIDRow
 	for rows.Next() {
-		var i Chunk
+		var i ListChunksByFileIDRow
 		if err := rows.Scan(
 			&i.ChunkID,
 			&i.FileID,
@@ -115,17 +167,21 @@ func (q *Queries) ListChunksByFileID(ctx context.Context, fileID uuid.UUID) ([]C
 
 const searchChunksByText = `-- name: SearchChunksByText :many
 SELECT
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    created_at
-FROM chunks
-WHERE subject_id = $2
-  AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
-ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', $1)) DESC
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  rf.original_filename AS file_name,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE rf.subject_id = $2
+  AND rf.is_active = TRUE
+  AND m.is_active = TRUE
+  AND to_tsvector('simple', m.content_markdown) @@ plainto_tsquery('simple', $1)
+ORDER BY ts_rank(to_tsvector('simple', m.content_markdown), plainto_tsquery('simple', $1)) DESC
 LIMIT $3
 `
 
@@ -139,14 +195,13 @@ type SearchChunksByTextRow struct {
 	ChunkID    uuid.UUID     `json:"chunk_id"`
 	FileID     uuid.UUID     `json:"file_id"`
 	SubjectID  uuid.UUID     `json:"subject_id"`
+	FileName   string        `json:"file_name"`
 	PageNumber sql.NullInt32 `json:"page_number"`
 	ChunkIndex int32         `json:"chunk_index"`
 	Content    string        `json:"content"`
 	CreatedAt  time.Time     `json:"created_at"`
 }
 
-// 全文検索（simple 辞書 / plainto_tsquery）
-// $1: query_text, $2: subject_id, $3: limit
 func (q *Queries) SearchChunksByText(ctx context.Context, arg SearchChunksByTextParams) ([]SearchChunksByTextRow, error) {
 	rows, err := q.db.QueryContext(ctx, searchChunksByText, arg.PlaintoTsquery, arg.SubjectID, arg.Limit)
 	if err != nil {
@@ -160,6 +215,7 @@ func (q *Queries) SearchChunksByText(ctx context.Context, arg SearchChunksByText
 			&i.ChunkID,
 			&i.FileID,
 			&i.SubjectID,
+			&i.FileName,
 			&i.PageNumber,
 			&i.ChunkIndex,
 			&i.Content,
@@ -180,16 +236,20 @@ func (q *Queries) SearchChunksByText(ctx context.Context, arg SearchChunksByText
 
 const searchChunksByVector = `-- name: SearchChunksByVector :many
 SELECT
-    chunk_id,
-    file_id,
-    subject_id,
-    page_number,
-    chunk_index,
-    content,
-    created_at
-FROM chunks
-WHERE subject_id = $2
-ORDER BY embedding <=> $1::vector
+  m.id AS chunk_id,
+  m.raw_file_id AS file_id,
+  rf.subject_id,
+  rf.original_filename AS file_name,
+  m.page_start AS page_number,
+  m.sequence_in_file AS chunk_index,
+  m.content_markdown AS content,
+  m.created_at
+FROM materials m
+JOIN raw_files rf ON rf.id = m.raw_file_id
+WHERE rf.subject_id = $2
+  AND rf.is_active = TRUE
+  AND m.is_active = TRUE
+ORDER BY m.embedding <=> $1::vector
 LIMIT $3
 `
 
@@ -203,14 +263,13 @@ type SearchChunksByVectorRow struct {
 	ChunkID    uuid.UUID     `json:"chunk_id"`
 	FileID     uuid.UUID     `json:"file_id"`
 	SubjectID  uuid.UUID     `json:"subject_id"`
+	FileName   string        `json:"file_name"`
 	PageNumber sql.NullInt32 `json:"page_number"`
 	ChunkIndex int32         `json:"chunk_index"`
 	Content    string        `json:"content"`
 	CreatedAt  time.Time     `json:"created_at"`
 }
 
-// コサイン類似度でのベクトル検索（HNSW インデックス使用）
-// $1: query_embedding (vector), $2: subject_id, $3: limit
 func (q *Queries) SearchChunksByVector(ctx context.Context, arg SearchChunksByVectorParams) ([]SearchChunksByVectorRow, error) {
 	rows, err := q.db.QueryContext(ctx, searchChunksByVector, arg.Column1, arg.SubjectID, arg.Limit)
 	if err != nil {
@@ -224,6 +283,7 @@ func (q *Queries) SearchChunksByVector(ctx context.Context, arg SearchChunksByVe
 			&i.ChunkID,
 			&i.FileID,
 			&i.SubjectID,
+			&i.FileName,
 			&i.PageNumber,
 			&i.ChunkIndex,
 			&i.Content,
