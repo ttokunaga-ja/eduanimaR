@@ -170,15 +170,24 @@ services:
       LIBRARIAN_PORT: ${GRPC_PORT:-50051}
       LIBRARIAN_HEALTH_PORT: ${LIBRARIAN_HEALTH_PORT:-8081}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY is required. cp .env.example .env}
-      LIBRARIAN_MODEL_SEARCH: ${LIBRARIAN_MODEL_SEARCH:-gemini-3-flash-preview}
-      LIBRARIAN_MAX_LOOPS: ${LIBRARIAN_MAX_LOOPS:-5}
+      # ThinkingLevel別モデル設定（C要件）
+      LIBRARIAN_MODEL_FLASH_LITE: ${LIBRARIAN_MODEL_FLASH_LITE:-gemini-3.1-flash-lite-preview}
+      LIBRARIAN_MODEL_FLASH: ${LIBRARIAN_MODEL_FLASH:-gemini-3-flash-preview}
+      LIBRARIAN_MAX_LOOPS: ${LIBRARIAN_MAX_LOOPS:-4}
       LIBRARIAN_MAX_RESULTS: ${LIBRARIAN_MAX_RESULTS:-10}
       LIBRARIAN_TIMEOUT_MS: ${LIBRARIAN_TIMEOUT_MS:-30000}
+      # Kafka コンシューマー（PDF インデックス処理ワーカー）
+      LIBRARIAN_KAFKA_ENABLED: ${LIBRARIAN_KAFKA_ENABLED:-true}
+      KAFKA_BROKERS: kafka:9092       # ← Docker 内部ホスト名
+      KAFKA_TOPIC_INGEST: ${KAFKA_TOPIC_INGEST:-eduanima.ingest.jobs}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     command: python -m librarian.main
     ports:
       - "50051:50051"
       - "8081:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - eduanima_net
     restart: unless-stopped
@@ -215,6 +224,9 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY is required}
       PROFESSOR_MODEL_INGESTION: ${PROFESSOR_MODEL_INGESTION:-gemini-3.1-flash-lite-preview}
       PROFESSOR_MODEL_ANSWER: ${PROFESSOR_MODEL_ANSWER:-gemini-3-flash-preview}
+      # 並列処理設定（ingestion 高速化）
+      PROFESSOR_KAFKA_WORKER_COUNT: ${PROFESSOR_KAFKA_WORKER_COUNT:-3}
+      PROFESSOR_EMBEDDING_CONCURRENCY: ${PROFESSOR_EMBEDDING_CONCURRENCY:-5}
       MINIO_ENDPOINT: minio:9000      # ← Docker 内部ホスト名
       MINIO_USE_SSL: "false"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}

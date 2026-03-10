@@ -10,9 +10,10 @@ import (
 
 // LibrarianSearchRequest は Librarian から Professor への検索リクエスト
 type LibrarianSearchRequest struct {
-	QueriesText   []string // 全文検索クエリ
-	QueriesVector []string // ベクトル検索クエリ（空の場合は全文検索のみ）
-	Rationale     string   // 検索理由（ログ・監査用）
+	QueriesText     []string // 全文検索クエリ
+	QueriesVector   []string // ベクトル検索クエリ（空の場合は全文検索のみ）
+	Rationale       string   // 検索理由（日本語自然文・UX表示用）
+	ExcludeChunkIDs []string // 既読チャンクID（B-2: IDフィルタリング）
 }
 
 // LibrarianSearchResponse は Professor から Librarian への検索結果
@@ -29,8 +30,9 @@ type LibrarianThinkResult struct {
 }
 
 // LibrarianEvidence は Librarian が選定したエビデンスチャンクの参照情報
+// chunk_id ベースに変更（temp_index廃止）
 type LibrarianEvidence struct {
-	TempIndex   int    // Professor の検索結果配列インデックス
+	ChunkID     string // チャンクID（UUID文字列）
 	WhyRelevant string // 選定理由
 }
 
@@ -39,6 +41,8 @@ type LibrarianClient interface {
 	// Think は双方向ストリーミングで Librarian に推論を依頼する。
 	// onSearchRequest: Librarian が検索を要求するたびに呼ばれるコールバック
 	//   → Professor は subject_id/user_id による物理制約を強制してから検索を実行する
+	// thinkingLevel: "flash-lite" | "flash" | "" (空文字はflashとして扱う)
+	//   → Librarian が使用するモデルを決定する（C要件）
 	Think(
 		ctx context.Context,
 		requestID string,
@@ -46,6 +50,7 @@ type LibrarianClient interface {
 		subjectID uuid.UUID,
 		userID uuid.UUID,
 		maxLoops int32,
+		thinkingLevel string,
 		onSearchRequest func(req LibrarianSearchRequest) (*LibrarianSearchResponse, error),
 	) (*LibrarianThinkResult, error)
 }

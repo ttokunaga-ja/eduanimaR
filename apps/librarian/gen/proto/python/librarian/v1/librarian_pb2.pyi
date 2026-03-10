@@ -36,14 +36,16 @@ class SearchHistory(_message.Message):
     def __init__(self, step: _Optional[int] = ..., action: _Optional[str] = ..., queries_text: _Optional[_Iterable[str]] = ..., rationale: _Optional[str] = ..., result_count: _Optional[int] = ...) -> None: ...
 
 class Constraints(_message.Message):
-    __slots__ = ("max_loops", "max_results", "timeout_ms")
+    __slots__ = ("max_loops", "max_results", "timeout_ms", "thinking_level")
     MAX_LOOPS_FIELD_NUMBER: _ClassVar[int]
     MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    THINKING_LEVEL_FIELD_NUMBER: _ClassVar[int]
     max_loops: int
     max_results: int
     timeout_ms: int
-    def __init__(self, max_loops: _Optional[int] = ..., max_results: _Optional[int] = ..., timeout_ms: _Optional[int] = ...) -> None: ...
+    thinking_level: str
+    def __init__(self, max_loops: _Optional[int] = ..., max_results: _Optional[int] = ..., timeout_ms: _Optional[int] = ..., thinking_level: _Optional[str] = ...) -> None: ...
 
 class ThinkResponse(_message.Message):
     __slots__ = ("request_id", "search", "complete", "error")
@@ -58,14 +60,16 @@ class ThinkResponse(_message.Message):
     def __init__(self, request_id: _Optional[str] = ..., search: _Optional[_Union[SearchAction, _Mapping]] = ..., complete: _Optional[_Union[CompleteAction, _Mapping]] = ..., error: _Optional[_Union[ErrorAction, _Mapping]] = ...) -> None: ...
 
 class SearchAction(_message.Message):
-    __slots__ = ("queries_text", "queries_vector", "rationale")
+    __slots__ = ("queries_text", "queries_vector", "rationale", "exclude_chunk_ids")
     QUERIES_TEXT_FIELD_NUMBER: _ClassVar[int]
     QUERIES_VECTOR_FIELD_NUMBER: _ClassVar[int]
     RATIONALE_FIELD_NUMBER: _ClassVar[int]
+    EXCLUDE_CHUNK_IDS_FIELD_NUMBER: _ClassVar[int]
     queries_text: _containers.RepeatedScalarFieldContainer[str]
     queries_vector: _containers.RepeatedScalarFieldContainer[str]
     rationale: str
-    def __init__(self, queries_text: _Optional[_Iterable[str]] = ..., queries_vector: _Optional[_Iterable[str]] = ..., rationale: _Optional[str] = ...) -> None: ...
+    exclude_chunk_ids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, queries_text: _Optional[_Iterable[str]] = ..., queries_vector: _Optional[_Iterable[str]] = ..., rationale: _Optional[str] = ..., exclude_chunk_ids: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class CompleteAction(_message.Message):
     __slots__ = ("evidence", "coverage_notes")
@@ -76,12 +80,12 @@ class CompleteAction(_message.Message):
     def __init__(self, evidence: _Optional[_Iterable[_Union[Evidence, _Mapping]]] = ..., coverage_notes: _Optional[str] = ...) -> None: ...
 
 class Evidence(_message.Message):
-    __slots__ = ("temp_index", "why_relevant")
-    TEMP_INDEX_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("chunk_id", "why_relevant")
+    CHUNK_ID_FIELD_NUMBER: _ClassVar[int]
     WHY_RELEVANT_FIELD_NUMBER: _ClassVar[int]
-    temp_index: int
+    chunk_id: str
     why_relevant: str
-    def __init__(self, temp_index: _Optional[int] = ..., why_relevant: _Optional[str] = ...) -> None: ...
+    def __init__(self, chunk_id: _Optional[str] = ..., why_relevant: _Optional[str] = ...) -> None: ...
 
 class ErrorAction(_message.Message):
     __slots__ = ("error_type", "message")

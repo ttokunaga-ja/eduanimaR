@@ -25,33 +25,50 @@ import (
 //	    base_url="https://host/api/v1/subjects/{subject_id}",
 //	    api_key="<Firebase ID Token>"
 //	)
-//	client.chat.completions.create(model="professor", messages=[...])
+//	client.chat.completions.create(model="eduanima", messages=[...])
 //
 // → POST /api/v1/subjects/:subject_id/chat/completions に転送される。
+//
+// # 利用可能なモデル名
+//
+//	"eduanima-flash" : 高速・低コスト（Librarian: flash-lite, ループ3回）
+//	"eduanima"       : 標準品質（Librarian: flash, ループ4回）[デフォルト]
+//	"eduanima-pro"   : 高精度（Librarian: flash, ループ5回）
 type OpenAIChatHandler struct {
-	uc              *usecases.ChatUseCase
-	modelAnswerPro  string
-	maxLoopsFast    int32
-	maxLoopsStd     int32
-	maxLoopsPro     int32
-	modelAnswerFast string
-	thinkingFast    string
-	thinkingStd     string
-	thinkingPro     string
+	uc                    *usecases.ChatUseCase
+	modelAnswerPro        string
+	maxLoopsFast          int32
+	maxLoopsStd           int32
+	maxLoopsPro           int32
+	modelAnswerFast       string
+	thinkingFast          string
+	thinkingStd           string
+	thinkingPro           string
+	librarianThinkingFast string // Librarian に渡す thinking_level（eduanima-flash 用）
+	librarianThinkingStd  string // Librarian に渡す thinking_level（eduanima 用）
+	librarianThinkingPro  string // Librarian に渡す thinking_level（eduanima-pro 用）
 }
 
 // NewOpenAIChatHandler は OpenAIChatHandler を生成する。
 func NewOpenAIChatHandler(uc *usecases.ChatUseCase) *OpenAIChatHandler {
 	return &OpenAIChatHandler{
-		uc:              uc,
-		modelAnswerPro:  strings.TrimSpace(os.Getenv("PROFESSOR_MODEL_ANSWER_PRO")),
-		maxLoopsFast:    parseInt32Env("PROFESSOR_MAX_LOOPS_FAST", 3),
-		maxLoopsStd:     parseInt32Env("PROFESSOR_MAX_LOOPS_DEFAULT", 4),
-		maxLoopsPro:     parseInt32Env("PROFESSOR_MAX_LOOPS_PRO", 5),
-		modelAnswerFast: parseStringEnv("PROFESSOR_MODEL_ANSWER_FAST", "gemini-3.1-flash-lite-preview"),
-		thinkingFast:    parseStringEnv("PROFESSOR_THINKING_ANSWER_FAST", "minimal"),
+		uc:             uc,
+		modelAnswerPro: strings.TrimSpace(os.Getenv("PROFESSOR_MODEL_ANSWER_PRO")),
+		maxLoopsFast:   parseInt32Env("PROFESSOR_MAX_LOOPS_FAST", 3),
+		maxLoopsStd:    parseInt32Env("PROFESSOR_MAX_LOOPS_DEFAULT", 4),
+		maxLoopsPro:    parseInt32Env("PROFESSOR_MAX_LOOPS_PRO", 5),
+		// eduanima-flash: 回答モデルは flash（flash-liteではない）、thinking=low
+		modelAnswerFast: parseStringEnv("PROFESSOR_MODEL_ANSWER_FAST", "gemini-3-flash-preview"),
+		thinkingFast:    parseStringEnv("PROFESSOR_THINKING_ANSWER_FAST", "low"),
 		thinkingStd:     parseStringEnv("PROFESSOR_THINKING_ANSWER_DEFAULT", "low"),
 		thinkingPro:     parseStringEnv("PROFESSOR_THINKING_ANSWER_PRO", "medium"),
+		// Librarian thinking level（C要件: LibrarianのモデルをLevel別に切り替え）
+		// "flash-lite" = flash-lite モデル + Minimal thinking（eduanima-flash）
+		// "flash"      = flash モデル + Minimal thinking（eduanima）
+		// "flash-low"  = flash モデル + Low thinking（eduanima-pro）
+		librarianThinkingFast: parseStringEnv("PROFESSOR_LIBRARIAN_THINKING_FAST", "flash-lite"),
+		librarianThinkingStd:  parseStringEnv("PROFESSOR_LIBRARIAN_THINKING_DEFAULT", "flash"),
+		librarianThinkingPro:  parseStringEnv("PROFESSOR_LIBRARIAN_THINKING_PRO", "flash-low"),
 	}
 }
 
@@ -169,9 +186,10 @@ type openaiMeta struct {
 }
 
 type qualityLevel struct {
-	MaxLoops            int32
-	AnswerModelOverride string
-	AnswerThinkingLevel string
+	MaxLoops               int32
+	AnswerModelOverride    string
+	AnswerThinkingLevel    string
+	LibrarianThinkingLevel string // C要件: Librarianが使用するモデル選択用（"flash-lite" | "flash"）
 }
 
 // ─── ChatCompletions ────────────────────────────────────────────────
@@ -222,7 +240,7 @@ func (h *OpenAIChatHandler) ChatCompletions(c *echo.Context) error {
 	if model == "" {
 		model = "professor"
 	}
-	level := resolveQualityLevel(model, h.modelAnswerFast, h.modelAnswerPro, h.maxLoopsFast, h.maxLoopsStd, h.maxLoopsPro, h.thinkingFast, h.thinkingStd, h.thinkingPro)
+	level := resolveQualityLevel(model, h.modelAnswerFast, h.modelAnswerPro, h.maxLoopsFast, h.maxLoopsStd, h.maxLoopsPro, h.thinkingFast, h.thinkingStd, h.thinkingPro, h.librarianThinkingFast, h.librarianThinkingStd, h.librarianThinkingPro)
 	chatID := fmt.Sprintf("chatcmpl-%s", uuid.New().String()[:8])
 	created := time.Now().Unix()
 
@@ -357,6 +375,7 @@ func (h *OpenAIChatHandler) handleStreaming(
 		MaxLoops:            level.MaxLoops,
 		AnswerModelOverride: level.AnswerModelOverride,
 		AnswerThinkingLevel: level.AnswerThinkingLevel,
+		ThinkingLevel:       level.LibrarianThinkingLevel,
 	}, onEvent)
 	if ucErr != nil {
 		// エラーは onEvent 内で既に送信済み
@@ -401,6 +420,7 @@ func (h *OpenAIChatHandler) handleNonStreaming(
 		MaxLoops:            level.MaxLoops,
 		AnswerModelOverride: level.AnswerModelOverride,
 		AnswerThinkingLevel: level.AnswerThinkingLevel,
+		ThinkingLevel:       level.LibrarianThinkingLevel,
 	}, onEvent)
 	if ucErr != nil {
 		return httpError(c, ucErr)
@@ -539,14 +559,39 @@ func extractMeta(data any) *openaiMeta {
 	return meta
 }
 
-func resolveQualityLevel(model string, modelAnswerFast string, modelAnswerPro string, maxLoopsFast int32, maxLoopsStd int32, maxLoopsPro int32, thinkingFast string, thinkingStd string, thinkingPro string) qualityLevel {
+// resolveQualityLevel はモデル名から品質レベル設定を解決する。
+//
+// 対応するモデル名:
+//   - "eduanima-flash" : 高速・低コスト（Librarian: flash-lite, ループ3回）
+//   - "eduanima"       : 標準品質（Librarian: flash, ループ4回）[デフォルト]
+//   - "eduanima-pro"   : 高精度（Librarian: flash, ループ5回）
+//
+// 後方互換のため "professor-fast"/"professor-lite"/"professor-pro" も引き続きサポート。
+func resolveQualityLevel(model string, modelAnswerFast string, modelAnswerPro string, maxLoopsFast int32, maxLoopsStd int32, maxLoopsPro int32, thinkingFast string, thinkingStd string, thinkingPro string, librarianThinkingFast string, librarianThinkingStd string, librarianThinkingPro string) qualityLevel {
 	switch strings.TrimSpace(model) {
-	case "professor-fast", "professor-lite":
-		return qualityLevel{MaxLoops: maxLoopsFast, AnswerModelOverride: modelAnswerFast, AnswerThinkingLevel: thinkingFast}
-	case "professor-pro":
-		return qualityLevel{MaxLoops: maxLoopsPro, AnswerModelOverride: strings.TrimSpace(modelAnswerPro), AnswerThinkingLevel: thinkingPro}
+	case "eduanima-flash", "professor-fast", "professor-lite":
+		// 高速モード: flash-lite で Librarian を動かし、回答は flash-lite + minimal thinking
+		return qualityLevel{
+			MaxLoops:               maxLoopsFast,
+			AnswerModelOverride:    modelAnswerFast,
+			AnswerThinkingLevel:    thinkingFast,
+			LibrarianThinkingLevel: librarianThinkingFast,
+		}
+	case "eduanima-pro", "professor-pro":
+		// 高精度モード: flash で Librarian を動かし、回答は pro モデル + medium thinking
+		return qualityLevel{
+			MaxLoops:               maxLoopsPro,
+			AnswerModelOverride:    strings.TrimSpace(modelAnswerPro),
+			AnswerThinkingLevel:    thinkingPro,
+			LibrarianThinkingLevel: librarianThinkingPro,
+		}
 	default:
-		return qualityLevel{MaxLoops: maxLoopsStd, AnswerThinkingLevel: thinkingStd}
+		// 標準モード（"eduanima" / "professor" 等）: flash で Librarian を動かし、回答は flash + low thinking
+		return qualityLevel{
+			MaxLoops:               maxLoopsStd,
+			AnswerThinkingLevel:    thinkingStd,
+			LibrarianThinkingLevel: librarianThinkingStd,
+		}
 	}
 }
 

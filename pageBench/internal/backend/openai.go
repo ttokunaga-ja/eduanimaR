@@ -16,7 +16,7 @@ import (
 
 // AgentBackend は Agent システム（RAG バックエンド）の実装。
 // OpenAI chat completions 互換形式でリクエストを送信する。
-// model フィールドには professor-fast/professor/professor-pro などを指定できる。
+// model フィールドには eduanima-flash/eduanima/eduanima-pro などを指定できる。
 type AgentBackend struct {
 	apiBase    string
 	apiKey     string
@@ -26,7 +26,7 @@ type AgentBackend struct {
 
 // NewAgentBackend は AgentBackend を構築する。
 func NewAgentBackend(apiBase, apiKey string, model ...string) *AgentBackend {
-	backendModel := "professor"
+	backendModel := "eduanima"
 	if len(model) > 0 && strings.TrimSpace(model[0]) != "" {
 		backendModel = strings.TrimSpace(model[0])
 	}

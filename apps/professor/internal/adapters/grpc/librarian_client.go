@@ -45,10 +45,13 @@ func NewLibrarianClient(addr string) (ports.LibrarianClient, error) {
 // Think は双方向ストリーミング RPC を使って Librarian に推論を依頼する。
 //
 // フロー:
-//  1. 初回 ThinkRequest（user_query, subject_id）を送信
+//  1. 初回 ThinkRequest（user_query, subject_id, thinking_level）を送信
 //  2. SearchAction を受信 → onSearchRequest コールバックで検索実行
+//     - ExcludeChunkIDs を使って既読チャンクをDBフィルタリング（B-2）
 //  3. 検索結果を state JSON に詰めて次の ThinkRequest を送信
+//     - new_chunk_ids: 今回の新規チャンクIDリスト（B-2: 蓄積型評価に使用）
 //  4. CompleteAction を受信 → LibrarianThinkResult を返す
+//     - Evidence は chunk_id ベース（temp_index廃止）
 func (c *librarianClient) Think(
 	ctx context.Context,
 	requestID string,
@@ -56,6 +59,7 @@ func (c *librarianClient) Think(
 	subjectID uuid.UUID,
 	userID uuid.UUID,
 	maxLoops int32,
+	thinkingLevel string,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
 	if maxLoops <= 0 {
@@ -73,13 +77,18 @@ func (c *librarianClient) Think(
 		UserQuery: userQuery,
 		SubjectId: subjectID.String(),
 		Constraints: &librarianv1.Constraints{
-			MaxLoops:   maxLoops,
-			MaxResults: defaultMaxResults,
-			TimeoutMs:  defaultTimeoutMs,
+			MaxLoops:      maxLoops,
+			MaxResults:    defaultMaxResults,
+			TimeoutMs:     defaultTimeoutMs,
+			ThinkingLevel: thinkingLevel, // C要件: Librarianのモデル選択に使用
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("send initial ThinkRequest: %w", err)
 	}
+
+	// 前回ループまでの全累積チャンクIDを追跡（TempIndex廃止後のlookup用）
+	allResults := make([]domain.SearchResult, 0)
+	seenChunkIDs := make(map[string]struct{})
 
 	// レスポンスループ
 	for {
@@ -99,12 +108,14 @@ func (c *librarianClient) Think(
 				"request_id", requestID,
 				"queries_count", len(action.Search.QueriesText),
 				"rationale", action.Search.Rationale,
+				"exclude_chunk_ids_count", len(action.Search.ExcludeChunkIds),
 			)
 
 			searchReq := ports.LibrarianSearchRequest{
-				QueriesText:   action.Search.QueriesText,
-				QueriesVector: action.Search.QueriesVector,
-				Rationale:     action.Search.Rationale,
+				QueriesText:     action.Search.QueriesText,
+				QueriesVector:   action.Search.QueriesVector,
+				Rationale:       action.Search.Rationale,
+				ExcludeChunkIDs: action.Search.ExcludeChunkIds, // B-2: 既読チャンク除外
 			}
 			searchResp, err := onSearchRequest(searchReq)
 			if err != nil {
@@ -112,8 +123,19 @@ func (c *librarianClient) Think(
 				return nil, fmt.Errorf("onSearchRequest: %w", err)
 			}
 
-			// 検索結果を state JSON に直列化
-			stateJSON, err := serializeSearchResults(searchResp.Results)
+			// 今回の新規チャンクIDリストを収集（B-2: seenChunkIDsで差分検出）
+			newChunkIDs := make([]string, 0, len(searchResp.Results))
+			for _, r := range searchResp.Results {
+				chunkIDStr := r.ChunkID.String()
+				if _, seen := seenChunkIDs[chunkIDStr]; !seen {
+					newChunkIDs = append(newChunkIDs, chunkIDStr)
+					seenChunkIDs[chunkIDStr] = struct{}{}
+					allResults = append(allResults, r)
+				}
+			}
+
+			// 検索結果を state JSON に直列化（new_chunk_ids を含める）
+			stateJSON, err := serializeSearchResults(allResults, newChunkIDs)
 			if err != nil {
 				_ = stream.CloseSend()
 				return nil, fmt.Errorf("serialize search results: %w", err)
@@ -134,10 +156,11 @@ func (c *librarianClient) Think(
 				"request_id", requestID,
 				"evidence_count", len(action.Complete.Evidence),
 			)
+			// chunk_id ベースのエビデンス（temp_index廃止）
 			evidences := make([]ports.LibrarianEvidence, len(action.Complete.Evidence))
 			for i, e := range action.Complete.Evidence {
 				evidences[i] = ports.LibrarianEvidence{
-					TempIndex:   int(e.TempIndex),
+					ChunkID:     e.ChunkId,
 					WhyRelevant: e.WhyRelevant,
 				}
 			}
@@ -168,15 +191,16 @@ func (c *librarianClient) Think(
 
 // serializeSearchResults は検索結果を Librarian が期待する state JSON 文字列に変換する。
 //
-// スキーマ:
+// スキーマ（拡張版）:
 //
 //	{
 //	  "search_results": [
 //	    {"chunk_id": "...", "content": "...", "file_name": "..."},
 //	    ...
-//	  ]
+//	  ],
+//	  "new_chunk_ids": ["uuid1", "uuid2", ...]  // 今回ループで初めて取得した新規ID
 //	}
-func serializeSearchResults(results []domain.SearchResult) (string, error) {
+func serializeSearchResults(results []domain.SearchResult, newChunkIDs []string) (string, error) {
 	type resultItem struct {
 		ChunkID    string `json:"chunk_id"`
 		FileID     string `json:"file_id"`
@@ -196,6 +220,7 @@ func serializeSearchResults(results []domain.SearchResult) (string, error) {
 	}
 	b, err := json.Marshal(map[string]interface{}{
 		"search_results": items,
+		"new_chunk_ids":  newChunkIDs, // B-2: 蓄積型評価のための新規IDリスト
 	})
 	if err != nil {
 		return "", err

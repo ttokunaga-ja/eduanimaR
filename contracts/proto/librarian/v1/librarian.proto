@@ -21,6 +21,7 @@ message ThinkRequest {
   string subject_id = 3;  // 科目ID(user_id/subject_idでDB絞り込み)
   
   // LangGraph state(シリアライズ済み)
+  // スキーマ: {"search_results": [...], "new_chunk_ids": [...]}
   string state = 4;
   
   // 検索履歴(前回までのSEARCH/COMPLETE記録)
@@ -39,9 +40,13 @@ message SearchHistory {
 }
 
 message Constraints {
-  int32 max_loops = 1;  // デフォルト3
-  int32 max_results = 2;  // 検索結果上限(デフォルト10)
-  int32 timeout_ms = 3;  // タイムアウト(デフォルト30000)
+  int32 max_loops = 1;     // デフォルト4
+  int32 max_results = 2;   // 検索結果上限（Dynamic Top-K: ループ毎に変動）
+  int32 timeout_ms = 3;    // タイムアウト（デフォルト30000）
+  // thinking_level: Librarianが使用するモデルを決定する
+  // "flash-lite" → eduanima-flash レベル（最速）
+  // "flash"      → eduanima / eduanima-pro レベル（バランス型）
+  string thinking_level = 4;
 }
 
 // Librarian → Professor
@@ -59,7 +64,10 @@ message ThinkResponse {
 message SearchAction {
   repeated string queries_text = 1;  // 全文検索用クエリ
   repeated string queries_vector = 2;  // ベクトル検索用クエリ(任意)
-  string rationale = 3;  // なぜこの検索を行うか(監査用)
+  string rationale = 3;  // なぜこの検索を行うか（UX表示用・日本語自然文）
+  // exclude_chunk_ids: 既読チャンクID（B-2: IDフィルタリング）
+  // Professor側でDBクエリから除外するか、返却時に除外する
+  repeated string exclude_chunk_ids = 4;
 }
 
 // (B) 収集完了
@@ -68,8 +76,10 @@ message CompleteAction {
   string coverage_notes = 2;  // 充足している点/不確実な点
 }
 
+// Evidence は chunk_id ベースに変更（temp_index廃止）
+// Professor側でchunk_idからチャンク内容をlookupする
 message Evidence {
-  int32 temp_index = 1;  // Professor側の検索結果配列インデックス
+  string chunk_id = 1;    // チャンクID（UUID文字列）
   string why_relevant = 2;  // 選定理由
 }
 

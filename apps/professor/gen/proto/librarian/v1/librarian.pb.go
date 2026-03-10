@@ -28,6 +28,7 @@ type ThinkRequest struct {
 	UserQuery string                 `protobuf:"bytes,2,opt,name=user_query,json=userQuery,proto3" json:"user_query,omitempty"` // ユーザーの質問
 	SubjectId string                 `protobuf:"bytes,3,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"` // 科目ID(user_id/subject_idでDB絞り込み)
 	// LangGraph state(シリアライズ済み)
+	// スキーマ: {"search_results": [...], "new_chunk_ids": [...]}
 	State string `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
 	// 検索履歴(前回までのSEARCH/COMPLETE記録)
 	SearchHistory []*SearchHistory `protobuf:"bytes,5,rep,name=search_history,json=searchHistory,proto3" json:"search_history,omitempty"`
@@ -186,10 +187,14 @@ func (x *SearchHistory) GetResultCount() int32 {
 }
 
 type Constraints struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	MaxLoops      int32                  `protobuf:"varint,1,opt,name=max_loops,json=maxLoops,proto3" json:"max_loops,omitempty"`       // デフォルト3
-	MaxResults    int32                  `protobuf:"varint,2,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"` // 検索結果上限(デフォルト10)
-	TimeoutMs     int32                  `protobuf:"varint,3,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`    // タイムアウト(デフォルト30000)
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	MaxLoops   int32                  `protobuf:"varint,1,opt,name=max_loops,json=maxLoops,proto3" json:"max_loops,omitempty"`       // デフォルト4
+	MaxResults int32                  `protobuf:"varint,2,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"` // 検索結果上限（Dynamic Top-K: ループ毎に変動）
+	TimeoutMs  int32                  `protobuf:"varint,3,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`    // タイムアウト（デフォルト30000）
+	// thinking_level: Librarianが使用するモデルを決定する
+	// "flash-lite" → eduanima-flash レベル（最速）
+	// "flash"      → eduanima / eduanima-pro レベル（バランス型）
+	ThinkingLevel string `protobuf:"bytes,4,opt,name=thinking_level,json=thinkingLevel,proto3" json:"thinking_level,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -243,6 +248,13 @@ func (x *Constraints) GetTimeoutMs() int32 {
 		return x.TimeoutMs
 	}
 	return 0
+}
+
+func (x *Constraints) GetThinkingLevel() string {
+	if x != nil {
+		return x.ThinkingLevel
+	}
+	return ""
 }
 
 // Librarian → Professor
@@ -357,9 +369,12 @@ type SearchAction struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	QueriesText   []string               `protobuf:"bytes,1,rep,name=queries_text,json=queriesText,proto3" json:"queries_text,omitempty"`       // 全文検索用クエリ
 	QueriesVector []string               `protobuf:"bytes,2,rep,name=queries_vector,json=queriesVector,proto3" json:"queries_vector,omitempty"` // ベクトル検索用クエリ(任意)
-	Rationale     string                 `protobuf:"bytes,3,opt,name=rationale,proto3" json:"rationale,omitempty"`                              // なぜこの検索を行うか(監査用)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Rationale     string                 `protobuf:"bytes,3,opt,name=rationale,proto3" json:"rationale,omitempty"`                              // なぜこの検索を行うか（UX表示用・日本語自然文）
+	// exclude_chunk_ids: 既読チャンクID（B-2: IDフィルタリング）
+	// Professor側でDBクエリから除外するか、返却時に除外する
+	ExcludeChunkIds []string `protobuf:"bytes,4,rep,name=exclude_chunk_ids,json=excludeChunkIds,proto3" json:"exclude_chunk_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SearchAction) Reset() {
@@ -411,6 +426,13 @@ func (x *SearchAction) GetRationale() string {
 		return x.Rationale
 	}
 	return ""
+}
+
+func (x *SearchAction) GetExcludeChunkIds() []string {
+	if x != nil {
+		return x.ExcludeChunkIds
+	}
+	return nil
 }
 
 // (B) 収集完了
@@ -466,9 +488,11 @@ func (x *CompleteAction) GetCoverageNotes() string {
 	return ""
 }
 
+// Evidence は chunk_id ベースに変更（temp_index廃止）
+// Professor側でchunk_idからチャンク内容をlookupする
 type Evidence struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TempIndex     int32                  `protobuf:"varint,1,opt,name=temp_index,json=tempIndex,proto3" json:"temp_index,omitempty"`      // Professor側の検索結果配列インデックス
+	ChunkId       string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`             // チャンクID（UUID文字列）
 	WhyRelevant   string                 `protobuf:"bytes,2,opt,name=why_relevant,json=whyRelevant,proto3" json:"why_relevant,omitempty"` // 選定理由
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -504,11 +528,11 @@ func (*Evidence) Descriptor() ([]byte, []int) {
 	return file_librarian_v1_librarian_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *Evidence) GetTempIndex() int32 {
+func (x *Evidence) GetChunkId() string {
 	if x != nil {
-		return x.TempIndex
+		return x.ChunkId
 	}
-	return 0
+	return ""
 }
 
 func (x *Evidence) GetWhyRelevant() string {
@@ -591,30 +615,31 @@ const file_librarian_v1_librarian_proto_rawDesc = "" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12!\n" +
 	"\fqueries_text\x18\x03 \x03(\tR\vqueriesText\x12\x1c\n" +
 	"\trationale\x18\x04 \x01(\tR\trationale\x12!\n" +
-	"\fresult_count\x18\x05 \x01(\x05R\vresultCount\"j\n" +
+	"\fresult_count\x18\x05 \x01(\x05R\vresultCount\"\x91\x01\n" +
 	"\vConstraints\x12\x1b\n" +
 	"\tmax_loops\x18\x01 \x01(\x05R\bmaxLoops\x12\x1f\n" +
 	"\vmax_results\x18\x02 \x01(\x05R\n" +
 	"maxResults\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x03 \x01(\x05R\ttimeoutMs\"\xdd\x01\n" +
+	"timeout_ms\x18\x03 \x01(\x05R\ttimeoutMs\x12%\n" +
+	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\"\xdd\x01\n" +
 	"\rThinkResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x124\n" +
 	"\x06search\x18\x02 \x01(\v2\x1a.librarian.v1.SearchActionH\x00R\x06search\x12:\n" +
 	"\bcomplete\x18\x03 \x01(\v2\x1c.librarian.v1.CompleteActionH\x00R\bcomplete\x121\n" +
 	"\x05error\x18\x04 \x01(\v2\x19.librarian.v1.ErrorActionH\x00R\x05errorB\b\n" +
-	"\x06action\"v\n" +
+	"\x06action\"\xa2\x01\n" +
 	"\fSearchAction\x12!\n" +
 	"\fqueries_text\x18\x01 \x03(\tR\vqueriesText\x12%\n" +
 	"\x0equeries_vector\x18\x02 \x03(\tR\rqueriesVector\x12\x1c\n" +
-	"\trationale\x18\x03 \x01(\tR\trationale\"k\n" +
+	"\trationale\x18\x03 \x01(\tR\trationale\x12*\n" +
+	"\x11exclude_chunk_ids\x18\x04 \x03(\tR\x0fexcludeChunkIds\"k\n" +
 	"\x0eCompleteAction\x122\n" +
 	"\bevidence\x18\x01 \x03(\v2\x16.librarian.v1.EvidenceR\bevidence\x12%\n" +
-	"\x0ecoverage_notes\x18\x02 \x01(\tR\rcoverageNotes\"L\n" +
-	"\bEvidence\x12\x1d\n" +
-	"\n" +
-	"temp_index\x18\x01 \x01(\x05R\ttempIndex\x12!\n" +
+	"\x0ecoverage_notes\x18\x02 \x01(\tR\rcoverageNotes\"H\n" +
+	"\bEvidence\x12\x19\n" +
+	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12!\n" +
 	"\fwhy_relevant\x18\x02 \x01(\tR\vwhyRelevant\"F\n" +
 	"\vErrorAction\x12\x1d\n" +
 	"\n" +

@@ -795,9 +795,21 @@ components:
         model:
           type: string
           description: |
-            professor では無視される（subject_id は URL パスから取得）。
-            任意の文字列を指定可能（例: "professor", "gpt-4o"）。
-          example: "professor"
+            使用する品質レベルを指定するモデル名。
+
+            | モデル名        | Librarianモデル | 最大ループ | 回答生成 | 用途 |
+            |----------------|----------------|-----------|---------|------|
+            | eduanima-flash | flash-lite      | 3回       | minimal | 高速・低コスト |
+            | eduanima       | flash           | 4回       | low     | 標準品質（デフォルト） |
+            | eduanima-pro   | flash           | 5回       | medium  | 高精度 |
+
+            後方互換のため `professor`, `professor-fast`, `professor-pro` も引き続きサポート。
+          enum:
+            - eduanima-flash
+            - eduanima
+            - eduanima-pro
+          default: eduanima
+          example: "eduanima"
         messages:
           type: array
           description: 会話履歴。最後の role="user" メッセージが質問として使用される。

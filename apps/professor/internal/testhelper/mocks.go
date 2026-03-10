@@ -152,9 +152,10 @@ func (m *MockLibrarianClient) Think(
 	subjectID uuid.UUID,
 	userID uuid.UUID,
 	maxLoops int32,
+	thinkingLevel string,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
-	args := m.Called(ctx, requestID, userQuery, subjectID, userID, maxLoops, onSearchRequest)
+	args := m.Called(ctx, requestID, userQuery, subjectID, userID, maxLoops, thinkingLevel, onSearchRequest)
 	v, _ := args.Get(0).(*ports.LibrarianThinkResult)
 	return v, args.Error(1)
 }

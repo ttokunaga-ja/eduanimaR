@@ -1,6 +1,11 @@
 """
 Librarian サービス設定
 環境変数から読み込み、デフォルト値を適用する。
+
+ThinkingLevel別モデル設定（C要件）:
+  - eduanima-flash  (thinking_level="flash-lite"): LIBRARIAN_MODEL_FLASH_LITE
+  - eduanima        (thinking_level="flash"):      LIBRARIAN_MODEL_FLASH
+  - eduanima-pro    (thinking_level="flash"):      LIBRARIAN_MODEL_FLASH（ProもLibrarianはflash使用）
 """
 
 from __future__ import annotations
@@ -21,13 +26,31 @@ class Config:
 
     # Gemini API
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    # クエリ生成・充足度評価に使用するモデル名
-    # LIBRARIAN_MODEL_SEARCH 環境変数で上書き可能（デフォルト: gemini-3-flash-preview）
-    gemini_model: str = field(default_factory=lambda: os.getenv("LIBRARIAN_MODEL_SEARCH", "gemini-3-flash-preview"))
+
+    # ─── ThinkingLevel別モデル設定（C要件） ─────────────────────────────
+    # eduanima-flash レベル用（最速・thinking_level="flash-lite"）
+    model_flash_lite: str = field(
+        default_factory=lambda: os.getenv(
+            "LIBRARIAN_MODEL_FLASH_LITE",
+            "gemini-3.1-flash-lite-preview",
+        )
+    )
+    # eduanima / eduanima-pro レベル用（thinking_level="flash"）
+    # ※ LibrarianはProレベルでもflashモデルを使用する（設計方針）
+    model_flash: str = field(
+        default_factory=lambda: os.getenv(
+            "LIBRARIAN_MODEL_FLASH",
+            "gemini-3-flash-preview",
+        )
+    )
 
     # エージェント制約
-    # max_loops: 上限 5 回（平均 3 回で収束する設計）
-    max_loops: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_LOOPS", "5")))
+    # max_loops: ThinkingLevelに応じて 3〜5 の範囲で可変
+    #   - eduanima-flash: 3（最速）
+    #   - eduanima:       4（デフォルト・バランス型）
+    #   - eduanima-pro:   5（最高品質）
+    # このデフォルト値は constraints.max_loops が未指定の場合のフォールバック
+    max_loops: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_LOOPS", "4")))
     max_results: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_MAX_RESULTS", "10")))
     timeout_ms: int = field(default_factory=lambda: int(os.getenv("LIBRARIAN_TIMEOUT_MS", "30000")))
 

@@ -17,12 +17,30 @@ import (
 )
 
 const (
-	chatSearchLimit   = 10 // 1クエリあたりの最大検索結果数
 	fallbackEvidenceN = 5  // Librarian がエビデンスを返さない場合のフォールバック件数
 	unanswerableTopN  = 10 // 回答不能時に返す収集ソース件数
 	excerptMaxLen     = 300
 	rrfK              = 60 // RRF 定数（標準値: 60）
 )
+
+// topKSchedule は Dynamic Top-K のループ回数に応じた検索件数スケジュール（B-1）。
+//
+// [ループ1: 5件, ループ2: 8件, ループ3: 8件, ループ4以降: 4件]
+// - Loop 1 (Top 5): 簡単な質問をFast Pathで最速終了させる。
+// - Loop 2-3 (Top 8): 難易度が高いと判断し、視野を広げて再検索。
+// - Loop 4+ (Top 4): 最終確認のみ行い、なければ素早く「回答不能」へ。
+var topKSchedule = []int{5, 8, 8, 4}
+
+func dynamicTopK(round int) int {
+	if round <= 0 {
+		return topKSchedule[0]
+	}
+	idx := round - 1
+	if idx >= len(topKSchedule) {
+		return topKSchedule[len(topKSchedule)-1]
+	}
+	return topKSchedule[idx]
+}
 
 // rrfMerge は複数のランク付き検索結果リストを Reciprocal Rank Fusion でマージする。
 //
@@ -81,6 +99,9 @@ type AskOptions struct {
 	AnswerModelOverride string
 	// AnswerThinkingLevel は回答生成時の thinking_level（minimal/low/medium/high）。
 	AnswerThinkingLevel string
+	// ThinkingLevel は Librarian が使用するモデルを決定するレベル（C要件）。
+	// "flash-lite" | "flash" | "" (空文字はflashとして扱う)
+	ThinkingLevel string
 }
 
 // NewChatUseCase は ChatUseCase を生成する。
@@ -161,13 +182,16 @@ func (uc *ChatUseCase) AskWithOptions(
 		return nil, err
 	}
 
-	// 累積検索結果（Librarian の TempIndex はこの配列のインデックスを指す）
+	// 累積検索結果（chunk_idベースのlookupで管理）
 	var allResults []domain.SearchResult
 	seenChunks := make(map[uuid.UUID]struct{})
+	// chunk_id → SearchResult のlookupマップ（chunk_idベースevidence処理用）
+	chunkByID := make(map[string]domain.SearchResult)
 	searchRounds := 0
 
 	// 4. Librarian Think（双方向ストリーミング）
 	librarianStarted := time.Now()
+
 	thinkResult, err := uc.librarian.Think(
 		ctx,
 		session.ID.String(),
@@ -175,6 +199,7 @@ func (uc *ChatUseCase) AskWithOptions(
 		subjectID,
 		userID,
 		opts.MaxLoops,
+		opts.ThinkingLevel, // C要件: Librarianのモデル選択に使用
 		func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error) {
 			searchRounds++
 			// 検索開始通知
@@ -202,6 +227,10 @@ func (uc *ChatUseCase) AskWithOptions(
 				}
 			}
 
+			// B-1: Dynamic Top-K - ループ回数に応じて検索件数を動的に変える
+			topK := dynamicTopK(searchRounds)
+			slog.Info("dynamic top-k applied", "round", searchRounds, "top_k", topK)
+
 			ch := make(chan []*domain.SearchResult, validQueries)
 
 			// (A) 全文検索（goroutine）
@@ -211,7 +240,7 @@ func (uc *ChatUseCase) AskWithOptions(
 				}
 				q := q
 				go func() {
-					results, err := uc.chunkRepo.SearchByText(ctx, subjectID, q, chatSearchLimit)
+					results, err := uc.chunkRepo.SearchByText(ctx, subjectID, q, topK)
 					if err != nil {
 						slog.Warn("text search error", "query", q, "error", err)
 						ch <- nil
@@ -235,7 +264,7 @@ func (uc *ChatUseCase) AskWithOptions(
 						return
 					}
 					vec := pgvector.NewVector(emb)
-					results, err := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, chatSearchLimit)
+					results, err := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, topK)
 					if err != nil {
 						slog.Warn("vector search error", "query", q, "error", err)
 						ch <- nil
@@ -257,12 +286,13 @@ func (uc *ChatUseCase) AskWithOptions(
 			// RRF でマージ：このラウンドの結果を RRF スコア順に統合
 			roundMerged := rrfMerge(rankedLists)
 
-			// allResults に追加（TempIndex の安定性を保つため重複除去のみ）
+			// allResults に追加（chunk_id ベースで重複除去、lookupマップにも登録）
 			for _, r := range roundMerged {
 				r := r
 				if _, seen := seenChunks[r.ChunkID]; !seen {
 					seenChunks[r.ChunkID] = struct{}{}
 					allResults = append(allResults, r)
+					chunkByID[r.ChunkID.String()] = r
 				}
 			}
 
@@ -288,14 +318,14 @@ func (uc *ChatUseCase) AskWithOptions(
 	sources := make([]domain.Source, 0, len(thinkResult.Evidences))
 
 	for _, ev := range thinkResult.Evidences {
-		if ev.TempIndex < 0 || ev.TempIndex >= len(allResults) {
-			slog.Warn("evidence index out of range",
-				"index", ev.TempIndex,
-				"allResults_len", len(allResults),
+		// chunk_id ベースで SearchResult を逆引き（A-3 Triaging 結果）
+		r, ok := chunkByID[ev.ChunkID]
+		if !ok {
+			slog.Warn("evidence chunk not found in accumulated results",
+				"chunk_id", ev.ChunkID,
 			)
 			continue
 		}
-		r := allResults[ev.TempIndex]
 		evidenceTexts = append(evidenceTexts, r.Content)
 
 		excerpt := r.Content

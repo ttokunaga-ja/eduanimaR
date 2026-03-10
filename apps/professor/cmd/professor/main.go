@@ -91,7 +91,7 @@ func main() {
 	slog.Info("kafka producer initialized", "brokers", cfg.KafkaBrokers)
 
 	// ─── Kafka コンシューマー（Ingest Worker 用） ─────────────
-	consumer := messaging.NewKafkaConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, "professor-ingest-worker")
+	consumer := messaging.NewKafkaConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, "professor-ingest-worker", cfg.KafkaWorkerCount)
 	defer func() {
 		if err := consumer.Close(); err != nil {
 			slog.Warn("failed to close kafka consumer", "error", err)
@@ -126,7 +126,7 @@ func main() {
 	subjectUC := usecases.NewSubjectUseCase(subjectRepo)
 	materialUC := usecases.NewMaterialUseCase(fileRepo, ingestJobRepo, objectStorage, publisher, subjectRepo)
 	chatUC := usecases.NewChatUseCase(subjectRepo, qaSessionRepo, chunkRepo, fileRepo, objectStorage, llmClient, librarianClient)
-	ingestUC := usecases.NewIngestUseCase(fileRepo, ingestJobRepo, chunkRepo, objectStorage, llmClient)
+	ingestUC := usecases.NewIngestUseCase(fileRepo, ingestJobRepo, chunkRepo, objectStorage, llmClient, cfg.EmbeddingConcurrency)
 
 	// ─── Echo サーバー設定 ────────────────────────────────────
 	e := echo.New()

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	pgvector "github.com/pgvector/pgvector-go"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/domain"
 	"github.com/ttokunaga-ja/eduanimaR/apps/professor/internal/ports"
@@ -17,27 +19,36 @@ import (
 // IngestUseCase は OCR/Embedding パイプラインのビジネスロジックを担う。
 // Kafka コンシューマーがメッセージを受信するたびに ProcessJob を呼び出す。
 type IngestUseCase struct {
-	files   ports.FileRepository
-	jobs    ports.IngestJobRepository
-	chunks  ports.ChunkRepository
-	storage ports.ObjectStorage
-	llm     ports.LLMClient
+	files                ports.FileRepository
+	jobs                 ports.IngestJobRepository
+	chunks               ports.ChunkRepository
+	storage              ports.ObjectStorage
+	llm                  ports.LLMClient
+	embeddingConcurrency int
 }
 
 // NewIngestUseCase は IngestUseCase を生成する。
+//
+// embeddingConcurrency: 1ファイル内でチャンク Embedding を並列生成する数。
+// 0 以下の場合はデフォルト値 5 を使用。
 func NewIngestUseCase(
 	files ports.FileRepository,
 	jobs ports.IngestJobRepository,
 	chunks ports.ChunkRepository,
 	storage ports.ObjectStorage,
 	llm ports.LLMClient,
+	embeddingConcurrency int,
 ) *IngestUseCase {
+	if embeddingConcurrency <= 0 {
+		embeddingConcurrency = 5
+	}
 	return &IngestUseCase{
-		files:   files,
-		jobs:    jobs,
-		chunks:  chunks,
-		storage: storage,
-		llm:     llm,
+		files:                files,
+		jobs:                 jobs,
+		chunks:               chunks,
+		storage:              storage,
+		llm:                  llm,
+		embeddingConcurrency: embeddingConcurrency,
 	}
 }
 
@@ -48,7 +59,7 @@ func NewIngestUseCase(
 //  2. FileStatus を "processing" に更新
 //  3. MinIO からファイルをダウンロード
 //  4. LLM.OCRAndChunk でテキスト抽出・チャンク分割
-//  5. 各チャンクの Embedding 生成（失敗チャンクはスキップ）
+//  5. 各チャンクの Embedding 生成（embeddingConcurrency 件並列、失敗チャンクはスキップ）
 //  6. ChunkRepository.BatchCreate でバルク保存
 //  7. FileStatus → "completed", IngestJob → "completed"
 //
@@ -137,42 +148,73 @@ func (uc *IngestUseCase) ProcessJob(ctx context.Context, msg ports.IngestMessage
 		"chunk_count", len(ocrResult.Chunks),
 	)
 
-	// 5. 各チャンクの Embedding 生成
+	// 5. 各チャンクの Embedding 生成（embeddingConcurrency 件並列）
+	//
+	// 並列化の仕組み:
+	//   - errgroup で全チャンクに goroutine を割り当て
+	//   - セマフォ（sem）で同時実行数を embeddingConcurrency に制限
+	//   - Embedding 失敗は警告のみ（そのチャンクをスキップ）
+	//   - mu（Mutex）で chunks スライスへの並列書き込みを保護
 	now := time.Now().UTC()
+	var mu sync.Mutex
 	chunks := make([]*domain.Chunk, 0, len(ocrResult.Chunks))
+
+	g, gCtx := errgroup.WithContext(ctx)
+	sem := make(chan struct{}, uc.embeddingConcurrency)
 
 	for _, c := range ocrResult.Chunks {
 		if c.Content == "" {
 			continue
 		}
+		c := c // ループ変数を goroutine にキャプチャ
 
-		emb, embErr := uc.llm.GenerateDocumentEmbedding(ctx, c.Content)
-		if embErr != nil {
-			// Embedding 失敗は警告のみ（そのチャンクをスキップ）
-			slog.Warn("embedding failed, skipping chunk",
-				"job_id", jobID,
-				"chunk_index", c.Index,
-				"error", embErr,
-			)
-			continue
-		}
+		g.Go(func() error {
+			// セマフォ取得: スロットが埋まっているか ctx キャンセル待ち
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-gCtx.Done():
+				return nil // コンテキストキャンセル時はスキップ
+			}
 
-		chunks = append(chunks, &domain.Chunk{
-			ID:         uuid.New(),
-			FileID:     fileID,
-			SubjectID:  subjectID,
-			PageNumber: c.PageNumber,
-			ChunkIndex: c.Index,
-			Content:    c.Content,
-			Embedding:  pgvector.NewVector(emb),
-			CreatedAt:  now,
+			// ctx を使用（gCtx は errgroup 内部のキャンセル伝播用のみ）
+			emb, embErr := uc.llm.GenerateDocumentEmbedding(ctx, c.Content)
+			if embErr != nil {
+				// Embedding 失敗は警告のみ（そのチャンクをスキップ）
+				slog.Warn("embedding failed, skipping chunk",
+					"job_id", jobID,
+					"chunk_index", c.Index,
+					"error", embErr,
+				)
+				return nil
+			}
+
+			mu.Lock()
+			chunks = append(chunks, &domain.Chunk{
+				ID:         uuid.New(),
+				FileID:     fileID,
+				SubjectID:  subjectID,
+				PageNumber: c.PageNumber,
+				ChunkIndex: c.Index,
+				Content:    c.Content,
+				Embedding:  pgvector.NewVector(emb),
+				CreatedAt:  now,
+			})
+			mu.Unlock()
+			return nil
 		})
+	}
+
+	if err := g.Wait(); err != nil {
+		processErr = fmt.Errorf("parallel embedding: %w", err)
+		return processErr
 	}
 
 	slog.Info("embeddings generated",
 		"job_id", jobID,
 		"embedded_chunks", len(chunks),
 		"total_chunks", len(ocrResult.Chunks),
+		"embedding_concurrency", uc.embeddingConcurrency,
 	)
 
 	// 6. DB にバルク保存

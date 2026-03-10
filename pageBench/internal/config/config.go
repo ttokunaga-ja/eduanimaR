@@ -9,7 +9,7 @@ import (
 )
 
 // AgentConfig は Agent システム（RAG バックエンド）の接続設定。
-// OpenAI互換 model フィールドで品質レベル（professor-fast/professor/professor-pro）を指定できる。
+// OpenAI互換 model フィールドで品質レベル（eduanima-flash/eduanima/eduanima-pro）を指定できる。
 type AgentConfig struct {
 	APIBase string
 	APIKey  string
@@ -139,7 +139,8 @@ func Load() (*Config, error) {
 		Agent: AgentConfig{
 			APIBase: getEnvDefault("AGENT_API_BASE", ""),
 			APIKey:  os.Getenv("AGENT_API_KEY"),
-			Model:   getEnvDefault("PAGEBENCH_MODEL", "professor"),
+			// PAGEBENCH_MODEL: eduanima-flash / eduanima / eduanima-pro
+			Model: getEnvDefault("PAGEBENCH_MODEL", "eduanima"),
 		},
 		Upload: UploadConfig{
 			Purpose:          getEnvDefault("AGENT_UPLOAD_PURPOSE", "assistants"),

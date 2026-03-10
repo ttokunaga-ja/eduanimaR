@@ -20,6 +20,7 @@ import (
 // ─── テストヘルパー ────────────────────────────────────────────────
 
 // newIngestUseCase はテスト用依存を注入した IngestUseCase を返す。
+// embeddingConcurrency=1 で逐次実行に固定し、テストの決定論性を保証する。
 func newIngestUseCase(
 	files *testhelper.MockFileRepository,
 	jobs *testhelper.MockIngestJobRepository,
@@ -27,7 +28,7 @@ func newIngestUseCase(
 	storage *testhelper.MockObjectStorage,
 	llm *testhelper.MockLLMClient,
 ) *usecases.IngestUseCase {
-	return usecases.NewIngestUseCase(files, jobs, chunks, storage, llm)
+	return usecases.NewIngestUseCase(files, jobs, chunks, storage, llm, 1)
 }
 
 // validIngestMessage は標準的なテスト用 IngestMessage を返す。

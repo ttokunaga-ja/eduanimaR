@@ -132,8 +132,9 @@ cp .env.example .env
 | `KAFKA_TOPIC_INGEST`        | 取り込みジョブトピック名            | `eduanima.ingest.jobs`        |
 | `PORT`                      | Professor HTTP ポート             | `8080`                        |
 | `GRPC_PORT`                 | Librarian gRPC ポート             | `50051`                       |
-| `PROFESSOR_MODEL_FAST`      | 高速モデル名                       | `gemini-2.0-flash`            |
-| `PROFESSOR_MODEL_ACCURATE`  | 高精度モデル名                     | `gemini-2.5-pro`              |
+| `PROFESSOR_MODEL_ANSWER`        | 標準回答生成モデル名（eduanima）   | `gemini-3-flash-preview`      |
+| `LIBRARIAN_MODEL_FLASH_LITE`    | Librarian flash-lite モデル名     | `gemini-3.1-flash-lite-preview` |
+| `LIBRARIAN_MODEL_FLASH`         | Librarian flash モデル名          | `gemini-3-flash-preview`      |
 | `LOG_LEVEL`                 | ログレベル                         | `info`（debug も可）           |
 | `NEXT_PUBLIC_API_BASE_URL`  | ブラウザからの API ベース URL       | `http://localhost:8080/api`   |
 
