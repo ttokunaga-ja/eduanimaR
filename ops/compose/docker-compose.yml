@@ -12,6 +12,14 @@
 #   make dev
 # ============================================================
 
+# 共通環境ファイル設定 (ルート .env を全サービスへ適用)
+#   top-level env_file は Compose spec で許されないためアンカーを使用。
+#   ルート compose.yml から include されるため、相対パスは
+#   プロジェクトルート基準で `.env` を指す。
+x-root-env: &root-env
+  env_file:
+    - ./.env
+
 # ──────────────────────────────────────────────────────────────
 # 共通ネットワーク
 # ──────────────────────────────────────────────────────────────
@@ -37,6 +45,7 @@ services:
   # pgvector/pgvector:pg18 = PostgreSQL 18 + pgvector 0.8.1（HNSW・コサイン類似度検索）
   # PG18 ネイティブ機能: uuidv7() / UNIQUE NULLS NOT DISTINCT / B-tree Skip Scan
   postgres:
+    <<: *root-env
     image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-eduanima}
@@ -158,6 +167,7 @@ services:
   # dev モード: builder ステージ + src ボリュームマウント
   # ⚠️ 初回またはproto変更時は: cd apps/librarian && make proto
   librarian:
+    <<: *root-env
     build:
       context: ./apps/librarian
       target: builder
@@ -195,6 +205,7 @@ services:
   # ── Professor（Go バックエンド）──────────────────────────────
   # dev モード: air ホットリロード（.air.toml 必須）
   professor-migrate:
+    <<: *root-env
     image: arigaio/atlas:latest
     depends_on:
       postgres:
@@ -213,6 +224,7 @@ services:
     restart: "no"
 
   professor:
+    <<: *root-env
     build:
       context: ./apps/professor
       target: dev          # air ホットリロードステージ
