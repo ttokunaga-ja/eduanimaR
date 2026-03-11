@@ -24,9 +24,12 @@ class TestConfigDefaults:
         cfg = Config()
         assert cfg.health_port == 8081
 
-    def test_デフォルトmax_loopsが3(self) -> None:
-        cfg = Config()
-        assert cfg.max_loops == 3
+    def test_デフォルトmax_loopsが4(self) -> None:
+        # LIBRARIAN_MAX_LOOPS 未設定時のデフォルト値は 4（config.py 参照）
+        env = {k: v for k, v in os.environ.items() if k != "LIBRARIAN_MAX_LOOPS"}
+        with patch.dict(os.environ, env, clear=True):
+            cfg = Config()
+            assert cfg.max_loops == 4
 
     def test_デフォルトmax_resultsが10(self) -> None:
         cfg = Config()

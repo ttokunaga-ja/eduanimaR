@@ -13,15 +13,17 @@ import type { ChatStreamState } from '../model/types';
 
 interface ChatStreamProps {
   state: ChatStreamState;
+  /** clarification 選択肢をクリックした時のコールバック（選択肢テキストで再質問） */
+  onSelectClarification?: (option: string) => void;
 }
 
 /**
  * SSEストリーム表示コンポーネント。
- * thinking / searching / evidence / streaming / done / error 各フェーズを表示。
+ * thinking / searching / evidence / streaming / done / error / clarification 各フェーズを表示。
  */
-export function ChatStream({ state }: ChatStreamProps) {
+export function ChatStream({ state, onSelectClarification }: ChatStreamProps) {
   const { t } = useTranslation('common');
-  const { status, searchQuery, evidences, answer, chatId, error } = state;
+  const { status, searchQuery, evidences, answer, chatId, error, clarificationOptions } = state;
 
   const handleFeedback = useCallback(
     async (rating: PostV1SubjectsSubjectIdChatsChatIdFeedbackBodyRating) => {
@@ -64,6 +66,30 @@ export function ChatStream({ state }: ChatStreamProps) {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ─── 曖昧な質問への選択肢提示 ─── */}
+      {status === 'clarification' && clarificationOptions && clarificationOptions.length > 0 && (
+        <div style={styles.clarificationBox}>
+          <p style={styles.clarificationLabel}>
+            ご質問の意図を教えてください。以下の中からお選びください：
+          </p>
+          <div style={styles.clarificationOptions}>
+            {clarificationOptions.map((option, i) => (
+              <button
+                key={i}
+                onClick={() => onSelectClarification?.(option)}
+                style={styles.clarificationBtn}
+                type="button"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <p style={styles.clarificationHint}>
+            または、入力欄に具体的な質問を入力してください。
+          </p>
         </div>
       )}
 
@@ -179,6 +205,45 @@ const styles = {
     borderRadius: '4px',
     fontSize: '13px',
   },
+  // ─── clarification スタイル ───────────────────────────────────
+  clarificationBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
+    padding: '16px',
+    background: '#fff8e1',
+    border: '1px solid #ffe082',
+    borderRadius: '8px',
+  },
+  clarificationLabel: {
+    margin: 0,
+    fontSize: '14px',
+    fontWeight: 600 as const,
+    color: '#5d4037',
+  },
+  clarificationOptions: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  clarificationBtn: {
+    padding: '10px 14px',
+    background: '#ffffff',
+    border: '1px solid #ffca28',
+    borderRadius: '6px',
+    fontSize: '14px',
+    color: '#4e342e',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    lineHeight: '1.5',
+    transition: 'background 0.15s',
+  },
+  clarificationHint: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#8d6e63',
+  },
+  // ──────────────────────────────────────────────────────────────
   evidenceDetails: {
     border: '1px solid #e0e0e0',
     borderRadius: '6px',

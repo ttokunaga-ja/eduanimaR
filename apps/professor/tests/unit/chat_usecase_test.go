@@ -72,6 +72,14 @@ func TestChatUseCase_Ask_Success(t *testing.T) {
 	// QASession 作成（session.ID は uuid.New() で動的生成されるため mock.Anything）
 	qaRepo.On("Create", ctx, mock.AnythingOfType("*domain.QASession")).Return(nil)
 
+	// 質問分析（Step1）: clear として返す
+	llmClient.On("GenerateQuestionAnalysis", ctx, question).
+		Return(&ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{},
+			Clarity:            ports.QuestionClarityClear,
+		}, nil)
+
 	// Librarian Think: エビデンスなし（フォールバック経路）
 	thinkResult := &ports.LibrarianThinkResult{
 		Evidences:     []ports.LibrarianEvidence{},
@@ -83,7 +91,10 @@ func TestChatUseCase_Ask_Success(t *testing.T) {
 		question,
 		subjectID,
 		userID,
-		mock.Anything, // maxLoops
+		mock.Anything, // maxLoops (int32)
+		mock.Anything, // thinkingLevel (string)
+		mock.Anything, // interpretedQuery (string)
+		mock.Anything, // completionCriteria ([]string)
 		mock.Anything, // onSearchRequest func
 	).Return(thinkResult, nil)
 
@@ -101,6 +112,10 @@ func TestChatUseCase_Ask_Success(t *testing.T) {
 		onChunk := args.Get(7).(func(string) error)
 		_ = onChunk("テスト回答")
 	})
+
+	// GenerateAnswerMeta: 回答メタデータ取得
+	llmClient.On("GenerateAnswerMeta", ctx, question, "テスト回答", 0).
+		Return(&ports.AnswerMeta{Answerability: "answerable"}, nil)
 
 	// UpdateAnswer（session.ID は動的生成のため mock.Anything）
 	updatedSession := testhelper.NewQASession(func(s *domain.QASession) {
@@ -207,9 +222,26 @@ func TestChatUseCase_Ask_LibrarianError_SendsSSEError(t *testing.T) {
 	subjectRepo.On("GetByIDAndUserID", ctx, subjectID, userID).Return(subject, nil)
 	qaRepo.On("Create", ctx, mock.AnythingOfType("*domain.QASession")).Return(nil)
 
+	// 質問分析（Step1）: clear として返す
+	llmClient.On("GenerateQuestionAnalysis", ctx, "質問").
+		Return(&ports.QuestionAnalysis{
+			InterpretedQuery:   "質問",
+			CompletionCriteria: []string{},
+			Clarity:            ports.QuestionClarityClear,
+		}, nil)
+
 	librarianErr := errors.New("librarian unavailable")
 	librarianClient.On("Think",
-		ctx, mock.Anything, "質問", subjectID, userID, mock.Anything, mock.Anything,
+		ctx,
+		mock.AnythingOfType("string"), // session.ID.String()
+		"質問",
+		subjectID,
+		userID,
+		mock.Anything, // maxLoops (int32)
+		mock.Anything, // thinkingLevel (string)
+		mock.Anything, // interpretedQuery (string)
+		mock.Anything, // completionCriteria ([]string)
+		mock.Anything, // onSearchRequest func
 	).Return((*ports.LibrarianThinkResult)(nil), librarianErr)
 
 	var gotErrorEvent bool
@@ -249,12 +281,29 @@ func TestChatUseCase_Ask_LLMStreamError_SendsSSEError(t *testing.T) {
 	subjectRepo.On("GetByIDAndUserID", ctx, subjectID, userID).Return(subject, nil)
 	qaRepo.On("Create", ctx, mock.AnythingOfType("*domain.QASession")).Return(nil)
 
+	// 質問分析（Step1）: clear として返す
+	llmClient.On("GenerateQuestionAnalysis", ctx, question).
+		Return(&ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{},
+			Clarity:            ports.QuestionClarityClear,
+		}, nil)
+
 	thinkResult := &ports.LibrarianThinkResult{
 		Evidences:     []ports.LibrarianEvidence{},
 		CoverageNotes: "推論",
 	}
 	librarianClient.On("Think",
-		ctx, mock.Anything, question, subjectID, userID, mock.Anything, mock.Anything,
+		ctx,
+		mock.AnythingOfType("string"), // session.ID.String()
+		question,
+		subjectID,
+		userID,
+		mock.Anything, // maxLoops (int32)
+		mock.Anything, // thinkingLevel (string)
+		mock.Anything, // interpretedQuery (string)
+		mock.Anything, // completionCriteria ([]string)
+		mock.Anything, // onSearchRequest func
 	).Return(thinkResult, nil)
 
 	streamErr := errors.New("LLM stream broken")
@@ -379,4 +428,129 @@ func TestChatUseCase_UpdateFeedback_NotFound(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrNotFound))
 	assert.Nil(t, result)
+}
+
+// ─── Ask: 曖昧な質問 → SSEEventClarification を送信 ───────────────
+
+// TestChatUseCase_Ask_AmbiguousQuestion_SendsClarification は、
+// GenerateQuestionAnalysis が "ambiguous" を返した場合に
+// SSEEventClarification + SSEEventDone が送信されることを検証する。
+// Think は呼ばれないことも確認する。
+func TestChatUseCase_Ask_AmbiguousQuestion_SendsClarification(t *testing.T) {
+	ctx := context.Background()
+	subjectID := testhelper.FixtureSubjectID
+	userID := testhelper.FixtureUserID
+	question := "機械学習について教えて"
+
+	subjectRepo := &testhelper.MockSubjectRepository{}
+	qaRepo := &testhelper.MockQASessionRepository{}
+	chunkRepo := &testhelper.MockChunkRepository{}
+	llmClient := &testhelper.MockLLMClient{}
+	librarianClient := &testhelper.MockLibrarianClient{}
+
+	subject := testhelper.NewSubject()
+	subjectRepo.On("GetByIDAndUserID", ctx, subjectID, userID).Return(subject, nil)
+	qaRepo.On("Create", ctx, mock.AnythingOfType("*domain.QASession")).Return(nil)
+
+	// Step1: 曖昧と判定
+	llmClient.On("GenerateQuestionAnalysis", ctx, question).
+		Return(&ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{},
+			Clarity:            ports.QuestionClarityAmbiguous,
+		}, nil)
+
+	// 選択肢生成
+	clarificationOpts := []string{
+		"機械学習の基本的なアルゴリズムについて知りたい",
+		"機械学習を使った具体的な応用例が知りたい",
+		"機械学習の学習方法・おすすめリソースが知りたい",
+	}
+	llmClient.On("GenerateClarificationOptions", ctx, question).
+		Return(&ports.ClarificationOptions{Options: clarificationOpts}, nil)
+
+	onEvent, events := collectEvents()
+	uc := newChatUseCase(subjectRepo, qaRepo, chunkRepo, llmClient, librarianClient)
+	session, err := uc.Ask(ctx, subjectID, userID, question, onEvent)
+
+	// 正常終了（エラーなし）
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	// clarification + done イベントが送信されること
+	assert.Contains(t, *events, domain.SSEEventClarification)
+	assert.Contains(t, *events, domain.SSEEventDone)
+
+	// thinking + answer イベントは発生しないこと
+	assert.NotContains(t, *events, domain.SSEEventThinking)
+	assert.NotContains(t, *events, domain.SSEEventAnswer)
+
+	// Think は呼ばれないこと
+	librarianClient.AssertNotCalled(t, "Think")
+
+	subjectRepo.AssertExpectations(t)
+	qaRepo.AssertExpectations(t)
+	llmClient.AssertExpectations(t)
+}
+
+// ─── Ask: 質問分析エラー時にフォールバックして Think を呼ぶ ─────────
+
+// TestChatUseCase_Ask_QuestionAnalysisError_FallsBackToClear は、
+// GenerateQuestionAnalysis がエラーを返した場合に early return せず
+// フォールバック（clear・元の質問）で Think が呼ばれることを検証する。
+func TestChatUseCase_Ask_QuestionAnalysisError_FallsBackToClear(t *testing.T) {
+	ctx := context.Background()
+	subjectID := testhelper.FixtureSubjectID
+	userID := testhelper.FixtureUserID
+	question := "分析エラー時のフォールバックテスト"
+
+	subjectRepo := &testhelper.MockSubjectRepository{}
+	qaRepo := &testhelper.MockQASessionRepository{}
+	chunkRepo := &testhelper.MockChunkRepository{}
+	llmClient := &testhelper.MockLLMClient{}
+	librarianClient := &testhelper.MockLibrarianClient{}
+
+	subject := testhelper.NewSubject()
+	subjectRepo.On("GetByIDAndUserID", ctx, subjectID, userID).Return(subject, nil)
+	qaRepo.On("Create", ctx, mock.AnythingOfType("*domain.QASession")).Return(nil)
+
+	// GenerateQuestionAnalysis はエラーを返す
+	analysisErr := errors.New("LLM analysis timeout")
+	llmClient.On("GenerateQuestionAnalysis", ctx, question).
+		Return((*ports.QuestionAnalysis)(nil), analysisErr)
+
+	// フォールバック後も Think が呼ばれることを確認（Think はエラーを返す）
+	librarianErr := errors.New("librarian error after fallback")
+	librarianClient.On("Think",
+		ctx,
+		mock.AnythingOfType("string"), // session.ID.String()
+		question,
+		subjectID,
+		userID,
+		mock.Anything, // maxLoops (int32)
+		mock.Anything, // thinkingLevel (string)
+		mock.Anything, // interpretedQuery (string) ← fallback: original question
+		mock.Anything, // completionCriteria ([]string) ← fallback: []
+		mock.Anything, // onSearchRequest func
+	).Return((*ports.LibrarianThinkResult)(nil), librarianErr)
+
+	var gotErrorEvent bool
+	onEvent := func(et domain.SSEEventType, _ any) error {
+		if et == domain.SSEEventError {
+			gotErrorEvent = true
+		}
+		return nil
+	}
+
+	uc := newChatUseCase(subjectRepo, qaRepo, chunkRepo, llmClient, librarianClient)
+	session, err := uc.Ask(ctx, subjectID, userID, question, onEvent)
+
+	// エラーで終了（Librarian エラーが伝播）
+	assert.Error(t, err)
+	assert.Nil(t, session)
+	assert.True(t, gotErrorEvent, "SSEEventError が送信されるべき")
+
+	// GenerateQuestionAnalysis がエラーを返しても Think が呼ばれること（early return しないこと）
+	librarianClient.AssertExpectations(t)
+	llmClient.AssertExpectations(t)
 }

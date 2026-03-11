@@ -32,10 +32,11 @@ type Source struct {
 type SSEEventType string
 
 const (
-	SSEEventThinking  SSEEventType = "thinking"  // Librarian が推論中
-	SSEEventSearching SSEEventType = "searching" // 検索クエリ実行中
-	SSEEventEvidence  SSEEventType = "evidence"  // エビデンスチャンク発見
-	SSEEventAnswer    SSEEventType = "answer"    // 回答テキスト（チャンク送信）
-	SSEEventDone      SSEEventType = "done"      // ストリーミング完了
-	SSEEventError     SSEEventType = "error"     // エラー発生
+	SSEEventThinking      SSEEventType = "thinking"      // Librarian が推論中
+	SSEEventSearching     SSEEventType = "searching"     // 検索クエリ実行中
+	SSEEventEvidence      SSEEventType = "evidence"      // エビデンスチャンク発見
+	SSEEventAnswer        SSEEventType = "answer"        // 回答テキスト（チャンク送信）
+	SSEEventDone          SSEEventType = "done"          // ストリーミング完了
+	SSEEventError         SSEEventType = "error"         // エラー発生
+	SSEEventClarification SSEEventType = "clarification" // 曖昧な質問への選択肢提示
 )

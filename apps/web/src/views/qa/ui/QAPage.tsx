@@ -29,6 +29,7 @@ export function QAPage({ subjectId }: QAPageProps) {
     state.status === 'thinking' ||
     state.status === 'searching' ||
     state.status === 'streaming';
+  // clarification はユーザーが選択肢を操作できるため isProcessing に含めない
 
   return (
     <div style={styles.root}>
@@ -64,7 +65,7 @@ export function QAPage({ subjectId }: QAPageProps) {
             </p>
           </div>
         ) : (
-          <ChatStream state={state} />
+          <ChatStream state={state} onSelectClarification={ask} />
         )}
       </main>
 

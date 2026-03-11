@@ -182,6 +182,52 @@ func (uc *ChatUseCase) AskWithOptions(
 	}
 	slog.Info("qa session created", "session_id", session.ID, "subject_id", subjectID)
 
+	// 2.5. 質問分析（Pre-search Step1）: 解釈・終了基準・曖昧さ判定を 1 回の LLM 呼び出しで実施
+	analysis, analysisErr := uc.llm.GenerateQuestionAnalysis(ctx, question)
+	if analysisErr != nil {
+		slog.Warn("question analysis failed, proceeding with fallback", "error", analysisErr)
+		analysis = &ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{},
+			Clarity:            ports.QuestionClarityClear,
+		}
+	}
+	// DB に question analysis を保存（失敗はログのみ）
+	if uc.analyticsRepo != nil {
+		_ = uc.analyticsRepo.UpdateQuestionAnalysis(ctx, session.ID, ports.QuestionAnalysisUpdate{
+			Clarity:            string(analysis.Clarity),
+			InterpretedQuery:   analysis.InterpretedQuery,
+			CompletionCriteria: analysis.CompletionCriteria,
+		})
+	}
+	// 曖昧な質問の場合: 選択肢を生成して SSEEventClarification を送信し早期リターン
+	if analysis.Clarity == ports.QuestionClarityAmbiguous {
+		clarifyOpts, clarifyErr := uc.llm.GenerateClarificationOptions(ctx, question)
+		if clarifyErr != nil {
+			slog.Warn("clarification options failed, falling back to clear path", "error", clarifyErr)
+			// フォールバック: clear として続行
+		} else {
+			// DB に clarification_options を保存
+			if uc.analyticsRepo != nil {
+				_ = uc.analyticsRepo.UpdateQuestionAnalysis(ctx, session.ID, ports.QuestionAnalysisUpdate{
+					Clarity:              string(analysis.Clarity),
+					InterpretedQuery:     analysis.InterpretedQuery,
+					CompletionCriteria:   analysis.CompletionCriteria,
+					ClarificationOptions: clarifyOpts.Options,
+				})
+			}
+			_ = onEvent(domain.SSEEventClarification, map[string]any{
+				"session_id": session.ID.String(),
+				"options":    clarifyOpts.Options,
+			})
+			_ = onEvent(domain.SSEEventDone, map[string]any{
+				"session_id":       session.ID.String(),
+				"is_clarification": true,
+			})
+			return session, nil
+		}
+	}
+
 	// 3. Librarian 推論開始通知
 	if err := onEvent(domain.SSEEventThinking, map[string]any{
 		"session_id": session.ID.String(),
@@ -208,7 +254,9 @@ func (uc *ChatUseCase) AskWithOptions(
 		subjectID,
 		userID,
 		opts.MaxLoops,
-		opts.ThinkingLevel, // C要件: Librarianのモデル選択に使用
+		opts.ThinkingLevel,          // C要件: Librarianのモデル選択に使用
+		analysis.InterpretedQuery,   // Pre-search Step1 で解釈した質問
+		analysis.CompletionCriteria, // judge_sufficiency に渡す終了基準
 		func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error) {
 			searchRounds++
 			// 検索開始通知

@@ -145,6 +145,16 @@ func (m *MockLLMClient) GenerateAnswerMeta(ctx context.Context, question, answer
 	v, _ := args.Get(0).(*ports.AnswerMeta)
 	return v, args.Error(1)
 }
+func (m *MockLLMClient) GenerateQuestionAnalysis(ctx context.Context, question string) (*ports.QuestionAnalysis, error) {
+	args := m.Called(ctx, question)
+	v, _ := args.Get(0).(*ports.QuestionAnalysis)
+	return v, args.Error(1)
+}
+func (m *MockLLMClient) GenerateClarificationOptions(ctx context.Context, question string) (*ports.ClarificationOptions, error) {
+	args := m.Called(ctx, question)
+	v, _ := args.Get(0).(*ports.ClarificationOptions)
+	return v, args.Error(1)
+}
 
 // ─── LibrarianClient ─────────────────────────────────────────────
 
@@ -158,9 +168,11 @@ func (m *MockLibrarianClient) Think(
 	userID uuid.UUID,
 	maxLoops int32,
 	thinkingLevel string,
+	interpretedQuery string,
+	completionCriteria []string,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
-	args := m.Called(ctx, requestID, userQuery, subjectID, userID, maxLoops, thinkingLevel, onSearchRequest)
+	args := m.Called(ctx, requestID, userQuery, subjectID, userID, maxLoops, thinkingLevel, interpretedQuery, completionCriteria, onSearchRequest)
 	v, _ := args.Get(0).(*ports.LibrarianThinkResult)
 	return v, args.Error(1)
 }
@@ -252,4 +264,7 @@ func (m *MockChatAnalyticsRepository) InsertLoopDetail(ctx context.Context, deta
 }
 func (m *MockChatAnalyticsRepository) InsertAccumulatedChunks(ctx context.Context, chunks []ports.ChatAccumulatedChunk) error {
 	return m.Called(ctx, chunks).Error(0)
+}
+func (m *MockChatAnalyticsRepository) UpdateQuestionAnalysis(ctx context.Context, chatID uuid.UUID, analysis ports.QuestionAnalysisUpdate) error {
+	return m.Called(ctx, chatID, analysis).Error(0)
 }

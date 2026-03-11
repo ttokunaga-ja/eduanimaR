@@ -25,6 +25,39 @@ type AnswerMeta struct {
 	DocumentSummary string `json:"document_summary"`
 }
 
+// QuestionClarity は質問の明確さを表す ENUM。
+// Professor の Step1（質問分析）で判定し、Librarian を呼ぶか選択肢提示かを決定する。
+type QuestionClarity string
+
+const (
+	// QuestionClarityClear は質問が十分に明確で、Librarian 検索に進めることを示す。
+	QuestionClarityClear QuestionClarity = "clear"
+	// QuestionClarityAmbiguous は質問が曖昧で、ユーザーへの選択肢提示が必要なことを示す。
+	QuestionClarityAmbiguous QuestionClarity = "ambiguous"
+)
+
+// QuestionAnalysis は Professor が Librarian 呼び出し前に生成する質問分析結果。
+// LLM の Structured Output（1回の呼び出し）で取得する。
+type QuestionAnalysis struct {
+	// InterpretedQuery は LLM が解釈した質問文（元の質問より精確）。
+	// Librarian の初回 build_search_queries に使用する。
+	InterpretedQuery string `json:"interpreted_query"`
+	// CompletionCriteria は「何が揃えば回答できるか」の終了基準リスト。
+	// Librarian の judge_sufficiency に渡し、Early Exit の判断基準にする。
+	CompletionCriteria []string `json:"completion_criteria"`
+	// Clarity は質問の明確さ ENUM。
+	// "clear" → Librarian 検索へ進む。
+	// "ambiguous" → GenerateClarificationOptions で選択肢提示へ分岐。
+	Clarity QuestionClarity `json:"clarity"`
+}
+
+// ClarificationOptions は曖昧な質問に対してユーザーに提示する具体的な質問候補。
+// GenerateClarificationOptions が返す Structured Output スキーマ。
+type ClarificationOptions struct {
+	// Options は 3〜5 個の具体的な質問候補テキスト。
+	Options []string `json:"options"`
+}
+
 // LLMClient は Gemini API 呼び出しを抽象化する。
 // Phase 1: 高速推論モデル（OCR/Embedding） + 高精度推論モデル（最終回答）を使い分ける。
 type LLMClient interface {
@@ -61,4 +94,14 @@ type LLMClient interface {
 	// answer: ストリーミング完了後の完全な回答テキスト
 	// evidenceCount: 使用したエビデンスチャンク数（0=回答不能の可能性が高い）
 	GenerateAnswerMeta(ctx context.Context, question, answer string, evidenceCount int) (*AnswerMeta, error)
+
+	// GenerateQuestionAnalysis は質問を分析し、解釈済み質問・終了基準・明確さを1回の
+	// LLM 呼び出しで返す（Professor の Step1）。
+	// 結果の Clarity により Librarian を呼ぶか選択肢提示かを決定する。
+	GenerateQuestionAnalysis(ctx context.Context, question string) (*QuestionAnalysis, error)
+
+	// GenerateClarificationOptions は曖昧な質問に対してユーザーに提示する
+	// 3〜5 個の具体的な質問候補を生成する（最終回答モデル使用）。
+	// Clarity == "ambiguous" の場合のみ呼び出す。
+	GenerateClarificationOptions(ctx context.Context, question string) (*ClarificationOptions, error)
 }

@@ -114,6 +114,46 @@ ON CONFLICT (chat_id, loop_number, chunk_id) DO NOTHING`
 	return nil
 }
 
+// UpdateQuestionAnalysis は chats テーブルの question_analysis カラムを更新する。
+// 003_add_question_analysis.sql で追加された 4 カラムを SET する。
+func (r *chatAnalyticsRepo) UpdateQuestionAnalysis(ctx context.Context, chatID uuid.UUID, analysis ports.QuestionAnalysisUpdate) error {
+	criteriaJSON, err := json.Marshal(analysis.CompletionCriteria)
+	if err != nil {
+		criteriaJSON = []byte("[]")
+	}
+
+	var optionsJSON []byte
+	if len(analysis.ClarificationOptions) > 0 {
+		optionsJSON, err = json.Marshal(analysis.ClarificationOptions)
+		if err != nil {
+			optionsJSON = []byte("null")
+		}
+	} else {
+		optionsJSON = []byte("null")
+	}
+
+	const query = `
+UPDATE chats SET
+    question_clarity      = $2::question_clarity_enum,
+    interpreted_query     = $3,
+    completion_criteria   = $4::jsonb,
+    clarification_options = $5::jsonb,
+    updated_at            = NOW()
+WHERE id = $1`
+
+	_, err = r.db.ExecContext(ctx, query,
+		chatID,
+		nullableStr(analysis.Clarity),
+		nullableStr(analysis.InterpretedQuery),
+		criteriaJSON,
+		optionsJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("chat_analytics_repo: update question analysis: %w", err)
+	}
+	return nil
+}
+
 // ─── ヘルパー ─────────────────────────────────────────────────────
 
 // nullableStr は空文字列を sql.NullString の NULL として扱うヘルパー。

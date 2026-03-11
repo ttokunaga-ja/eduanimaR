@@ -1,9 +1,19 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class QuestionClarity(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    QUESTION_CLARITY_UNSPECIFIED: _ClassVar[QuestionClarity]
+    QUESTION_CLARITY_CLEAR: _ClassVar[QuestionClarity]
+    QUESTION_CLARITY_AMBIGUOUS: _ClassVar[QuestionClarity]
+QUESTION_CLARITY_UNSPECIFIED: QuestionClarity
+QUESTION_CLARITY_CLEAR: QuestionClarity
+QUESTION_CLARITY_AMBIGUOUS: QuestionClarity
 
 class ThinkRequest(_message.Message):
     __slots__ = ("request_id", "user_query", "subject_id", "state", "search_history", "constraints")
@@ -36,16 +46,22 @@ class SearchHistory(_message.Message):
     def __init__(self, step: _Optional[int] = ..., action: _Optional[str] = ..., queries_text: _Optional[_Iterable[str]] = ..., rationale: _Optional[str] = ..., result_count: _Optional[int] = ...) -> None: ...
 
 class Constraints(_message.Message):
-    __slots__ = ("max_loops", "max_results", "timeout_ms", "thinking_level")
+    __slots__ = ("max_loops", "max_results", "timeout_ms", "thinking_level", "interpreted_query", "completion_criteria", "clarity")
     MAX_LOOPS_FIELD_NUMBER: _ClassVar[int]
     MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     THINKING_LEVEL_FIELD_NUMBER: _ClassVar[int]
+    INTERPRETED_QUERY_FIELD_NUMBER: _ClassVar[int]
+    COMPLETION_CRITERIA_FIELD_NUMBER: _ClassVar[int]
+    CLARITY_FIELD_NUMBER: _ClassVar[int]
     max_loops: int
     max_results: int
     timeout_ms: int
     thinking_level: str
-    def __init__(self, max_loops: _Optional[int] = ..., max_results: _Optional[int] = ..., timeout_ms: _Optional[int] = ..., thinking_level: _Optional[str] = ...) -> None: ...
+    interpreted_query: str
+    completion_criteria: _containers.RepeatedScalarFieldContainer[str]
+    clarity: QuestionClarity
+    def __init__(self, max_loops: _Optional[int] = ..., max_results: _Optional[int] = ..., timeout_ms: _Optional[int] = ..., thinking_level: _Optional[str] = ..., interpreted_query: _Optional[str] = ..., completion_criteria: _Optional[_Iterable[str]] = ..., clarity: _Optional[_Union[QuestionClarity, str]] = ...) -> None: ...
 
 class ThinkResponse(_message.Message):
     __slots__ = ("request_id", "search", "complete", "error")

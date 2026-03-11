@@ -1,3 +1,4 @@
-h1:ykmgW4qHJK4FMpj0G9cJbnP0vL37yurd5Gk9l4kvp+U=
+h1:t85DwTbhNTaN9FN+ihhYLgSjySwVi6u7C7fr7Veng/k=
 001_init.sql h1:5xlQhEBBMG7tk6zTCTBQP1b8Re4QyxS8s3n5//Jg48c=
 002_add_chat_analytics.sql h1:XXfB7WNWSDjSflCuPqNtMKO+pj6aa5xEpfRiv2FhBZY=
+003_add_question_analysis.sql h1:yBMXRk7mNfxwtqHd49tSkSrbbIqjnF1QvK+6zLTDfrU=

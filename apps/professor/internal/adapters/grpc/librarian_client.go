@@ -60,6 +60,8 @@ func (c *librarianClient) Think(
 	userID uuid.UUID,
 	maxLoops int32,
 	thinkingLevel string,
+	interpretedQuery string,
+	completionCriteria []string,
 	onSearchRequest func(req ports.LibrarianSearchRequest) (*ports.LibrarianSearchResponse, error),
 ) (*ports.LibrarianThinkResult, error) {
 	if maxLoops <= 0 {
@@ -77,10 +79,12 @@ func (c *librarianClient) Think(
 		UserQuery: userQuery,
 		SubjectId: subjectID.String(),
 		Constraints: &librarianv1.Constraints{
-			MaxLoops:      maxLoops,
-			MaxResults:    defaultMaxResults,
-			TimeoutMs:     defaultTimeoutMs,
-			ThinkingLevel: thinkingLevel, // C要件: Librarianのモデル選択に使用
+			MaxLoops:           maxLoops,
+			MaxResults:         defaultMaxResults,
+			TimeoutMs:          defaultTimeoutMs,
+			ThinkingLevel:      thinkingLevel,      // C要件: Librarianのモデル選択に使用
+			InterpretedQuery:   interpretedQuery,   // Pre-search Step1 で解釈した質問
+			CompletionCriteria: completionCriteria, // judge_sufficiency に渡す終了基準
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("send initial ThinkRequest: %w", err)

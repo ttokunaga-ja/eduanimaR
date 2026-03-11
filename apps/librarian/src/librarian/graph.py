@@ -178,6 +178,10 @@ class AgentState(TypedDict):
     user_query: str
     subject_id: str
 
+    # Pre-search Step1 で生成された解釈済み質問と終了基準
+    interpreted_query: str
+    completion_criteria: list[str]
+
     # 検索結果（Professor から受け取った生データ）
     search_results: list[dict[str, Any]]
 
@@ -199,6 +203,7 @@ def build_search_queries(
     loop_count: int,
     missing_keywords: list[str] | None = None,
     thinking_level: str = "flash",
+    interpreted_query: str = "",
 ) -> list[str]:
     """
     Gemini Structured Output でユーザークエリから検索クエリ群を生成する。
@@ -214,6 +219,7 @@ def build_search_queries(
         loop_count: 現在のループ番号（0 始まり）
         missing_keywords: judge_sufficiency で検出された不足キーワード
         thinking_level: 使用するモデルレベル
+        interpreted_query: Pre-search Step1 で解釈した質問（初回クエリ生成に使用）
 
     Returns:
         queries: 検索クエリのリスト
@@ -225,10 +231,13 @@ def build_search_queries(
 
     # プロンプト構築
     if loop_count == 0 or not missing_keywords:
+        # 初回: interpreted_query が提供されている場合はそちらを優先
+        query_text = interpreted_query if interpreted_query else user_query
         prompt = f"""You are an academic search query generator.
 Generate diverse search queries to find relevant course material chunks for the user's question.
 
 User question: {user_query}
+Interpreted question: {query_text}
 
 Generate 2-3 distinct search queries that approach the question from different angles.
 Queries should be concise and use academic terminology."""
@@ -378,6 +387,7 @@ def judge_sufficiency(
     loop_count: int,
     max_loops: int,
     thinking_level: str = "flash",
+    completion_criteria: list[str] | None = None,
 ) -> tuple[bool, list[str]]:
     """
     SubAgent-C: 新規＋保存済みチャンクの累積情報量で充足度を判断する（A-2）。
@@ -392,6 +402,8 @@ def judge_sufficiency(
         kept_chunks: 過去のループでKeepされた精鋭チャンク（累積）
         loop_count: 現在のループ番号（1 以上）
         max_loops: ループ上限
+        thinking_level: 使用するモデルレベル
+        completion_criteria: Pre-search Step1 で生成された終了基準リスト
 
     Returns:
         (is_sufficient, missing_keywords)
@@ -426,9 +438,17 @@ def judge_sufficiency(
         new_chunks_parts.append(f"- {content}")
     new_chunks_text = "\n".join(new_chunks_parts) if new_chunks_parts else "（なし）"
 
+    # completion_criteria をプロンプトに追加（提供されている場合）
+    criteria_section = ""
+    if completion_criteria:
+        criteria_lines = "\n".join(f"- {c}" for c in completion_criteria)
+        criteria_section = (
+            f"\n\n## Completion criteria (all must be met to mark sufficient):\n{criteria_lines}"
+        )
+
     prompt = f"""You are an academic research evaluator.
 
-User question: {user_query}
+User question: {user_query}{criteria_section}
 
 ## Already collected evidence (from previous loops):
 {kept_summary}
@@ -437,6 +457,7 @@ User question: {user_query}
 {new_chunks_text}
 
 Evaluate whether the combination of already collected evidence AND new chunks is sufficient to answer the user's question completely.
+{"Check each completion criterion above: is_sufficient=true only if ALL criteria are met." if completion_criteria else ""}
 
 Rules:
 - is_sufficient: true only if the combined evidence can fully answer the question
@@ -490,6 +511,7 @@ def evaluate_parallel(
     loop_count: int,
     max_loops: int,
     thinking_level: str = "flash",
+    completion_criteria: list[str] | None = None,
 ) -> tuple[list[str], bool, list[str]]:
     """
     SubAgent-B と SubAgent-C を ThreadPoolExecutor で並列実行する。
@@ -506,6 +528,7 @@ def evaluate_parallel(
         loop_count: 現在のループ番号（1 以上）
         max_loops: ループ上限
         thinking_level: 使用するモデルレベル
+        completion_criteria: Pre-search Step1 で生成された終了基準リスト
 
     Returns:
         (useful_chunk_ids, is_sufficient, missing_keywords)
@@ -542,6 +565,7 @@ def evaluate_parallel(
                 loop_count,
                 max_loops,
                 thinking_level,
+                completion_criteria,
             )
 
             # 各 Future の戻り型が異なるため、直接 .result() を呼ぶ

@@ -122,6 +122,19 @@ type ChatAccumulatedChunk struct {
 	IsUseful bool
 }
 
+// QuestionAnalysisUpdate は chats テーブルの question_analysis カラム更新データ。
+// 003_add_question_analysis.sql で追加された 4 カラムに対応する。
+type QuestionAnalysisUpdate struct {
+	// Clarity は質問の曖昧さ判定: "clear" | "ambiguous"
+	Clarity string
+	// InterpretedQuery は LLM が解釈した質問テキスト
+	InterpretedQuery string
+	// CompletionCriteria は「何が揃えば回答できるか」の終了基準リスト（JSONB）
+	CompletionCriteria []string
+	// ClarificationOptions は曖昧な質問への選択肢リスト（JSONB）。nil は NULL。
+	ClarificationOptions []string
+}
+
 // ChatAnalyticsRepository は chat analytics テーブル群の書き込みを抽象化する。
 // ChatUseCase に WithAnalyticsRepo() でオプションとして注入する。
 type ChatAnalyticsRepository interface {
@@ -136,4 +149,8 @@ type ChatAnalyticsRepository interface {
 	// InsertAccumulatedChunks は複数チャンクを chat_accumulated_chunks にバッチ挿入する。
 	// onConflict=IGNORE（同一 chat_id + loop_number + chunk_id は無視する）
 	InsertAccumulatedChunks(ctx context.Context, chunks []ChatAccumulatedChunk) error
+
+	// UpdateQuestionAnalysis は chats テーブルの question_analysis カラムを更新する。
+	// 003_add_question_analysis.sql で追加された 4 カラムを SET する。
+	UpdateQuestionAnalysis(ctx context.Context, chatID uuid.UUID, analysis QuestionAnalysisUpdate) error
 }

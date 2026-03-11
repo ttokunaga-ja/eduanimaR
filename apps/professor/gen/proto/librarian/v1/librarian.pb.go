@@ -21,6 +21,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// QuestionClarity は Professor の質問分析結果（明確 or 曖昧）
+type QuestionClarity int32
+
+const (
+	QuestionClarity_QUESTION_CLARITY_UNSPECIFIED QuestionClarity = 0
+	QuestionClarity_QUESTION_CLARITY_CLEAR       QuestionClarity = 1 // 検索実行へ進む
+	QuestionClarity_QUESTION_CLARITY_AMBIGUOUS   QuestionClarity = 2 // 選択肢提示（Librarian は呼ばない）
+)
+
+// Enum value maps for QuestionClarity.
+var (
+	QuestionClarity_name = map[int32]string{
+		0: "QUESTION_CLARITY_UNSPECIFIED",
+		1: "QUESTION_CLARITY_CLEAR",
+		2: "QUESTION_CLARITY_AMBIGUOUS",
+	}
+	QuestionClarity_value = map[string]int32{
+		"QUESTION_CLARITY_UNSPECIFIED": 0,
+		"QUESTION_CLARITY_CLEAR":       1,
+		"QUESTION_CLARITY_AMBIGUOUS":   2,
+	}
+)
+
+func (x QuestionClarity) Enum() *QuestionClarity {
+	p := new(QuestionClarity)
+	*p = x
+	return p
+}
+
+func (x QuestionClarity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (QuestionClarity) Descriptor() protoreflect.EnumDescriptor {
+	return file_librarian_v1_librarian_proto_enumTypes[0].Descriptor()
+}
+
+func (QuestionClarity) Type() protoreflect.EnumType {
+	return &file_librarian_v1_librarian_proto_enumTypes[0]
+}
+
+func (x QuestionClarity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use QuestionClarity.Descriptor instead.
+func (QuestionClarity) EnumDescriptor() ([]byte, []int) {
+	return file_librarian_v1_librarian_proto_rawDescGZIP(), []int{0}
+}
+
 // Professor → Librarian
 type ThinkRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -195,6 +245,12 @@ type Constraints struct {
 	// "flash-lite" → eduanima-flash レベル（最速）
 	// "flash"      → eduanima / eduanima-pro レベル（バランス型）
 	ThinkingLevel string `protobuf:"bytes,4,opt,name=thinking_level,json=thinkingLevel,proto3" json:"thinking_level,omitempty"`
+	// Professor が解釈した質問文（初回 build_search_queries に使用）
+	InterpretedQuery string `protobuf:"bytes,5,opt,name=interpreted_query,json=interpretedQuery,proto3" json:"interpreted_query,omitempty"`
+	// 終了基準リスト（judge_sufficiency の判断基準として Librarian に渡す）
+	CompletionCriteria []string `protobuf:"bytes,6,rep,name=completion_criteria,json=completionCriteria,proto3" json:"completion_criteria,omitempty"`
+	// 質問の明確さ（Librarian は参考情報として保持、実際の分岐は Professor 側で実施済み）
+	Clarity       QuestionClarity `protobuf:"varint,7,opt,name=clarity,proto3,enum=librarian.v1.QuestionClarity" json:"clarity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -255,6 +311,27 @@ func (x *Constraints) GetThinkingLevel() string {
 		return x.ThinkingLevel
 	}
 	return ""
+}
+
+func (x *Constraints) GetInterpretedQuery() string {
+	if x != nil {
+		return x.InterpretedQuery
+	}
+	return ""
+}
+
+func (x *Constraints) GetCompletionCriteria() []string {
+	if x != nil {
+		return x.CompletionCriteria
+	}
+	return nil
+}
+
+func (x *Constraints) GetClarity() QuestionClarity {
+	if x != nil {
+		return x.Clarity
+	}
+	return QuestionClarity_QUESTION_CLARITY_UNSPECIFIED
 }
 
 // Librarian → Professor
@@ -615,14 +692,17 @@ const file_librarian_v1_librarian_proto_rawDesc = "" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12!\n" +
 	"\fqueries_text\x18\x03 \x03(\tR\vqueriesText\x12\x1c\n" +
 	"\trationale\x18\x04 \x01(\tR\trationale\x12!\n" +
-	"\fresult_count\x18\x05 \x01(\x05R\vresultCount\"\x91\x01\n" +
+	"\fresult_count\x18\x05 \x01(\x05R\vresultCount\"\xa8\x02\n" +
 	"\vConstraints\x12\x1b\n" +
 	"\tmax_loops\x18\x01 \x01(\x05R\bmaxLoops\x12\x1f\n" +
 	"\vmax_results\x18\x02 \x01(\x05R\n" +
 	"maxResults\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\x03 \x01(\x05R\ttimeoutMs\x12%\n" +
-	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\"\xdd\x01\n" +
+	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\x12+\n" +
+	"\x11interpreted_query\x18\x05 \x01(\tR\x10interpretedQuery\x12/\n" +
+	"\x13completion_criteria\x18\x06 \x03(\tR\x12completionCriteria\x127\n" +
+	"\aclarity\x18\a \x01(\x0e2\x1d.librarian.v1.QuestionClarityR\aclarity\"\xdd\x01\n" +
 	"\rThinkResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x124\n" +
@@ -644,7 +724,11 @@ const file_librarian_v1_librarian_proto_rawDesc = "" +
 	"\vErrorAction\x12\x1d\n" +
 	"\n" +
 	"error_type\x18\x01 \x01(\tR\terrorType\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2X\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*o\n" +
+	"\x0fQuestionClarity\x12 \n" +
+	"\x1cQUESTION_CLARITY_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16QUESTION_CLARITY_CLEAR\x10\x01\x12\x1e\n" +
+	"\x1aQUESTION_CLARITY_AMBIGUOUS\x10\x022X\n" +
 	"\x10LibrarianService\x12D\n" +
 	"\x05Think\x12\x1a.librarian.v1.ThinkRequest\x1a\x1b.librarian.v1.ThinkResponse(\x010\x01BZZXgithub.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1b\x06proto3"
 
@@ -660,31 +744,34 @@ func file_librarian_v1_librarian_proto_rawDescGZIP() []byte {
 	return file_librarian_v1_librarian_proto_rawDescData
 }
 
+var file_librarian_v1_librarian_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_librarian_v1_librarian_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_librarian_v1_librarian_proto_goTypes = []any{
-	(*ThinkRequest)(nil),   // 0: librarian.v1.ThinkRequest
-	(*SearchHistory)(nil),  // 1: librarian.v1.SearchHistory
-	(*Constraints)(nil),    // 2: librarian.v1.Constraints
-	(*ThinkResponse)(nil),  // 3: librarian.v1.ThinkResponse
-	(*SearchAction)(nil),   // 4: librarian.v1.SearchAction
-	(*CompleteAction)(nil), // 5: librarian.v1.CompleteAction
-	(*Evidence)(nil),       // 6: librarian.v1.Evidence
-	(*ErrorAction)(nil),    // 7: librarian.v1.ErrorAction
+	(QuestionClarity)(0),   // 0: librarian.v1.QuestionClarity
+	(*ThinkRequest)(nil),   // 1: librarian.v1.ThinkRequest
+	(*SearchHistory)(nil),  // 2: librarian.v1.SearchHistory
+	(*Constraints)(nil),    // 3: librarian.v1.Constraints
+	(*ThinkResponse)(nil),  // 4: librarian.v1.ThinkResponse
+	(*SearchAction)(nil),   // 5: librarian.v1.SearchAction
+	(*CompleteAction)(nil), // 6: librarian.v1.CompleteAction
+	(*Evidence)(nil),       // 7: librarian.v1.Evidence
+	(*ErrorAction)(nil),    // 8: librarian.v1.ErrorAction
 }
 var file_librarian_v1_librarian_proto_depIdxs = []int32{
-	1, // 0: librarian.v1.ThinkRequest.search_history:type_name -> librarian.v1.SearchHistory
-	2, // 1: librarian.v1.ThinkRequest.constraints:type_name -> librarian.v1.Constraints
-	4, // 2: librarian.v1.ThinkResponse.search:type_name -> librarian.v1.SearchAction
-	5, // 3: librarian.v1.ThinkResponse.complete:type_name -> librarian.v1.CompleteAction
-	7, // 4: librarian.v1.ThinkResponse.error:type_name -> librarian.v1.ErrorAction
-	6, // 5: librarian.v1.CompleteAction.evidence:type_name -> librarian.v1.Evidence
-	0, // 6: librarian.v1.LibrarianService.Think:input_type -> librarian.v1.ThinkRequest
-	3, // 7: librarian.v1.LibrarianService.Think:output_type -> librarian.v1.ThinkResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	2, // 0: librarian.v1.ThinkRequest.search_history:type_name -> librarian.v1.SearchHistory
+	3, // 1: librarian.v1.ThinkRequest.constraints:type_name -> librarian.v1.Constraints
+	0, // 2: librarian.v1.Constraints.clarity:type_name -> librarian.v1.QuestionClarity
+	5, // 3: librarian.v1.ThinkResponse.search:type_name -> librarian.v1.SearchAction
+	6, // 4: librarian.v1.ThinkResponse.complete:type_name -> librarian.v1.CompleteAction
+	8, // 5: librarian.v1.ThinkResponse.error:type_name -> librarian.v1.ErrorAction
+	7, // 6: librarian.v1.CompleteAction.evidence:type_name -> librarian.v1.Evidence
+	1, // 7: librarian.v1.LibrarianService.Think:input_type -> librarian.v1.ThinkRequest
+	4, // 8: librarian.v1.LibrarianService.Think:output_type -> librarian.v1.ThinkResponse
+	8, // [8:9] is the sub-list for method output_type
+	7, // [7:8] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_librarian_v1_librarian_proto_init() }
@@ -702,13 +789,14 @@ func file_librarian_v1_librarian_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_librarian_v1_librarian_proto_rawDesc), len(file_librarian_v1_librarian_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_librarian_v1_librarian_proto_goTypes,
 		DependencyIndexes: file_librarian_v1_librarian_proto_depIdxs,
+		EnumInfos:         file_librarian_v1_librarian_proto_enumTypes,
 		MessageInfos:      file_librarian_v1_librarian_proto_msgTypes,
 	}.Build()
 	File_librarian_v1_librarian_proto = out.File

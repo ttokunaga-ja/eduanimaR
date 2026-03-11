@@ -112,6 +112,10 @@ class LibrarianServicer:
         max_loops: int = self._cfg.max_loops
         thinking_level: str = "flash"  # デフォルト: flash
 
+        # Pre-search Step1 で生成された解釈済み質問と終了基準（セッション全体で保持）
+        interpreted_query: str = ""
+        completion_criteria: list[str] = []
+
         # A-2: 蓄積型エビデンス管理
         kept_chunks: list[dict] = []           # 過去のループでKeepされた精鋭チャンク
         all_seen_chunk_ids: set[str] = set()   # 全ループを通じて既読のchunk_idセット（B-2）
@@ -131,6 +135,9 @@ class LibrarianServicer:
                     max_loops = req.constraints.max_loops or self._cfg.max_loops
                     # thinking_level: C要件 - Librarianが使用するモデルを決定する
                     thinking_level = req.constraints.thinking_level or "flash"
+                    # Pre-search Step1 で生成された解釈済み質問と終了基準
+                    interpreted_query = req.constraints.interpreted_query or ""
+                    completion_criteria = list(req.constraints.completion_criteria)
 
                     logger.info(
                         "Think セッション開始",
@@ -138,6 +145,8 @@ class LibrarianServicer:
                         subject_id=subject_id,
                         max_loops=max_loops,
                         thinking_level=thinking_level,
+                        has_interpreted_query=bool(interpreted_query),
+                        completion_criteria_count=len(completion_criteria),
                     )
 
                     # ─── SearchAction を生成して送信 ──────────────────
@@ -147,6 +156,7 @@ class LibrarianServicer:
                         loop_count,
                         missing_keywords=None,
                         thinking_level=thinking_level,
+                        interpreted_query=interpreted_query,  # Pre-search Step1 結果を活用
                     )
                     # UX 向け rationale をローカルで簡易生成（D要件: LLM 呼び出し不要）
                     rationale = (
@@ -213,6 +223,7 @@ class LibrarianServicer:
                     loop_count,
                     max_loops,
                     thinking_level=thinking_level,
+                    completion_criteria=completion_criteria,  # Pre-search Step1 の終了基準
                 )
 
                 # A-3: useful_chunk_ids のチャンクを kept_chunks に追加

@@ -51,6 +51,8 @@ type LibrarianClient interface {
 		userID uuid.UUID,
 		maxLoops int32,
 		thinkingLevel string,
+		interpretedQuery string, // LLM が解釈した質問（Pre-search Step1 結果）
+		completionCriteria []string, // 終了基準リスト（judge_sufficiency に渡す）
 		onSearchRequest func(req LibrarianSearchRequest) (*LibrarianSearchResponse, error),
 	) (*LibrarianThinkResult, error)
 }

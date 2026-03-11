@@ -39,6 +39,13 @@ message SearchHistory {
   int32 result_count = 5;
 }
 
+// QuestionClarity は Professor の質問分析結果（明確 or 曖昧）
+enum QuestionClarity {
+  QUESTION_CLARITY_UNSPECIFIED = 0;
+  QUESTION_CLARITY_CLEAR       = 1;  // 検索実行へ進む
+  QUESTION_CLARITY_AMBIGUOUS   = 2;  // 選択肢提示（Librarian は呼ばない）
+}
+
 message Constraints {
   int32 max_loops = 1;     // デフォルト4
   int32 max_results = 2;   // 検索結果上限（Dynamic Top-K: ループ毎に変動）
@@ -47,6 +54,12 @@ message Constraints {
   // "flash-lite" → eduanima-flash レベル（最速）
   // "flash"      → eduanima / eduanima-pro レベル（バランス型）
   string thinking_level = 4;
+  // Professor が解釈した質問文（初回 build_search_queries に使用）
+  string interpreted_query = 5;
+  // 終了基準リスト（judge_sufficiency の判断基準として Librarian に渡す）
+  repeated string completion_criteria = 6;
+  // 質問の明確さ（Librarian は参考情報として保持、実際の分岐は Professor 側で実施済み）
+  QuestionClarity clarity = 7;
 }
 
 // Librarian → Professor

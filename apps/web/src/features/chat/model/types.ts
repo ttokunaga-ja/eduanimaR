@@ -5,7 +5,8 @@ export type ChatStreamStatus =
   | 'searching'
   | 'streaming'
   | 'done'
-  | 'error';
+  | 'error'
+  | 'clarification'; // 曖昧な質問への選択肢提示
 
 /** エビデンスチャンク（根拠資料の断片） */
 export interface EvidenceChunk {
@@ -38,12 +39,22 @@ export interface SSEChunkEvent {
 
 export interface SSEDoneEvent {
   type: 'done';
-  data: { chat_id: string };
+  data: { chat_id: string; is_clarification?: boolean };
 }
 
 export interface SSEErrorEvent {
   type: 'error';
   data: { message: string };
+}
+
+/** 曖昧な質問への選択肢提示イベント */
+export interface SSEClarificationEvent {
+  type: 'clarification';
+  data: {
+    session_id: string;
+    /** ユーザーに提示する具体的な質問候補（3〜5個） */
+    options: string[];
+  };
 }
 
 export type SSEEvent =
@@ -52,7 +63,8 @@ export type SSEEvent =
   | SSEEvidenceEvent
   | SSEChunkEvent
   | SSEDoneEvent
-  | SSEErrorEvent;
+  | SSEErrorEvent
+  | SSEClarificationEvent;
 
 // ─── フック戻り値の状態 ───────────────────────────────────────────────────────
 
@@ -68,4 +80,6 @@ export interface ChatStreamState {
   chatId?: string;
   /** error イベントのメッセージ */
   error?: string;
+  /** clarification フェーズで提示する質問候補（3〜5個） */
+  clarificationOptions?: string[];
 }

@@ -16,6 +16,11 @@ const INITIAL_STATE: ChatStreamState = {
  * POST /v1/subjects/{subjectId}/chats → text/event-stream
  * EventSource は POST をサポートしないため fetch + ReadableStream で実装。
  *
+ * clarification フロー:
+ *   質問が曖昧な場合、サーバーは SSEEventClarification を送信して早期リターンする。
+ *   state.status === 'clarification' になり、state.clarificationOptions に選択肢が格納される。
+ *   ユーザーが選択肢をクリックすると ask(selectedOption) を再呼び出しして通常フローへ進む。
+ *
  * @param subjectId - 対象科目 ID
  */
 export function useChatStream(subjectId: string) {
@@ -123,6 +128,14 @@ export function useChatStream(subjectId: string) {
                   ...s,
                   status: 'done',
                   chatId: event.data.chat_id,
+                }));
+                break;
+              case 'clarification':
+                // 曖昧な質問: 選択肢を state にセットして clarification ステータスへ
+                setState((s) => ({
+                  ...s,
+                  status: 'clarification',
+                  clarificationOptions: event.data.options ?? [],
                 }));
                 break;
               case 'error':

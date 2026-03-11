@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1clibrarian/v1/librarian.proto\x12\x0clibrarian.v1\"\xbe\x01\n\x0cThinkRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x12\n\nuser_query\x18\x02 \x01(\t\x12\x12\n\nsubject_id\x18\x03 \x01(\t\x12\r\n\x05state\x18\x04 \x01(\t\x12\x33\n\x0esearch_history\x18\x05 \x03(\x0b\x32\x1b.librarian.v1.SearchHistory\x12.\n\x0b\x63onstraints\x18\x06 \x01(\x0b\x32\x19.librarian.v1.Constraints\"l\n\rSearchHistory\x12\x0c\n\x04step\x18\x01 \x01(\x05\x12\x0e\n\x06\x61\x63tion\x18\x02 \x01(\t\x12\x14\n\x0cqueries_text\x18\x03 \x03(\t\x12\x11\n\trationale\x18\x04 \x01(\t\x12\x14\n\x0cresult_count\x18\x05 \x01(\x05\"a\n\x0b\x43onstraints\x12\x11\n\tmax_loops\x18\x01 \x01(\x05\x12\x13\n\x0bmax_results\x18\x02 \x01(\x05\x12\x12\n\ntimeout_ms\x18\x03 \x01(\x05\x12\x16\n\x0ethinking_level\x18\x04 \x01(\t\"\xb9\x01\n\rThinkResponse\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12,\n\x06search\x18\x02 \x01(\x0b\x32\x1a.librarian.v1.SearchActionH\x00\x12\x30\n\x08\x63omplete\x18\x03 \x01(\x0b\x32\x1c.librarian.v1.CompleteActionH\x00\x12*\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x19.librarian.v1.ErrorActionH\x00\x42\x08\n\x06\x61\x63tion\"j\n\x0cSearchAction\x12\x14\n\x0cqueries_text\x18\x01 \x03(\t\x12\x16\n\x0equeries_vector\x18\x02 \x03(\t\x12\x11\n\trationale\x18\x03 \x01(\t\x12\x19\n\x11\x65xclude_chunk_ids\x18\x04 \x03(\t\"R\n\x0e\x43ompleteAction\x12(\n\x08\x65vidence\x18\x01 \x03(\x0b\x32\x16.librarian.v1.Evidence\x12\x16\n\x0e\x63overage_notes\x18\x02 \x01(\t\"2\n\x08\x45vidence\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x14\n\x0cwhy_relevant\x18\x02 \x01(\t\"2\n\x0b\x45rrorAction\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t2X\n\x10LibrarianService\x12\x44\n\x05Think\x12\x1a.librarian.v1.ThinkRequest\x1a\x1b.librarian.v1.ThinkResponse(\x01\x30\x01\x42ZZXgithub.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1clibrarian/v1/librarian.proto\x12\x0clibrarian.v1\"\xbe\x01\n\x0cThinkRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x12\n\nuser_query\x18\x02 \x01(\t\x12\x12\n\nsubject_id\x18\x03 \x01(\t\x12\r\n\x05state\x18\x04 \x01(\t\x12\x33\n\x0esearch_history\x18\x05 \x03(\x0b\x32\x1b.librarian.v1.SearchHistory\x12.\n\x0b\x63onstraints\x18\x06 \x01(\x0b\x32\x19.librarian.v1.Constraints\"l\n\rSearchHistory\x12\x0c\n\x04step\x18\x01 \x01(\x05\x12\x0e\n\x06\x61\x63tion\x18\x02 \x01(\t\x12\x14\n\x0cqueries_text\x18\x03 \x03(\t\x12\x11\n\trationale\x18\x04 \x01(\t\x12\x14\n\x0cresult_count\x18\x05 \x01(\x05\"\xc9\x01\n\x0b\x43onstraints\x12\x11\n\tmax_loops\x18\x01 \x01(\x05\x12\x13\n\x0bmax_results\x18\x02 \x01(\x05\x12\x12\n\ntimeout_ms\x18\x03 \x01(\x05\x12\x16\n\x0ethinking_level\x18\x04 \x01(\t\x12\x19\n\x11interpreted_query\x18\x05 \x01(\t\x12\x1b\n\x13\x63ompletion_criteria\x18\x06 \x03(\t\x12.\n\x07\x63larity\x18\x07 \x01(\x0e\x32\x1d.librarian.v1.QuestionClarity\"\xb9\x01\n\rThinkResponse\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12,\n\x06search\x18\x02 \x01(\x0b\x32\x1a.librarian.v1.SearchActionH\x00\x12\x30\n\x08\x63omplete\x18\x03 \x01(\x0b\x32\x1c.librarian.v1.CompleteActionH\x00\x12*\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x19.librarian.v1.ErrorActionH\x00\x42\x08\n\x06\x61\x63tion\"j\n\x0cSearchAction\x12\x14\n\x0cqueries_text\x18\x01 \x03(\t\x12\x16\n\x0equeries_vector\x18\x02 \x03(\t\x12\x11\n\trationale\x18\x03 \x01(\t\x12\x19\n\x11\x65xclude_chunk_ids\x18\x04 \x03(\t\"R\n\x0e\x43ompleteAction\x12(\n\x08\x65vidence\x18\x01 \x03(\x0b\x32\x16.librarian.v1.Evidence\x12\x16\n\x0e\x63overage_notes\x18\x02 \x01(\t\"2\n\x08\x45vidence\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x14\n\x0cwhy_relevant\x18\x02 \x01(\t\"2\n\x0b\x45rrorAction\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t*o\n\x0fQuestionClarity\x12 \n\x1cQUESTION_CLARITY_UNSPECIFIED\x10\x00\x12\x1a\n\x16QUESTION_CLARITY_CLEAR\x10\x01\x12\x1e\n\x1aQUESTION_CLARITY_AMBIGUOUS\x10\x02\x32X\n\x10LibrarianService\x12\x44\n\x05Think\x12\x1a.librarian.v1.ThinkRequest\x1a\x1b.librarian.v1.ThinkResponse(\x01\x30\x01\x42ZZXgithub.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,22 +32,24 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'librarian.v1.librarian_pb2'
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'ZXgithub.com/ttokunaga-ja/eduanimaR/eduanimaR_Professor/gen/proto/librarian/v1;librarianv1'
+  _globals['_QUESTIONCLARITY']._serialized_start=1037
+  _globals['_QUESTIONCLARITY']._serialized_end=1148
   _globals['_THINKREQUEST']._serialized_start=47
   _globals['_THINKREQUEST']._serialized_end=237
   _globals['_SEARCHHISTORY']._serialized_start=239
   _globals['_SEARCHHISTORY']._serialized_end=347
-  _globals['_CONSTRAINTS']._serialized_start=349
-  _globals['_CONSTRAINTS']._serialized_end=446
-  _globals['_THINKRESPONSE']._serialized_start=449
-  _globals['_THINKRESPONSE']._serialized_end=634
-  _globals['_SEARCHACTION']._serialized_start=636
-  _globals['_SEARCHACTION']._serialized_end=742
-  _globals['_COMPLETEACTION']._serialized_start=744
-  _globals['_COMPLETEACTION']._serialized_end=826
-  _globals['_EVIDENCE']._serialized_start=828
-  _globals['_EVIDENCE']._serialized_end=878
-  _globals['_ERRORACTION']._serialized_start=880
-  _globals['_ERRORACTION']._serialized_end=930
-  _globals['_LIBRARIANSERVICE']._serialized_start=932
-  _globals['_LIBRARIANSERVICE']._serialized_end=1020
+  _globals['_CONSTRAINTS']._serialized_start=350
+  _globals['_CONSTRAINTS']._serialized_end=551
+  _globals['_THINKRESPONSE']._serialized_start=554
+  _globals['_THINKRESPONSE']._serialized_end=739
+  _globals['_SEARCHACTION']._serialized_start=741
+  _globals['_SEARCHACTION']._serialized_end=847
+  _globals['_COMPLETEACTION']._serialized_start=849
+  _globals['_COMPLETEACTION']._serialized_end=931
+  _globals['_EVIDENCE']._serialized_start=933
+  _globals['_EVIDENCE']._serialized_end=983
+  _globals['_ERRORACTION']._serialized_start=985
+  _globals['_ERRORACTION']._serialized_end=1035
+  _globals['_LIBRARIANSERVICE']._serialized_start=1150
+  _globals['_LIBRARIANSERVICE']._serialized_end=1238
 # @@protoc_insertion_point(module_scope)

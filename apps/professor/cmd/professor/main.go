@@ -121,11 +121,13 @@ func main() {
 	ingestJobRepo := pgadapter.NewIngestJobRepo(db)
 	chunkRepo := pgadapter.NewChunkRepo(db)
 	qaSessionRepo := pgadapter.NewQASessionRepo(db)
+	analyticsRepo := pgadapter.NewChatAnalyticsRepo(db)
 
 	// ─── ユースケース ─────────────────────────────────────────
 	subjectUC := usecases.NewSubjectUseCase(subjectRepo)
 	materialUC := usecases.NewMaterialUseCase(fileRepo, ingestJobRepo, objectStorage, publisher, subjectRepo)
-	chatUC := usecases.NewChatUseCase(subjectRepo, qaSessionRepo, chunkRepo, fileRepo, objectStorage, llmClient, librarianClient)
+	chatUC := usecases.NewChatUseCase(subjectRepo, qaSessionRepo, chunkRepo, fileRepo, objectStorage, llmClient, librarianClient).
+		WithAnalyticsRepo(analyticsRepo)
 	ingestUC := usecases.NewIngestUseCase(fileRepo, ingestJobRepo, chunkRepo, objectStorage, llmClient, cfg.EmbeddingConcurrency)
 
 	// ─── Echo サーバー設定 ────────────────────────────────────

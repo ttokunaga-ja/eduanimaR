@@ -489,6 +489,146 @@ func buildAnswerPrompt(question string, evidences []string) string {
 	return sb.String()
 }
 
+// ─── GenerateQuestionAnalysis ────────────────────────────────────
+
+// GenerateQuestionAnalysis は質問を分析し、解釈済み質問・終了基準リスト・明確さを
+// 1 回の Structured Output 呼び出しで取得する（Professor の Step1）。
+// Temperature=1.0 + Seed=42 で再現性を確保する（gemini_use.md 準拠）。
+func (g *geminiClient) GenerateQuestionAnalysis(ctx context.Context, question string) (*ports.QuestionAnalysis, error) {
+	prompt := fmt.Sprintf(`You are an academic question analyst for a university RAG system.
+Analyze the student's question and produce a structured analysis.
+
+Student question: %s
+
+Rules:
+1. interpreted_query: Rewrite the question in precise, academic terms (same language as the question).
+2. completion_criteria: List 1-5 specific facts/items that must be found to fully answer the question.
+   Each criterion should be short (under 15 words) and independently verifiable.
+3. clarity: 
+   - "clear" if the question has a specific, answerable intent
+   - "ambiguous" if the question is too vague, broad, or could have multiple valid interpretations
+     that require user clarification before searching`, question)
+
+	config := &genai.GenerateContentConfig{
+		ResponseMIMEType: "application/json",
+		ResponseSchema: &genai.Schema{
+			Type: genai.TypeObject,
+			Properties: map[string]*genai.Schema{
+				"interpreted_query": {
+					Type:        genai.TypeString,
+					Description: "Precise restatement of the question in academic terms.",
+				},
+				"completion_criteria": {
+					Type: genai.TypeArray,
+					Items: &genai.Schema{
+						Type:        genai.TypeString,
+						Description: "A single verifiable fact or item needed to answer the question.",
+					},
+					Description: "List of 1-5 specific criteria that must be satisfied to fully answer the question.",
+				},
+				"clarity": {
+					Type:        genai.TypeString,
+					Enum:        []string{"clear", "ambiguous"},
+					Description: "Whether the question is specific enough to search for directly.",
+				},
+			},
+			Required: []string{"interpreted_query", "completion_criteria", "clarity"},
+		},
+		Temperature: genai.Ptr(float32(1.0)),
+		Seed:        genai.Ptr(int32(42)),
+	}
+
+	contents := []*genai.Content{
+		{Parts: []*genai.Part{{Text: prompt}}, Role: "user"},
+	}
+
+	resp, err := g.client.Models.GenerateContent(ctx, g.modelAnswer, contents, config)
+	if err != nil {
+		slog.Warn("gemini: generate question analysis failed, using fallback", "error", err)
+		return &ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{question},
+			Clarity:            ports.QuestionClarityClear,
+		}, nil
+	}
+
+	var result ports.QuestionAnalysis
+	if err := json.Unmarshal([]byte(resp.Text()), &result); err != nil {
+		slog.Warn("gemini: unmarshal question analysis failed, using fallback", "error", err)
+		return &ports.QuestionAnalysis{
+			InterpretedQuery:   question,
+			CompletionCriteria: []string{question},
+			Clarity:            ports.QuestionClarityClear,
+		}, nil
+	}
+	if result.InterpretedQuery == "" {
+		result.InterpretedQuery = question
+	}
+	if len(result.CompletionCriteria) == 0 {
+		result.CompletionCriteria = []string{question}
+	}
+	if result.Clarity != ports.QuestionClarityAmbiguous {
+		result.Clarity = ports.QuestionClarityClear
+	}
+	return &result, nil
+}
+
+// ─── GenerateClarificationOptions ───────────────────────────────
+
+// GenerateClarificationOptions は曖昧な質問に対して 3〜5 個の具体的な質問候補を生成する。
+// Clarity == "ambiguous" の場合のみ呼び出す（最終回答モデル使用）。
+// Temperature=1.0 + Seed=42 で再現性を確保する。
+func (g *geminiClient) GenerateClarificationOptions(ctx context.Context, question string) (*ports.ClarificationOptions, error) {
+	prompt := fmt.Sprintf(`You are an academic tutor assistant.
+The student asked a vague question. Generate 3-5 specific, concrete question alternatives that the student might have intended.
+
+Original vague question: %s
+
+Rules:
+- Each option should be a complete, specific, searchable question
+- Options should cover different likely interpretations of the original question
+- Use the same language as the original question
+- Each option should be independently answerable from academic course materials`, question)
+
+	config := &genai.GenerateContentConfig{
+		ResponseMIMEType: "application/json",
+		ResponseSchema: &genai.Schema{
+			Type: genai.TypeObject,
+			Properties: map[string]*genai.Schema{
+				"options": {
+					Type: genai.TypeArray,
+					Items: &genai.Schema{
+						Type:        genai.TypeString,
+						Description: "A specific, concrete question alternative.",
+					},
+					Description: "3-5 concrete question options for the student to choose from.",
+				},
+			},
+			Required: []string{"options"},
+		},
+		Temperature: genai.Ptr(float32(1.0)),
+		Seed:        genai.Ptr(int32(42)),
+	}
+
+	contents := []*genai.Content{
+		{Parts: []*genai.Part{{Text: prompt}}, Role: "user"},
+	}
+
+	resp, err := g.client.Models.GenerateContent(ctx, g.modelAnswer, contents, config)
+	if err != nil {
+		slog.Warn("gemini: generate clarification options failed", "error", err)
+		return &ports.ClarificationOptions{Options: []string{}}, nil
+	}
+
+	var result ports.ClarificationOptions
+	if err := json.Unmarshal([]byte(resp.Text()), &result); err != nil {
+		slog.Warn("gemini: unmarshal clarification options failed", "error", err)
+		return &ports.ClarificationOptions{Options: []string{}}, nil
+	}
+	return &result, nil
+}
+
+// buildAnswerPromptForPDF は PDF 原本と evidence ヒントを組み合わせたプロンプトを構築する。
 // buildAnswerPromptForPDF は PDF 原本と evidence ヒントを組み合わせたプロンプトを構築する。
 // PDF を Blob として渡すので、プロンプトはヒント（重点箇所）の提供に留める。
 func buildAnswerPromptForPDF(question string, evidences []string) string {
