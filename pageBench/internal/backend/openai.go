@@ -147,6 +147,10 @@ func (b *AgentBackend) Query(collectionID string, question string) (*QueryResult
 		if v, ok := meta["answer_gen_ms"].(int); ok {
 			qr.AnswerGenMS = v
 		}
+		// answerability: professor GenerateAnswerMeta から取得（"answerable" | "unanswerable"）
+		if v, ok := meta["answerability"].(string); ok {
+			qr.Answerability = v
+		}
 	}
 
 	return qr, nil

@@ -24,6 +24,7 @@ import (
 type geminiQAPair struct {
 	Question        string `json:"question"`
 	QuestionType    string `json:"question_type"`    // "answerable" | "unanswerable"
+	Difficulty      string `json:"difficulty"`       // "simple" | "reasoning" | "multi_chunk" | "N/A"
 	ReferenceAnswer string `json:"reference_answer"` // unanswerable の場合は空文字
 	EvidenceText    string `json:"evidence_text"`    // unanswerable の場合は空文字
 	TargetPage      string `json:"target_page"`
@@ -37,29 +38,49 @@ var qaListSchema = &genai.Schema{
 		Properties: map[string]*genai.Schema{
 			"question":         {Type: genai.TypeString, Description: "質問文"},
 			"question_type":    {Type: genai.TypeString, Description: `"answerable"（文書から回答可能）または "unanswerable"（文書に答えがない）`},
+			"difficulty":       {Type: genai.TypeString, Description: `answerable の場合は "simple" | "reasoning" | "multi_chunk"、unanswerable の場合は "N/A"`},
 			"reference_answer": {Type: genai.TypeString, Description: "質問への模範解答（unanswerable の場合は空文字）"},
 			"evidence_text":    {Type: genai.TypeString, Description: "解答の根拠となる文書内のテキスト（100字以内。unanswerable の場合は空文字）"},
 			"target_page":      {Type: genai.TypeString, Description: "根拠ページ番号（不明・unanswerable の場合は空文字）"},
 		},
-		Required: []string{"question", "question_type", "reference_answer", "evidence_text"},
+		Required: []string{"question", "question_type", "difficulty", "reference_answer", "evidence_text"},
 	},
 }
 
-const generatePromptTmpl = `あなたは RAG システム評価用の QA データセット作成の専門家です。
-提供された文書（%s）から、RAG システムの検索・回答能力を評価するための質問と解答ペアを %d 件作成してください。
+const generatePromptTmpl = `You are an expert QA dataset creator for benchmarking RAG (Retrieval-Augmented Generation) and Agentic Search systems.
 
-要件:
-1. 質問は文書の具体的な内容（数値、固有名詞、因果関係など）に基づくこと
-2. 参照解答は文書から直接導出できる正確な内容であること
-3. 質問の難易度は多様にすること（ファクトual質問と推論を要する質問を混在）
-4. 各質問は独立していること（前の質問への回答を前提としない）
-5. 日本語と英語が混在する文書の場合は、質問・解答ともに日本語で作成すること
-6. 全体の約20%%を「回答不能質問（unanswerable）」とすること:
-   - 文書の主題と関連するが、文書内に根拠がない質問（他社比較・将来予測・文書外の情報など）
-   - question_type を "unanswerable" に設定し、reference_answer と evidence_text は空文字にすること
-   - 残りの約80%%は question_type を "answerable" に設定すること
+## Language Rule (ABSOLUTE)
+Detect the primary language of document "%s" and generate ALL output — questions, reference answers, and evidence — in that EXACT same language.
 
-JSON 配列形式で出力してください。`
+## Task
+Generate %d high-quality QA pairs from the provided document to evaluate retrieval accuracy, multi-chunk reasoning, and hallucination resistance.
+
+## Distribution Requirements
+
+**Answerable (~80%%)** — set question_type to "answerable":
+- simple (~30%%): Single factual lookup from one sentence or chunk. Set difficulty "simple".
+- reasoning (~30%%): Requires deduction, calculation, or combining facts within one section. Set difficulty "reasoning".
+- multi_chunk (~20%%): Requires synthesizing information from two or more separate sections. Set difficulty "multi_chunk".
+
+**Unanswerable (~20%%)** — set question_type to "unanswerable", difficulty to "N/A", reference_answer to "", evidence_text to "":
+- Must be topically relevant to the document's named entities, but the answer must NOT appear anywhere in the text.
+- Valid types: comparisons with external entities, future predictions beyond document scope, undisclosed technical or pricing details.
+
+## Question Uniqueness and Entity Binding (CRITICAL)
+Each question must be universally unique and specifically anchored to this document so that it cannot be confused with any other document in a multi-document corpus.
+
+**Rule 1 — Entity Binding (applies to >70%% of questions)**
+Include highly specific proper nouns, named entities, unique product or concept names, specific years, or unique terminology found in the document.
+
+**Rule 2 — Numeric Anchoring (applies to >20%% of questions)**
+Include specific numbers, metrics, percentages, dates, or quantities that appear in the document.
+
+**Rule 3 — No Vague References (applies to ALL questions)**
+NEVER use "this document", "this paper", "the author", "the report", or "the system". Always refer to entities by their specific names as they appear in the document.
+- Bad: "What is the main finding of this research?"
+- Good: "What accuracy did the AMAQA benchmark achieve on the 2025 cross-lingual evaluation task?"
+
+Each question must be fully self-contained and independent (no question may assume knowledge of any other question's answer).`
 
 // Options は generate サブコマンドのオプション。
 type Options struct {
@@ -68,6 +89,7 @@ type Options struct {
 	ThinkingLevel string
 	QAPerDoc      int            // 1 ドキュメントあたりの QA 件数
 	Cfg           *config.Config // フェーズ実行制御のために使用（nil = 全フェーズ実行）
+	Force         bool           // true の場合は既存 0a/0b の上書きを許可
 }
 
 // Run は source/ のPDFをスキャンして 0a_registry.csv を生成し、
@@ -90,6 +112,16 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		fmt.Printf("      既存 %s から %d 件を読み込みました\n\n", domain.FileRegistry, len(corpus))
 	} else {
+		if !opts.Force {
+			hasRows, checkErr := domain.HasNonHeaderRows(opts.DomainDir, domain.FileRegistry)
+			if checkErr != nil {
+				return fmt.Errorf("%s の既存データ確認に失敗: %w", domain.FileRegistry, checkErr)
+			}
+			if hasRows {
+				return fmt.Errorf("%s に既存データがあります。上書きするには --force を指定してください", domain.FileRegistry)
+			}
+		}
+
 		fmt.Printf("[1/3] source/ をスキャンして %s を生成中...\n", domain.FileRegistry)
 		corpus, err = domain.ScanAndWriteRegistry(opts.DomainDir)
 		if err != nil {
@@ -103,6 +135,15 @@ func Run(ctx context.Context, opts Options) error {
 	if skipQA {
 		fmt.Printf("[SKIP] %s 生成をスキップ（PAGEBENCH_EXECUTE_QA=false）\n", domain.FileQAPairs)
 		return nil
+	}
+	if !opts.Force {
+		hasRows, checkErr := domain.HasNonHeaderRows(opts.DomainDir, domain.FileQAPairs)
+		if checkErr != nil {
+			return fmt.Errorf("%s の既存データ確認に失敗: %w", domain.FileQAPairs, checkErr)
+		}
+		if hasRows {
+			return fmt.Errorf("%s に既存データがあります。上書きするには --force を指定してください", domain.FileQAPairs)
+		}
 	}
 
 	// Gemini クライアント初期化
@@ -153,6 +194,7 @@ func Run(ctx context.Context, opts Options) error {
 				QID:          fmt.Sprintf("Q%04d", qidCounter),
 				Question:     p.Question,
 				QuestionType: qt,
+				Difficulty:   p.Difficulty,
 				RefAnswer:    p.ReferenceAnswer,
 				RefEvidence:  p.EvidenceText,
 				RefFile:      entry.FileName,

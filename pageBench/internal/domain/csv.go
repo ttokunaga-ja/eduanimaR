@@ -17,6 +17,33 @@ const (
 	FileReport   = "0d_evaluation_report.md" // 評価レポート（eval/report コマンドが生成）
 )
 
+// HasNonHeaderRows は CSV ファイルの 2 行目以降に非空行があるかを返す。
+// CSV パースに依存せずテキストとして判定するため、破損した CSV でも安全側（上書き禁止）で扱える。
+func HasNonHeaderRows(domainDir, fileName string) (bool, error) {
+	path := filepath.Join(domainDir, fileName)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("%s の読み込みに失敗: %w", fileName, err)
+	}
+
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	lines := strings.Split(text, "\n")
+	if len(lines) <= 1 {
+		return false, nil
+	}
+
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(line) != "" {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // ScanAndWriteRegistry は domainDir/source/ 内の PDF ファイルをスキャンして
 // 0a_registry.csv を生成する。既存エントリは保持し、新規 PDF のみ追記する。
 func ScanAndWriteRegistry(domainDir string) ([]CorpusEntry, error) {
@@ -124,10 +151,12 @@ func LoadCorpus(domainDir string) ([]CorpusEntry, error) {
 	var entries []CorpusEntry
 	for _, row := range records[1:] {
 		e := CorpusEntry{
-			FileName:  getField(row, idx, "file_name"),
-			FileTitle: getField(row, idx, "file_title"),
-			FileURL:   getField(row, idx, "file_url"),
-			FilePages: getField(row, idx, "file_pages"),
+			FileName: getField(row, idx, "file_name"),
+			// 互換対応: 旧形式(file_title/file_url/file_pages) と
+			// 新形式(title/source_url/page_count) の両方を受け入れる。
+			FileTitle: getFieldAny(row, idx, "file_title", "title"),
+			FileURL:   getFieldAny(row, idx, "file_url", "source_url"),
+			FilePages: getFieldAny(row, idx, "file_pages", "page_count"),
 		}
 		if e.FileName != "" {
 			entries = append(entries, e)
@@ -168,6 +197,7 @@ func LoadQAPairs(domainDir string) ([]QAPair, error) {
 			QID:          getField(row, idx, "q_id"),
 			Question:     getField(row, idx, "question"),
 			QuestionType: qt,
+			Difficulty:   getField(row, idx, "difficulty"),
 			RefAnswer:    getField(row, idx, "ref_answer"),
 			RefEvidence:  getField(row, idx, "ref_evidence"),
 			RefFile:      getField(row, idx, "ref_file"),
@@ -187,13 +217,13 @@ func WriteQAPairs(domainDir string, pairs []QAPair) error {
 	defer f.Close()
 
 	w := csv.NewWriter(f)
-	_ = w.Write([]string{"q_id", "question", "question_type", "ref_answer", "ref_evidence", "ref_file", "ref_page"})
+	_ = w.Write([]string{"q_id", "question", "question_type", "difficulty", "ref_answer", "ref_evidence", "ref_file", "ref_page"})
 	for _, p := range pairs {
 		qt := p.QuestionType
 		if qt == "" {
 			qt = "answerable"
 		}
-		_ = w.Write([]string{p.QID, p.Question, qt, p.RefAnswer, p.RefEvidence, p.RefFile, p.RefPage})
+		_ = w.Write([]string{p.QID, p.Question, qt, p.Difficulty, p.RefAnswer, p.RefEvidence, p.RefFile, p.RefPage})
 	}
 	w.Flush()
 	return w.Error()
@@ -223,10 +253,8 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 
 	var out []EvalRecord
 	for _, row := range records[1:] {
-		var rougeL float64
-		fmt.Sscanf(getField(row, idx, "rouge_l"), "%f", &rougeL)
-		var em int
-		fmt.Sscanf(getField(row, idx, "exact_match"), "%d", &em)
+		var semSim float64
+		fmt.Sscanf(getField(row, idx, "semantic_similarity"), "%f", &semSim)
 		var latencyMS int
 		fmt.Sscanf(getField(row, idx, "latency_ms"), "%d", &latencyMS)
 		var loopCount int
@@ -245,8 +273,6 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 		fmt.Sscanf(getField(row, idx, "ref_page_found"), "%d", &refPageFound)
 		var refFilePageFound int
 		fmt.Sscanf(getField(row, idx, "ref_file_page_found"), "%d", &refFilePageFound)
-		var ragRefused int
-		fmt.Sscanf(getField(row, idx, "rag_refused"), "%d", &ragRefused)
 
 		qt := getField(row, idx, "question_type")
 		if qt == "" {
@@ -258,6 +284,7 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 			Domain:             getField(row, idx, "domain"),
 			Question:           getField(row, idx, "question"),
 			QuestionType:       qt,
+			Difficulty:         getField(row, idx, "difficulty"),
 			RefAnswer:          getField(row, idx, "ref_answer"),
 			RefEvidence:        getField(row, idx, "ref_evidence"),
 			RefFile:            getField(row, idx, "ref_file"),
@@ -270,9 +297,8 @@ func LoadEvaluate(domainDir string) ([]EvalRecord, error) {
 			RefFileFound:       refFileFound,
 			RefPageFound:       refPageFound,
 			RefFilePageFound:   refFilePageFound,
-			RougeL:             rougeL,
-			ExactMatch:         em,
-			RagRefused:         ragRefused,
+			SemanticSimilarity: semSim,
+			Answerability:      getField(row, idx, "answerability"),
 			LatencyMS:          latencyMS,
 			LoopCount:          loopCount,
 			LibrarianMS:        librarianMS,
@@ -302,13 +328,17 @@ func WriteEvaluate(domainDir string, records []EvalRecord) error {
 		// 識別情報
 		"q_id", "domain",
 		// QA内容（0b 共通）
-		"question", "question_type", "ref_answer", "ref_evidence", "ref_file", "ref_page",
+		"question", "question_type", "difficulty", "ref_answer", "ref_evidence", "ref_file", "ref_page",
 		// RAG回答
 		"rag_answer", "rag_sources",
-		// LLMなし自動メトリクス
-		"file_hit", "page_hit", "retrieved_file_pages", "ref_file_found", "ref_page_found", "ref_file_page_found", "rouge_l", "exact_match", "rag_refused", "latency_ms", "loop_count", "librarian_ms", "answer_gen_ms",
+		// 自動メトリクス
+		"file_hit", "page_hit", "retrieved_file_pages",
+		"ref_file_found", "ref_page_found", "ref_file_page_found",
+		"semantic_similarity", "answerability",
+		"latency_ms", "loop_count", "librarian_ms", "answer_gen_ms",
 		// LLM-as-Judge
-		"judge_accuracy", "judge_faithfulness", "judge_completeness", "judge_overall", "judge_hallucination", "judge_reasoning",
+		"judge_accuracy", "judge_faithfulness", "judge_completeness",
+		"judge_overall", "judge_hallucination", "judge_reasoning",
 	})
 	for _, r := range records {
 		qt := r.QuestionType
@@ -317,18 +347,20 @@ func WriteEvaluate(domainDir string, records []EvalRecord) error {
 		}
 		_ = w.Write([]string{
 			r.QID, r.Domain,
-			r.Question, qt, r.RefAnswer, r.RefEvidence, r.RefFile, r.RefPage,
+			r.Question, qt, r.Difficulty, r.RefAnswer, r.RefEvidence, r.RefFile, r.RefPage,
 			r.RagAnswer, r.RagSources,
 			fmt.Sprintf("%d", r.FileHit), fmt.Sprintf("%d", r.PageHit),
 			r.RetrievedFilePages,
-			fmt.Sprintf("%d", r.RefFileFound), fmt.Sprintf("%d", r.RefPageFound), fmt.Sprintf("%d", r.RefFilePageFound),
-			fmt.Sprintf("%.4f", r.RougeL), fmt.Sprintf("%d", r.ExactMatch),
-			fmt.Sprintf("%d", r.RagRefused),
+			fmt.Sprintf("%d", r.RefFileFound), fmt.Sprintf("%d", r.RefPageFound),
+			fmt.Sprintf("%d", r.RefFilePageFound),
+			fmt.Sprintf("%.4f", r.SemanticSimilarity),
+			r.Answerability,
 			fmt.Sprintf("%d", r.LatencyMS),
 			fmt.Sprintf("%d", r.LoopCount),
 			fmt.Sprintf("%d", r.LibrarianMS),
 			fmt.Sprintf("%d", r.AnswerGenMS),
-			r.JudgeAccuracy, r.JudgeFaithful, r.JudgeComplete, r.JudgeOverall, r.JudgeHallucination, r.JudgeReasoning,
+			r.JudgeAccuracy, r.JudgeFaithful, r.JudgeComplete,
+			r.JudgeOverall, r.JudgeHallucination, r.JudgeReasoning,
 		})
 	}
 	w.Flush()
@@ -386,4 +418,13 @@ func getField(row []string, idx map[string]int, key string) string {
 		return ""
 	}
 	return row[i]
+}
+
+func getFieldAny(row []string, idx map[string]int, keys ...string) string {
+	for _, k := range keys {
+		if v := getField(row, idx, k); v != "" {
+			return v
+		}
+	}
+	return ""
 }

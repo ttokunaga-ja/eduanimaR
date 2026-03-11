@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -388,6 +389,78 @@ func toThinkingLevel(level string) genai.ThinkingLevel {
 	default:
 		return genai.ThinkingLevelMinimal
 	}
+}
+
+// ─── GenerateAnswerMeta ──────────────────────────────────────────
+
+// GenerateAnswerMeta は回答後の構造化メタデータを Structured Output で生成する。
+// answerability（"answerable" / "unanswerable" / "partial"）と
+// document_summary（コース資料の概要）を返す。
+// Temperature=1.0 + Seed=42 で再現性を確保する（gemini_use.md 準拠）。
+// API エラー・パース失敗時は evidenceCount から推定してフォールバックする。
+func (g *geminiClient) GenerateAnswerMeta(ctx context.Context, question, answer string, evidenceCount int) (*ports.AnswerMeta, error) {
+	// answer を先頭 500 文字に切り詰めてトークン節約
+	answerPreview := answer
+	if len([]rune(answer)) > 500 {
+		answerPreview = string([]rune(answer)[:500]) + "..."
+	}
+
+	prompt := fmt.Sprintf(`You are an academic QA quality evaluator.
+Given the question, answer preview, and evidence count, evaluate the response.
+
+Question: %s
+Answer preview (first 500 chars): %s
+Evidence chunks used: %d
+
+Classify the answer quality and summarize what the course materials cover.`,
+		question, answerPreview, evidenceCount)
+
+	config := &genai.GenerateContentConfig{
+		ResponseMIMEType: "application/json",
+		ResponseSchema: &genai.Schema{
+			Type: genai.TypeObject,
+			Properties: map[string]*genai.Schema{
+				"answerability": {
+					Type:        genai.TypeString,
+					Enum:        []string{"answerable", "unanswerable", "partial"},
+					Description: "Whether the question could be answered from the provided materials. Use 'unanswerable' if evidenceCount=0 or answer says materials are insufficient.",
+				},
+				"document_summary": {
+					Type:        genai.TypeString,
+					Description: "Brief 1-2 sentence summary of what the course materials cover, even if the question was unanswerable.",
+				},
+			},
+			Required: []string{"answerability", "document_summary"},
+		},
+		// gemini_use.md: Temperature=1.0 MANDATORY for Gemini 3
+		// Seed=42 で分類の再現性を確保する
+		Temperature: genai.Ptr(float32(1.0)),
+		Seed:        genai.Ptr(int32(42)),
+	}
+
+	contents := []*genai.Content{
+		{Parts: []*genai.Part{{Text: prompt}}, Role: "user"},
+	}
+
+	fallbackAnswerability := "answerable"
+	if evidenceCount == 0 {
+		fallbackAnswerability = "unanswerable"
+	}
+
+	resp, err := g.client.Models.GenerateContent(ctx, g.modelAnswer, contents, config)
+	if err != nil {
+		slog.Warn("gemini: generate answer meta failed, using fallback",
+			"evidence_count", evidenceCount, "error", err)
+		return &ports.AnswerMeta{Answerability: fallbackAnswerability, DocumentSummary: ""}, nil
+	}
+
+	var meta ports.AnswerMeta
+	if err := json.Unmarshal([]byte(resp.Text()), &meta); err != nil {
+		slog.Warn("gemini: unmarshal answer meta failed, using fallback",
+			"evidence_count", evidenceCount, "error", err)
+		return &ports.AnswerMeta{Answerability: fallbackAnswerability, DocumentSummary: ""}, nil
+	}
+	return &meta, nil
 }
 
 // ─── ヘルパー ─────────────────────────────────────────────────────

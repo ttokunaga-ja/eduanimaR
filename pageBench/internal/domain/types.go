@@ -14,6 +14,7 @@ type QAPair struct {
 	QID          string // q_id          : 質問ID
 	Question     string // question      : 質問文
 	QuestionType string // question_type : "answerable" | "unanswerable"
+	Difficulty   string // difficulty    : "simple" | "reasoning" | "multi_chunk" | "N/A"
 	RefAnswer    string // ref_answer    : 正解の解答（unanswerable の場合は空）
 	RefEvidence  string // ref_evidence  : 正解の根拠テキスト（unanswerable の場合は空）
 	RefFile      string // ref_file      : 関連ファイル名（0a.FileName と結合可能）
@@ -29,6 +30,7 @@ type EvalRecord struct {
 	// ── QA内容（0b_qa_pairs と共通カラム） ─────────────────
 	Question     string // question      : 質問文
 	QuestionType string // question_type : "answerable" | "unanswerable"
+	Difficulty   string // difficulty    : "simple" | "reasoning" | "multi_chunk" | "N/A"
 	RefAnswer    string // ref_answer    : 正解の解答（unanswerable の場合は空）
 	RefEvidence  string // ref_evidence  : 正解の根拠テキスト（unanswerable の場合は空）
 	RefFile      string // ref_file      : 関連ファイル名
@@ -38,20 +40,19 @@ type EvalRecord struct {
 	RagAnswer  string // rag_answer : RAG の回答テキスト
 	RagSources string // rag_sources: RAG が参照したソース（JSON 文字列）
 
-	// ── LLM なし自動メトリクス ─────────────────────────────
-	FileHit            int     // file_hit   : rag_sources に ref_file が含まれるか（0/1）
-	PageHit            int     // page_hit   : rag_sources に ref_file + ref_page の組が含まれるか（0/1）
+	// ── 自動メトリクス ─────────────────────────────────────
+	FileHit            int     // file_hit            : rag_sources に ref_file が含まれるか（0/1）
+	PageHit            int     // page_hit            : rag_sources に ref_file + ref_page の組が含まれるか（0/1）
 	RetrievedFilePages string  // retrieved_file_pages: 取得ソース一覧（JSON文字列）
-	RefFileFound       int     // ref_file_found: ref_file が取得ソースに含まれるか（0/1）
-	RefPageFound       int     // ref_page_found: ref_page が取得ソースに含まれるか（0/1）
-	RefFilePageFound   int     // ref_file_page_found: ref_file + ref_page 厳密一致（0/1）
-	RougeL             float64 // rouge_l    : ROUGE-L スコア（0.0〜1.0）
-	ExactMatch         int     // exact_match: 完全一致（0/1）
-	RagRefused         int     // rag_refused : RAGが「情報なし」と回答したか（0/1）。unanswerable 専用
-	LatencyMS          int     // latency_ms : レスポンスタイム（ms）
-	LoopCount          int     // loop_count: Librarian の検索ループ回数
-	LibrarianMS        int     // librarian_ms: Librarian フェーズ所要時間（ms）
-	AnswerGenMS        int     // answer_gen_ms: 回答生成フェーズ所要時間（ms）
+	RefFileFound       int     // ref_file_found      : ref_file が取得ソースに含まれるか（0/1）
+	RefPageFound       int     // ref_page_found      : ref_page が取得ソースに含まれるか（0/1）
+	RefFilePageFound   int     // ref_file_page_found : ref_file + ref_page 厳密一致（0/1）
+	SemanticSimilarity float64 // semantic_similarity : gemini-embedding-001 SEMANTIC_SIMILARITY コサイン類似度（0.0〜1.0）。answerable 専用
+	Answerability      string  // answerability       : professor GenerateAnswerMeta の判定（"answerable" | "unanswerable" | ""）
+	LatencyMS          int     // latency_ms          : レスポンスタイム（ms）
+	LoopCount          int     // loop_count          : Librarian の検索ループ回数
+	LibrarianMS        int     // librarian_ms        : Librarian フェーズ所要時間（ms）
+	AnswerGenMS        int     // answer_gen_ms       : 回答生成フェーズ所要時間（ms）
 
 	// ── LLM-as-Judge スコア ────────────────────────────────
 	JudgeAccuracy      string // judge_accuracy    : 正確性（1〜5）。answerable 専用

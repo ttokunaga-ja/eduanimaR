@@ -55,7 +55,7 @@ func main() {
 	defer rootCancel()
 
 	// ─── DB 接続 ──────────────────────────────────────────────
-	db, err := connectDB(cfg.DatabaseURL)
+	db, err := connectDB(cfg.DatabaseURL, cfg.DBMaxOpenConns, cfg.DBMaxIdleConns)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -223,15 +223,15 @@ func main() {
 }
 
 // connectDB は DSN から pgx/v5 を使用して *sql.DB を返す。
-func connectDB(dsn string) (*sql.DB, error) {
+func connectDB(dsn string, maxOpenConns, maxIdleConns int) (*sql.DB, error) {
 	pgxCfg, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 
 	db := stdlib.OpenDB(*pgxCfg)
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 

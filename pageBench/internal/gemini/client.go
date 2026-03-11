@@ -4,6 +4,7 @@ package gemini
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 
 	"google.golang.org/genai"
@@ -41,4 +42,55 @@ func ThinkingLevel(level string) genai.ThinkingLevel {
 	default: // "minimal" or anything else
 		return genai.ThinkingLevelMinimal
 	}
+}
+
+// EmbedText は gemini-embedding-001 で SEMANTIC_SIMILARITY タスク用の埋め込みベクトルを取得する。
+// unanswerable 問題や空文字の場合は呼び出し側でスキップすること。
+func EmbedText(ctx context.Context, client *genai.Client, text string) ([]float32, error) {
+	if text == "" {
+		return nil, fmt.Errorf("空のテキストは埋め込みできません")
+	}
+	contents := []*genai.Content{
+		{
+			Parts: []*genai.Part{{Text: text}},
+			Role:  "user",
+		},
+	}
+	resp, err := client.Models.EmbedContent(ctx, "gemini-embedding-001", contents, &genai.EmbedContentConfig{
+		TaskType: "SEMANTIC_SIMILARITY",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("EmbedContent 失敗: %w", err)
+	}
+	if len(resp.Embeddings) == 0 {
+		return nil, fmt.Errorf("EmbedContent のレスポンスに Embeddings が含まれていません")
+	}
+	return resp.Embeddings[0].Values, nil
+}
+
+// CosineSimilarity は 2 つの埋め込みベクトル間のコサイン類似度を計算する（範囲: -1.0〜1.0）。
+// 長さが 0 またはゼロベクトルの場合は 0.0 を返す。
+func CosineSimilarity(a, b []float32) float64 {
+	if len(a) == 0 || len(a) != len(b) {
+		return 0.0
+	}
+	var dot, normA, normB float64
+	for i := range a {
+		fA := float64(a[i])
+		fB := float64(b[i])
+		dot += fA * fB
+		normA += fA * fA
+		normB += fB * fB
+	}
+	if normA == 0 || normB == 0 {
+		return 0.0
+	}
+	sim := dot / (math.Sqrt(normA) * math.Sqrt(normB))
+	// 丸め誤差のクランプ
+	if sim > 1.0 {
+		sim = 1.0
+	} else if sim < -1.0 {
+		sim = -1.0
+	}
+	return sim
 }

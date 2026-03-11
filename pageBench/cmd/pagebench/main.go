@@ -86,6 +86,7 @@ func generateCmd() *cobra.Command {
 		qaPerDoc      int
 		thinkingLevel string
 		model         string
+		force         bool
 	)
 
 	cmd := &cobra.Command{
@@ -124,6 +125,7 @@ func generateCmd() *cobra.Command {
 					ThinkingLevel: thinkingLevel,
 					QAPerDoc:      qaPerDoc,
 					Cfg:           cfg,
+					Force:         force,
 				}); runErr != nil {
 					fmt.Fprintf(os.Stderr, "[ERROR] %s: %v\n", d, runErr)
 					lastErr = runErr
@@ -137,6 +139,7 @@ func generateCmd() *cobra.Command {
 	cmd.Flags().IntVar(&qaPerDoc, "qa-per-doc", 10, "1 ドキュメントあたりの QA 生成件数")
 	cmd.Flags().StringVar(&thinkingLevel, "thinking", "", "thinking レベル: minimal|low|medium|high (デフォルト: GEMINI_THINKING_LEVEL)")
 	cmd.Flags().StringVar(&model, "model", "", "Gemini モデル名 (デフォルト: GEMINI_GENERATE_MODEL)")
+	cmd.Flags().BoolVar(&force, "force", false, "既存の 0a/0b 出力を上書きして再生成する")
 
 	return cmd
 }
@@ -204,6 +207,7 @@ func evalCmd() *cobra.Command {
 		skipJudge bool
 		resume    bool
 		noCleanup bool
+		force     bool
 	)
 
 	cmd := &cobra.Command{
@@ -237,6 +241,7 @@ func evalCmd() *cobra.Command {
 					SkipJudge: skipJudge,
 					Resume:    resume,
 					NoCleanup: noCleanup,
+					Force:     force,
 				}); runErr != nil {
 					fmt.Fprintf(os.Stderr, "[ERROR] %s: %v\n", d, runErr)
 					lastErr = runErr
@@ -251,6 +256,7 @@ func evalCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipJudge, "skip-judge", false, "LLM-as-Judge をスキップする")
 	cmd.Flags().BoolVar(&resume, "resume", false, "チェックポイントから再開する")
 	cmd.Flags().BoolVar(&noCleanup, "no-cleanup", false, "評価後にコレクションを削除しない")
+	cmd.Flags().BoolVar(&force, "force", false, "既存の 0c/0d 出力を上書きして評価を実行する")
 
 	return cmd
 }

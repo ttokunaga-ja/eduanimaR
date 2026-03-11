@@ -95,13 +95,13 @@ func (m *MockChunkRepository) ListByFileID(ctx context.Context, fileID uuid.UUID
 func (m *MockChunkRepository) BatchCreate(ctx context.Context, chunks []*domain.Chunk) error {
 	return m.Called(ctx, chunks).Error(0)
 }
-func (m *MockChunkRepository) SearchByVector(ctx context.Context, subjectID uuid.UUID, embedding pgvector.Vector, limit int) ([]*domain.SearchResult, error) {
-	args := m.Called(ctx, subjectID, embedding, limit)
+func (m *MockChunkRepository) SearchByVector(ctx context.Context, subjectID uuid.UUID, embedding pgvector.Vector, limit int, excludeIDs []uuid.UUID) ([]*domain.SearchResult, error) {
+	args := m.Called(ctx, subjectID, embedding, limit, excludeIDs)
 	v, _ := args.Get(0).([]*domain.SearchResult)
 	return v, args.Error(1)
 }
-func (m *MockChunkRepository) SearchByText(ctx context.Context, subjectID uuid.UUID, query string, limit int) ([]*domain.SearchResult, error) {
-	args := m.Called(ctx, subjectID, query, limit)
+func (m *MockChunkRepository) SearchByText(ctx context.Context, subjectID uuid.UUID, query string, limit int, excludeIDs []uuid.UUID) ([]*domain.SearchResult, error) {
+	args := m.Called(ctx, subjectID, query, limit, excludeIDs)
 	v, _ := args.Get(0).([]*domain.SearchResult)
 	return v, args.Error(1)
 }
@@ -139,6 +139,11 @@ func (m *MockLLMClient) GenerateAnswerStream(ctx context.Context, question strin
 func (m *MockLLMClient) GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, modelOverride string, thinkingLevel string, onChunk func(text string) error) error {
 	args := m.Called(ctx, question, evidences, pdfContent, mimeType, modelOverride, thinkingLevel, onChunk)
 	return args.Error(0)
+}
+func (m *MockLLMClient) GenerateAnswerMeta(ctx context.Context, question, answer string, evidenceCount int) (*ports.AnswerMeta, error) {
+	args := m.Called(ctx, question, answer, evidenceCount)
+	v, _ := args.Get(0).(*ports.AnswerMeta)
+	return v, args.Error(1)
 }
 
 // ─── LibrarianClient ─────────────────────────────────────────────
@@ -233,4 +238,18 @@ func (m *MockObjectStorage) Delete(ctx context.Context, key string) error {
 func (m *MockObjectStorage) GetPresignedURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
 	args := m.Called(ctx, key, expiry)
 	return args.String(0), args.Error(1)
+}
+
+// ─── ChatAnalyticsRepository ──────────────────────────────────────
+
+type MockChatAnalyticsRepository struct{ mock.Mock }
+
+func (m *MockChatAnalyticsRepository) UpdateChatAnalytics(ctx context.Context, chatID uuid.UUID, data ports.ChatAnalyticsUpdate) error {
+	return m.Called(ctx, chatID, data).Error(0)
+}
+func (m *MockChatAnalyticsRepository) InsertLoopDetail(ctx context.Context, detail ports.ChatLoopDetail) error {
+	return m.Called(ctx, detail).Error(0)
+}
+func (m *MockChatAnalyticsRepository) InsertAccumulatedChunks(ctx context.Context, chunks []ports.ChatAccumulatedChunk) error {
+	return m.Called(ctx, chunks).Error(0)
 }

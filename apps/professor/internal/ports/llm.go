@@ -14,6 +14,17 @@ type OCRResult struct {
 	Chunks []ChunkData
 }
 
+// AnswerMeta は最終回答の構造化メタデータ（answerability + document_summary）。
+// GenerateAnswerStreamWithPDF の完了後に GenerateAnswerMeta で取得する。
+type AnswerMeta struct {
+	// Answerability は質問への回答可否を表す ENUM 値。
+	// "answerable" | "unanswerable" | "partial"
+	Answerability string `json:"answerability"`
+	// DocumentSummary はコースマテリアルの簡潔な概要（1-2文）。
+	// unanswerable の場合でも「何の資料か」の説明として使用する。
+	DocumentSummary string `json:"document_summary"`
+}
+
 // LLMClient は Gemini API 呼び出しを抽象化する。
 // Phase 1: 高速推論モデル（OCR/Embedding） + 高精度推論モデル（最終回答）を使い分ける。
 type LLMClient interface {
@@ -42,4 +53,12 @@ type LLMClient interface {
 	// 高精度な回答を実現する（テキスト抽出のみでは失われる表・図・数式も参照可能）。
 	// pdfContent が nil または空の場合は GenerateAnswerStream と同じ動作をする。
 	GenerateAnswerStreamWithPDF(ctx context.Context, question string, evidences []string, pdfContent []byte, mimeType string, modelOverride string, thinkingLevel string, onChunk func(text string) error) error
+
+	// GenerateAnswerMeta は回答後の構造化メタデータを生成する。
+	// GenerateAnswerStreamWithPDF 完了後に呼び出すことで、
+	// answerability（回答可否）と document_summary（文書概要）を取得する。
+	// question: ユーザーの質問
+	// answer: ストリーミング完了後の完全な回答テキスト
+	// evidenceCount: 使用したエビデンスチャンク数（0=回答不能の可能性が高い）
+	GenerateAnswerMeta(ctx context.Context, question, answer string, evidenceCount int) (*AnswerMeta, error)
 }

@@ -42,7 +42,7 @@ from librarian.config import Config
 from librarian.graph import (
     build_search_queries,
     deserialize_state,
-    evaluate_and_triage,
+    evaluate_parallel,
     init_gemini,
 )
 
@@ -141,13 +141,17 @@ class LibrarianServicer:
                     )
 
                     # ─── SearchAction を生成して送信 ──────────────────
-                    # Gemini でクエリを生成する。
-                    # rationale は日本語自然文（D要件: UX表示）
-                    queries, rationale = build_search_queries(
+                    # Gemini でクエリを生成する（rationale は LLM に依頼せずローカル生成）。
+                    queries = build_search_queries(
                         user_query,
                         loop_count,
                         missing_keywords=None,
                         thinking_level=thinking_level,
+                    )
+                    # UX 向け rationale をローカルで簡易生成（D要件: LLM 呼び出し不要）
+                    rationale = (
+                        f"「{queries[0][:30]}」に関連する資料を検索しています..."
+                        if queries else "資料を検索しています..."
                     )
                     search_action = librarian_pb2.SearchAction(
                         queries_text=queries,
@@ -163,7 +167,6 @@ class LibrarianServicer:
                         "SearchAction 送信",
                         **obs_fields(request_id),
                         queries=queries,
-                        rationale=rationale,
                         loop=loop_count + 1,
                     )
                     yield response
@@ -200,10 +203,10 @@ class LibrarianServicer:
                     loop_count=loop_count,
                 )
 
-                # ─── Gemini で蓄積型評価・Triaging を実行 ───────────────
-                # A-2: new_chunks + kept_chunks で累積評価
-                # A-3: useful_chunk_ids で新規チャンクをTriaging
-                is_sufficient, useful_chunk_ids, missing_keywords = evaluate_and_triage(
+                # ─── SubAgent B/C 並列評価・Triaging を実行 ─────────────
+                # SubAgent-B: new_chunks のフィルタリング
+                # SubAgent-C: new_chunks + kept_chunks で累積充足度評価（A-2）
+                useful_chunk_ids, is_sufficient, missing_keywords = evaluate_parallel(
                     user_query,
                     new_chunks,
                     kept_chunks,
@@ -232,11 +235,16 @@ class LibrarianServicer:
                 if not is_sufficient and loop_count < max_loops:
                     # ─── 不足: リファインクエリで再検索 ────────────────
                     current_missing_keywords = missing_keywords
-                    queries, rationale = build_search_queries(
+                    queries = build_search_queries(
                         user_query,
                         loop_count,
                         missing_keywords=current_missing_keywords,
                         thinking_level=thinking_level,
+                    )
+                    # UX 向け rationale をローカルで簡易生成（D要件: LLM 呼び出し不要）
+                    rationale = (
+                        f"「{queries[0][:30]}」に関する追加情報を検索しています..."
+                        if queries else "資料を追加検索しています..."
                     )
                     search_action = librarian_pb2.SearchAction(
                         queries_text=queries,
@@ -248,7 +256,6 @@ class LibrarianServicer:
                         "SearchAction 送信（リファイン）",
                         **obs_fields(request_id),
                         queries=queries,
-                        rationale=rationale,
                         loop=loop_count + 1,
                         missing_keywords=missing_keywords,
                         exclude_count=len(all_seen_chunk_ids),

@@ -503,7 +503,7 @@ eduanimaR/
 
 ## 関連ドキュメント
 
-- [docs/REFRACTORING_PHASE1_BACKLOG.md](REFRACTORING_PHASE1_BACKLOG.md) — Phase 1 施策（完了済み）
+- [docs/REFACTORING_PHASE1_BACKLOG.md](REFACTORING_PHASE1_BACKLOG.md) — Phase 1 施策（完了済み）
 - [docs/adr/001-contract-canonical-paths.md](adr/001-contract-canonical-paths.md)
 - [docs/adr/002-apps-directory-structure.md](adr/002-apps-directory-structure.md)
 - [ops/compose/README.md](../ops/compose/README.md) — ローカル開発環境

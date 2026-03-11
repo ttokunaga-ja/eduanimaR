@@ -52,6 +52,16 @@ type Config struct {
 	// 環境変数: PROFESSOR_EMBEDDING_CONCURRENCY
 	EmbeddingConcurrency int
 
+	// DBMaxOpenConns は DB 接続プールの最大接続数。
+	// Cloud Run: (max-instances × DBMaxOpenConns) が Cloud SQL の max_connections を超えないこと。
+	// 例: max-instances=20, DBMaxOpenConns=10 → 最大200接続
+	// 環境変数: PROFESSOR_DB_MAX_OPEN_CONNS / デフォルト: 25（ローカル開発向け）
+	DBMaxOpenConns int
+
+	// DBMaxIdleConns は DB 接続プールのアイドル接続数。
+	// 環境変数: PROFESSOR_DB_MAX_IDLE_CONNS / デフォルト: 5
+	DBMaxIdleConns int
+
 	// Librarian gRPC サービス
 	LibrarianAddr string
 
@@ -83,6 +93,8 @@ func Load() *Config {
 		KafkaWorkerCount:     getEnvInt("PROFESSOR_KAFKA_WORKER_COUNT", 3),
 		GeminiAPIKey:         getEnv("GEMINI_API_KEY", ""),
 		EmbeddingConcurrency: getEnvInt("PROFESSOR_EMBEDDING_CONCURRENCY", 5),
+		DBMaxOpenConns:       getEnvInt("PROFESSOR_DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:       getEnvInt("PROFESSOR_DB_MAX_IDLE_CONNS", 5),
 		ModelIngestion:       getEnv("PROFESSOR_MODEL_INGESTION", "gemini-3-flash-preview"),
 		// 先頭ダッシュは「本番非推奨」マーカーとして使われることがある。
 		// 実際の Gemini API 呼び出し時に不正モデル名にならないよう除去する。

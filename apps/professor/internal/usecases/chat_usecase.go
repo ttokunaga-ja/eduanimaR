@@ -89,6 +89,7 @@ type ChatUseCase struct {
 	storage       ports.ObjectStorage  // MinIO から PDF をダウンロードするためのストレージ
 	llm           ports.LLMClient
 	librarian     ports.LibrarianClient
+	analyticsRepo ports.ChatAnalyticsRepository // optional: WithAnalyticsRepo で注入
 }
 
 // AskOptions は質問応答の実行オプション。
@@ -123,6 +124,13 @@ func NewChatUseCase(
 		llm:           llm,
 		librarian:     librarian,
 	}
+}
+
+// WithAnalyticsRepo は ChatAnalyticsRepository をオプション注入する。
+// NewChatUseCase のシグネチャを変更せずに analytics 機能を有効化できる。
+func (uc *ChatUseCase) WithAnalyticsRepo(repo ports.ChatAnalyticsRepository) *ChatUseCase {
+	uc.analyticsRepo = repo
+	return uc
 }
 
 // ─── Ask ─────────────────────────────────────────────────────────
@@ -182,11 +190,12 @@ func (uc *ChatUseCase) AskWithOptions(
 		return nil, err
 	}
 
-	// 累積検索結果（chunk_idベースのlookupで管理）
-	var allResults []domain.SearchResult
-	seenChunks := make(map[uuid.UUID]struct{})
-	// chunk_id → SearchResult のlookupマップ（chunk_idベースevidence処理用）
+	// DBレベル重複除外リスト（SearchByText/SearchByVector に渡す）
+	excludeIDs := make([]uuid.UUID, 0)
+	// chunk_id → SearchResult の逆引きマップ（evidence 処理・analytics 用）
 	chunkByID := make(map[string]domain.SearchResult)
+	// chunk_id → 最初に取得されたループ番号（chat_accumulated_chunks.loop_number 用）
+	chunkLoopMap := make(map[string]int)
 	searchRounds := 0
 
 	// 4. Librarian Think（双方向ストリーミング）
@@ -234,13 +243,16 @@ func (uc *ChatUseCase) AskWithOptions(
 			ch := make(chan []*domain.SearchResult, validQueries)
 
 			// (A) 全文検索（goroutine）
+			// excludeIDs をクロージャでキャプチャ（スナップショット）
+			currentExcludeIDs := append([]uuid.UUID(nil), excludeIDs...)
+
 			for _, q := range req.QueriesText {
 				if q == "" {
 					continue
 				}
 				q := q
 				go func() {
-					results, err := uc.chunkRepo.SearchByText(ctx, subjectID, q, topK)
+					results, err := uc.chunkRepo.SearchByText(ctx, subjectID, q, topK, currentExcludeIDs)
 					if err != nil {
 						slog.Warn("text search error", "query", q, "error", err)
 						ch <- nil
@@ -264,7 +276,7 @@ func (uc *ChatUseCase) AskWithOptions(
 						return
 					}
 					vec := pgvector.NewVector(emb)
-					results, err := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, topK)
+					results, err := uc.chunkRepo.SearchByVector(ctx, subjectID, vec, topK, currentExcludeIDs)
 					if err != nil {
 						slog.Warn("vector search error", "query", q, "error", err)
 						ch <- nil
@@ -283,28 +295,37 @@ func (uc *ChatUseCase) AskWithOptions(
 				}
 			}
 
-			// RRF でマージ：このラウンドの結果を RRF スコア順に統合
+			// RRF でマージ：このラウンドの新規チャンクを RRF スコア順に統合
 			roundMerged := rrfMerge(rankedLists)
 
-			// allResults に追加（chunk_id ベースで重複除去、lookupマップにも登録）
+			// chunkByID / chunkLoopMap / excludeIDs を更新
 			for _, r := range roundMerged {
 				r := r
-				if _, seen := seenChunks[r.ChunkID]; !seen {
-					seenChunks[r.ChunkID] = struct{}{}
-					allResults = append(allResults, r)
-					chunkByID[r.ChunkID.String()] = r
-				}
+				chunkByID[r.ChunkID.String()] = r
+				chunkLoopMap[r.ChunkID.String()] = searchRounds
+				excludeIDs = append(excludeIDs, r.ChunkID)
 			}
 
 			slog.Info("search round completed (RRF)",
 				"text_queries", len(req.QueriesText),
 				"vector_queries", len(req.QueriesVector),
 				"rrf_merged", len(roundMerged),
-				"total_accumulated", len(allResults),
+				"total_accumulated", len(chunkByID),
 			)
 
-			// Librarian には累積された全結果を返す（TempIndex が安定する）
-			return &ports.LibrarianSearchResponse{Results: allResults}, nil
+			// ループ詳細を DB に保存（失敗はログのみ）
+			if uc.analyticsRepo != nil {
+				_ = uc.analyticsRepo.InsertLoopDetail(ctx, ports.ChatLoopDetail{
+					ChatID:          session.ID,
+					LoopNumber:      searchRounds,
+					QueriesText:     req.QueriesText,
+					MissingKeywords: []string{},
+				})
+			}
+
+			// Librarian には今ラウンドの新規チャンクのみ返す
+			// （excludeIDs により DB が重複除外済みなので全量返信不要）
+			return &ports.LibrarianSearchResponse{Results: roundMerged}, nil
 		},
 	)
 	librarianMS := int(time.Since(librarianStarted).Milliseconds())
@@ -352,13 +373,13 @@ func (uc *ChatUseCase) AskWithOptions(
 		})
 	}
 
-	// エビデンスが0件の場合: 累積検索結果の上位N件をフォールバック
-	if len(evidenceTexts) == 0 && len(allResults) > 0 {
+	// エビデンスが0件の場合: 累積チャンクの上位N件をフォールバック
+	if len(evidenceTexts) == 0 && len(chunkByID) > 0 {
 		slog.Warn("no evidences from librarian, using fallback",
 			"fallback_n", fallbackEvidenceN,
-			"available", len(allResults),
+			"available", len(chunkByID),
 		)
-		top := allResults
+		top := chunkByIDToSlice(chunkByID)
 		if len(top) > fallbackEvidenceN {
 			top = top[:fallbackEvidenceN]
 		}
@@ -412,7 +433,17 @@ func (uc *ChatUseCase) AskWithOptions(
 		return nil, fmt.Errorf("generate answer stream with pdf: %w", streamErr)
 	}
 
-	// 7. QASession.Answer / Sources を永続化
+	// 7. GenerateAnswerMeta で answerability / document_summary を取得
+	meta, _ := uc.llm.GenerateAnswerMeta(ctx, question, answerBuf.String(), len(evidenceTexts))
+	if meta == nil {
+		// フォールバック（GenerateAnswerMeta は通常 nil を返さないが念のため）
+		meta = &ports.AnswerMeta{Answerability: "answerable"}
+		if len(evidenceTexts) == 0 {
+			meta.Answerability = "unanswerable"
+		}
+	}
+
+	// 8. QASession.Answer / Sources を永続化
 	updated, updateErr := uc.qaSessionRepo.UpdateAnswer(ctx, session.ID, answerBuf.String(), sources)
 	if updateErr != nil {
 		// 永続化失敗はログのみ（クライアントへのストリーミングは完了済み）
@@ -424,12 +455,24 @@ func (uc *ChatUseCase) AskWithOptions(
 		session = updated
 	}
 
-	// 8. 完了通知
-	isUnanswerable := len(evidenceTexts) == 0 || thinkResult.ErrorType != ""
-	answerability := "answerable"
-	if isUnanswerable {
-		answerability = "unanswerable"
+	// 9. Analytics を DB に保存（WithAnalyticsRepo が設定されている場合のみ）
+	terminationReason := determineTerminationReason(thinkResult, len(evidenceTexts))
+	if uc.analyticsRepo != nil {
+		_ = uc.analyticsRepo.UpdateChatAnalytics(ctx, session.ID, ports.ChatAnalyticsUpdate{
+			Answerability:         meta.Answerability,
+			DocumentSummary:       meta.DocumentSummary,
+			LoopTerminationReason: terminationReason,
+			TotalLoopCount:        searchRounds,
+			LibrarianDurationMS:   librarianMS,
+			ProfessorDurationMS:   answerGenMS,
+		})
+		_ = uc.analyticsRepo.InsertAccumulatedChunks(ctx,
+			buildAccumulatedChunks(session.ID, chunkByID, chunkLoopMap, thinkResult.Evidences),
+		)
 	}
+
+	// 10. 完了通知
+	isUnanswerable := meta.Answerability == "unanswerable"
 	donePayload := map[string]any{
 		"session_id":      session.ID.String(),
 		"coverage_notes":  thinkResult.CoverageNotes,
@@ -437,14 +480,14 @@ func (uc *ChatUseCase) AskWithOptions(
 		"error_type":      thinkResult.ErrorType,
 		"evidence_count":  len(evidenceTexts),
 		"is_unanswerable": isUnanswerable,
-		"answerability":   answerability,
+		"answerability":   meta.Answerability,
 		"loop_count":      searchRounds,
 		"librarian_ms":    librarianMS,
 		"answer_gen_ms":   answerGenMS,
 	}
 	if isUnanswerable {
 		donePayload["unanswerable_reason"] = summarizeUnanswerableReason(thinkResult.CoverageNotes, thinkResult.ErrorType)
-		collected := buildCollectedSources(allResults, unanswerableTopN)
+		collected := buildCollectedSources(chunkByIDToSlice(chunkByID), unanswerableTopN)
 		if len(collected) > 0 {
 			donePayload["collected_sources"] = collected
 		}
@@ -488,6 +531,8 @@ func (uc *ChatUseCase) UpdateFeedback(
 	return uc.qaSessionRepo.UpdateFeedback(ctx, sessionID, userID, feedback)
 }
 
+// ─── ヘルパー ─────────────────────────────────────────────────────
+
 func summarizeUnanswerableReason(coverageNotes, errorType string) string {
 	if strings.TrimSpace(errorType) != "" {
 		return strings.TrimSpace(errorType)
@@ -496,6 +541,78 @@ func summarizeUnanswerableReason(coverageNotes, errorType string) string {
 		return strings.TrimSpace(coverageNotes)
 	}
 	return "insufficient_evidence"
+}
+
+// determineTerminationReason はループ終了理由を loop_termination_enum 値に変換する。
+// "sufficient" | "loop_limit" | "error" | "no_evidence"
+func determineTerminationReason(result *ports.LibrarianThinkResult, evidenceCount int) string {
+	if result == nil {
+		return "error"
+	}
+	if strings.TrimSpace(result.ErrorType) != "" {
+		return "error"
+	}
+	if evidenceCount == 0 {
+		return "no_evidence"
+	}
+	if result.IsPartial {
+		return "loop_limit"
+	}
+	return "sufficient"
+}
+
+// chunkByIDToSlice は chunkByID マップを []domain.SearchResult スライスに変換する。
+// 順序は ChunkID 挿入順を保証しない（主に fallback / collected_sources 用）。
+func chunkByIDToSlice(chunkByID map[string]domain.SearchResult) []domain.SearchResult {
+	out := make([]domain.SearchResult, 0, len(chunkByID))
+	for _, r := range chunkByID {
+		out = append(out, r)
+	}
+	return out
+}
+
+// buildAccumulatedChunks は chunkByID/chunkLoopMap から chat_accumulated_chunks バルク挿入データを生成する。
+// evidences に含まれる chunk_id は IsUseful=true、それ以外は IsUseful=false。
+func buildAccumulatedChunks(
+	chatID uuid.UUID,
+	chunkByID map[string]domain.SearchResult,
+	chunkLoopMap map[string]int,
+	evidences []ports.LibrarianEvidence,
+) []ports.ChatAccumulatedChunk {
+	// evidence chunk_id を set で管理
+	usefulSet := make(map[string]struct{}, len(evidences))
+	for _, ev := range evidences {
+		usefulSet[ev.ChunkID] = struct{}{}
+	}
+
+	chunks := make([]ports.ChatAccumulatedChunk, 0, len(chunkByID))
+	for chunkIDStr, r := range chunkByID {
+		_, isUseful := usefulSet[chunkIDStr]
+
+		var snippet *string
+		if isUseful {
+			s := r.Content
+			snippet = &s
+		}
+
+		var pageStr *string
+		if r.PageNumber != nil {
+			s := fmt.Sprintf("%d", *r.PageNumber)
+			pageStr = &s
+		}
+
+		chunks = append(chunks, ports.ChatAccumulatedChunk{
+			ChatID:      chatID,
+			LoopNumber:  chunkLoopMap[chunkIDStr],
+			ChunkID:     chunkIDStr,
+			FileName:    r.FileName,
+			PageNumber:  pageStr,
+			SearchScore: nil, // RRF スコアは domain.SearchResult に未保持
+			TextSnippet: snippet,
+			IsUseful:    isUseful,
+		})
+	}
+	return chunks
 }
 
 func buildCollectedSources(results []domain.SearchResult, limit int) []map[string]any {

@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/genai"
+
 	"github.com/ttokunaga-ja/pagebench/internal/backend"
 	"github.com/ttokunaga-ja/pagebench/internal/checkpoint"
 	"github.com/ttokunaga-ja/pagebench/internal/config"
 	"github.com/ttokunaga-ja/pagebench/internal/domain"
+	geminiutil "github.com/ttokunaga-ja/pagebench/internal/gemini"
 	"github.com/ttokunaga-ja/pagebench/internal/judge"
-	"github.com/ttokunaga-ja/pagebench/internal/metrics"
 	"github.com/ttokunaga-ja/pagebench/internal/prepare"
 	"github.com/ttokunaga-ja/pagebench/internal/reporter"
 )
@@ -29,6 +31,7 @@ type Options struct {
 	SkipJudge  bool
 	Resume     bool
 	NoCleanup  bool
+	Force      bool // true の場合は既存 0c/0d の上書きを許可
 	UploadOnly bool // アップロードのみ実行して評価ループをスキップ（後方互換）
 }
 
@@ -42,6 +45,21 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 	}
 
 	domainName := filepath.Base(opts.DomainDir)
+
+	if !opts.UploadOnly && !opts.Force {
+		hasRows, checkErr := domain.HasNonHeaderRows(opts.DomainDir, domain.FileEvaluate)
+		if checkErr != nil {
+			return nil, fmt.Errorf("%s の既存データ確認に失敗: %w", domain.FileEvaluate, checkErr)
+		}
+		if hasRows {
+			return nil, fmt.Errorf("%s に既存データがあります。上書きするには --force を指定してください", domain.FileEvaluate)
+		}
+
+		reportPath := filepath.Join(opts.DomainDir, domain.FileReport)
+		if st, err := os.Stat(reportPath); err == nil && st.Size() > 0 {
+			return nil, fmt.Errorf("%s に既存データがあります。上書きするには --force を指定してください", domain.FileReport)
+		}
+	}
 
 	// データ読み込み
 	corpus, err := domain.LoadCorpus(opts.DomainDir)
@@ -180,6 +198,21 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 		}
 	}
 
+	// Gemini クライアント初期化（SemanticSimilarity 計算用）
+	// GEMINI_API_KEY が設定されていれば初期化する（SkipJudge に関係なく）
+	var geminiClient *genai.Client
+	if opts.Cfg.Gemini.APIKey != "" {
+		gc, gcErr := geminiutil.NewClient(ctx)
+		if gcErr != nil {
+			fmt.Fprintf(os.Stderr, "[WARN] Gemini クライアント初期化失敗（SemanticSimilarity をスキップ）: %v\n", gcErr)
+		} else {
+			geminiClient = gc
+			fmt.Println("[info] Gemini embedding クライアント初期化完了（SemanticSimilarity 計算有効）")
+		}
+	} else {
+		fmt.Println("[info] GEMINI_API_KEY 未設定。SemanticSimilarity 計算をスキップします。")
+	}
+
 	// 評価ループ
 	fmt.Printf("[4/4] 評価開始 (%d 件)...\n", len(qaPairs))
 	results := cp.GetResults()
@@ -203,16 +236,20 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 		var fileHit, pageHit int
 		var retrievedFilePages string
 		var refFileFound, refPageFound, refFilePageFound int
+		var answerability string
+		var qResult *backend.QueryResult
 
-		qResult, err := b.Query(collectionID, qa.Question)
+		qResult, err = b.Query(collectionID, qa.Question)
 		if err != nil {
 			fmt.Printf("          [ERROR] 回答取得失敗: %v\n", err)
 		} else {
 			ragAnswer = qResult.Answer
 			latencyMS = qResult.LatencyMS
+			answerability = qResult.Answerability
 			srcJSON, _ := json.Marshal(qResult.Sources)
 			ragSourcesStr = string(srcJSON)
-			fmt.Printf("          回答取得完了 (%d ms) | 文字数: %d\n", latencyMS, len(ragAnswer))
+			fmt.Printf("          回答取得完了 (%d ms) | 文字数: %d | answerability: %s\n",
+				latencyMS, len(ragAnswer), answerability)
 
 			// ファイル・ページ一致検証（LLM なし）
 			retrievedFilePages, refFileFound, refPageFound, refFilePageFound = evaluateRetrievedSources(qResult.Sources, qa.RefFile, qa.RefPage)
@@ -223,15 +260,23 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			fmt.Printf("          retrieved=%s\n", truncate(retrievedFilePages, 220))
 		}
 
-		// rag_refused 検知（unanswerable 専用）
-		ragRefused := detectRefusal(ragAnswer)
+		// answerability 表示（unanswerable 専用）
 		if qa.QuestionType == "unanswerable" {
-			fmt.Printf("          unanswerable | rag_refused=%d\n", ragRefused)
+			fmt.Printf("          unanswerable | answerability=%s\n", answerability)
 		}
 
-		// ROUGE-L / Exact Match（answerable のみ有意）
-		rougeL := metrics.RougeL(ragAnswer, qa.RefAnswer)
-		em := metrics.ExactMatch(ragAnswer, qa.RefAnswer)
+		// SemanticSimilarity（answerable かつ ref_answer / rag_answer あり、Gemini 有効時のみ）
+		var semSim float64
+		if qa.QuestionType != "unanswerable" && ragAnswer != "" && qa.RefAnswer != "" && geminiClient != nil {
+			var simErr error
+			semSim, simErr = computeSemanticSimilarity(ctx, geminiClient, ragAnswer, qa.RefAnswer)
+			if simErr != nil {
+				fmt.Printf("          [WARN] SemanticSimilarity 計算失敗: %v\n", simErr)
+				semSim = 0.0
+			} else {
+				fmt.Printf("          semantic_similarity=%.4f\n", semSim)
+			}
+		}
 
 		// LLM-as-Judge
 		var judgeAccuracy, judgeFaithful, judgeComplete, judgeOverall string
@@ -266,11 +311,21 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			}
 		}
 
+		loopCount := 0
+		librarianMS := 0
+		answerGenMS := 0
+		if qResult != nil {
+			loopCount = qResult.LoopCount
+			librarianMS = qResult.LibrarianMS
+			answerGenMS = qResult.AnswerGenMS
+		}
+
 		rec := domain.EvalRecord{
 			QID:                qa.QID,
 			Domain:             domainName,
 			Question:           qa.Question,
 			QuestionType:       qa.QuestionType,
+			Difficulty:         qa.Difficulty,
 			RefAnswer:          qa.RefAnswer,
 			RefEvidence:        qa.RefEvidence,
 			RefFile:            qa.RefFile,
@@ -283,13 +338,12 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			RefFileFound:       refFileFound,
 			RefPageFound:       refPageFound,
 			RefFilePageFound:   refFilePageFound,
-			RougeL:             rougeL,
-			ExactMatch:         em,
-			RagRefused:         ragRefused,
+			SemanticSimilarity: semSim,
+			Answerability:      answerability,
 			LatencyMS:          latencyMS,
-			LoopCount:          qResult.LoopCount,
-			LibrarianMS:        qResult.LibrarianMS,
-			AnswerGenMS:        qResult.AnswerGenMS,
+			LoopCount:          loopCount,
+			LibrarianMS:        librarianMS,
+			AnswerGenMS:        answerGenMS,
 			JudgeAccuracy:      judgeAccuracy,
 			JudgeFaithful:      judgeFaithful,
 			JudgeComplete:      judgeComplete,
@@ -331,30 +385,18 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 	return results, nil
 }
 
-// detectRefusal は RAG の回答が「情報なし」を示す拒否応答かどうかを判定する。
-// 拒否と判断した場合は 1、そうでなければ 0 を返す。
-func detectRefusal(answer string) int {
-	if answer == "" {
-		return 1 // 空回答も拒否とみなす
+// computeSemanticSimilarity は 2 つのテキスト間の SemanticSimilarity（コサイン類似度）を計算する。
+// gemini-embedding-001 + task_type="SEMANTIC_SIMILARITY" を使用する。
+func computeSemanticSimilarity(ctx context.Context, client *genai.Client, a, b string) (float64, error) {
+	embA, err := geminiutil.EmbedText(ctx, client, a)
+	if err != nil {
+		return 0, fmt.Errorf("回答の埋め込み失敗: %w", err)
 	}
-	lower := strings.ToLower(answer)
-	refusalPhrases := []string{
-		"わかりません", "分かりません",
-		"情報がありません", "情報がない", "記載されていません", "記載がありません", "記載はありません",
-		"掲載されていません", "掲載されておりません", "明記されていません",
-		"確認できません", "ございません", "含まれておりません",
-		"答えられません", "回答できません", "お答えできません",
-		"見つかりません", "見つからない",
-		"提供された文書には", "文書に", "資料に", "ご質問の件については",
-		"not found", "no information", "cannot answer", "don't know", "do not know",
-		"not available", "not mentioned", "not provided",
+	embB, err := geminiutil.EmbedText(ctx, client, b)
+	if err != nil {
+		return 0, fmt.Errorf("参照解答の埋め込み失敗: %w", err)
 	}
-	for _, phrase := range refusalPhrases {
-		if strings.Contains(lower, phrase) {
-			return 1
-		}
-	}
-	return 0
+	return geminiutil.CosineSimilarity(embA, embB), nil
 }
 
 func truncate(s string, max int) string {
@@ -427,11 +469,11 @@ func evaluateRetrievedSources(sources []backend.Source, refFile, refPage string)
 		entries = append(entries, retrievedFilePagesEntry{FileName: fileName, Pages: pages})
 	}
 
-	b, err := json.Marshal(entries)
+	bJSON, err := json.Marshal(entries)
 	if err != nil {
 		return "[]", refFileFound, refPageFound, refFilePageFound
 	}
-	return string(b), refFileFound, refPageFound, refFilePageFound
+	return string(bJSON), refFileFound, refPageFound, refFilePageFound
 }
 
 func normalizeFileNameForMatch(name string) string {
