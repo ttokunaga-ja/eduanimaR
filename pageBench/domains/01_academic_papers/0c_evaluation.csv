@@ -1,1 +1,957 @@
-q_id,domain,question,question_type,difficulty,ref_answer,ref_evidence,ref_file,ref_page,rag_answer,rag_sources,file_hit,page_hit,retrieved_file_pages,ref_file_found,ref_page_found,ref_file_page_found,rouge_l,exact_match,rag_refused,latency_ms,loop_count,librarian_ms,answer_gen_ms,judge_accuracy,judge_faithfulness,judge_completeness,judge_overall,judge_hallucination,judge_reasoning
+q_id,domain,question,question_type,difficulty,ref_answer,ref_evidence,ref_file,ref_page,rag_answer,rag_sources,file_hit,page_hit,retrieved_file_pages,ref_file_found,ref_page_found,ref_file_page_found,semantic_similarity,answerability,latency_ms,loop_count,librarian_ms,answer_gen_ms,judge_accuracy,judge_faithfulness,judge_completeness,judge_overall,judge_hallucination,judge_reasoning
+Q0001,01_academic_papers,Saitoらによる研究において、AL（Automatically Labeled Pairs）データセットの構築に使用されたシード語彙には、正（positive）と負（negative）の単語がそれぞれ何語ずつ含まれていますか？,answerable,simple,Saitoらによる研究のシード語彙は、15の正の単語と15の負の単語、計30語で構成されています。,"We constructed our seed lexicon consisting of 15 positive words and 15 negative words, as shown in Section A.1.",1909.00694.pdf,4,"Saitoらによる研究において、AL（Automatically Labeled Pairs）データセットの構築に使用されたシード語彙（seed lexicon）には、**正（positive）と負（negative）の単語がそれぞれ15語ずつ**含まれています。
+
+この情報は、提供された資料の以下の箇所に基づいています。
+
+*   **第4.1.1節（4ページ目）**: 「We constructed our seed lexicon consisting of **15 positive words and 15 negative words**, as shown in Section A.1.」（セクションA.1に示すように、15の正の単語と15の負の単語からなるシード語彙を構築した）と記載されています。
+*   **付録 A.1 Seed Lexicon（8ページ目）**: 実際に使用された語彙のリストが掲載されており、正の単語（喜ぶ、嬉しい、楽しいなど）15語と、負の単語（怒る、悲しい、寂しいなど）15語を確認することができます。","[{""Name"":""1909.00694.pdf"",""Page"":""8""},{""Name"":""1910.14497.pdf"",""Page"":""7""}]",1,0,"[{""file_name"":""1909.00694.pdf"",""pages"":[""8""]},{""file_name"":""1910.14497.pdf"",""pages"":[""7""]}]",1,0,0,0.9378,answerable,28697,3,13051,7708,5,5,5,5,,システムの回答は根拠テキストの数値を正確に反映しており、参照解答と完全に一致しています。また、付録の内容にまで言及しており、非常に丁寧で信頼性の高い回答となっています。
+Q0002,01_academic_papers,Minimally Supervised Learning of Affective Eventsの研究で提案された手法において、BiGRUエンコーダを使用しAL+CA+COデータセットで訓練した場合のハイパーパラメータλCA、λCO、およびμの最適化された値はそれぞれいくつですか？,answerable,reasoning,最適化されたハイパーパラメータの値は、λCA = 0.35、λCO = 1、μ = 0.5です。,"The result of hyperparameter optimization for the BiGRU encoder was as follows: λAL = 1, λCA = 0.35, λCO = 1, μ = 0.5.",1909.00694.pdf,5,"ご提示いただいた提供資料の中には、""Minimally Supervised Learning of Affective Events""という研究に関する記述、およびAL+CA+COというデータセットや、ハイパーパラメータλCA、λCO、μについての具体的な言及はありません。
+
+Reference 1にはBiGRUエンコーダの一般的な設定（埋め込み次元256、隠れ層の数2、隠れユニット次元256、オプティマイザMomentum SGD、ミニバッチサイズ1024など）が記載されていますが、ご質問にある特定のハイパーパラメータ（λCA、λCO、μ）の最適化された値については、提供された資料から回答することは不可能です。",null,0,0,[],0,0,0,0.8319,unanswerable,29611,3,14290,4750,1,1,1,1,,"根拠テキストには質問に対する直接的な回答（λCA = 0.35, λCO = 1, μ = 0.5）が明記されているにもかかわらず、システムは「記述がない」と誤った回答をしています。情報の抽出に完全に失敗しており、正確性・忠実性ともに最低評価です。"
+Q0003,01_academic_papers,Saitoらが提案した感情イベント認識手法において、BiGRUとBERTの2つのエンコーダを比較した際、AL+CA+COデータセットを用いた訓練結果におけるAccuracy（正確性）の違いと、その性能差が生じた理由に関する著者の推測を説明してください。,answerable,multi_chunk,AL+CA+COデータセットを用いた場合、BiGRUのAccuracyは0.866であったのに対し、BERTは0.835と低下しました。著者は、BERTがCA（原因）やCO（譲歩）のデータに含まれるノイズに対してより敏感であったためだと推測しています。,highest score with the BiGRU encoder trained with the AL+CA+CO dataset. ... BERT was competitive but its performance went down if CA and CO were used in addition to AL.,1909.00694.pdf,5,"Saitoらによる論文に基づき、AL+CA+COデータセットを用いた訓練におけるBiGRUとBERTの性能差とその理由について説明します。
+
+### 1. Accuracy（正確性）の違い
+Table 3（5ページ）に示された、AL+CA+COデータセットを用いた際の各エンコーダの精度は以下の通りです。
+
+*   **BiGRU:** 0.866
+*   **BERT:** 0.835
+
+比較の結果、**BiGRUの方が高い性能**を示しており、これは提案手法のモデルバリアントの中で最高スコアでした。一方で、BERTはAL（自動ラベル付け）のみの訓練時（0.863）に比べ、CA（原因）やCO（逆接）のデータを追加すると精度が低下するという結果になっています。
+
+### 2. 性能差が生じた理由に関する著者の推測
+著者は、BERTがBiGRUよりも低くなった理由として、以下の点を推測・指摘しています（Section 4.3, 5ページ）。
+
+*   **ノイズへの敏感さ:** 著者は、**BERTがCAやCOのデータセットに頻繁に含まれる「ノイズ」に対して、BiGRUよりも敏感に反応した**のではないかと推測しています。
+*   **CA/COデータの性質:** ALデータに比べて、CAやCOのペアはノイズが多いと述べられています。具体的には、ハイパーパラメータの最適化において、CAの重み（$\lambda_{CA}$）がCO（$\lambda_{CO}$）の約3分の1になったことから、特にCAペアのノイズが示唆されています。
+*   **ノイズの具体例:** 著者が挙げるCAのノイズの代表例は、**「悪い状況（負）が解決策（正）を引き起こす」**という形式のペアです。
+    *   例：「悪いところがある（負）」→「よくなるように努力する（正）」
+    *   本来、CAUSE（原因・理由）関係では前後のイベントが同じ極性を持つと仮定していますが、このような例では極性が反転しており、これが学習におけるノイズとなります。
+
+結論として、BiGRUはこれら不完全なデータからもある程度頑健に学習できたのに対し、BERTはそのノイズの影響を強く受けてしまったことが性能差に繋がったと考えられています。","[{""Name"":""1909.00694.pdf"",""Page"":""5""}]",1,1,"[{""file_name"":""1909.00694.pdf"",""pages"":[""5""]}]",1,1,1,0.9357,answerable,20664,1,3834,9448,5,5,5,5,,システムの回答は、参照解答に含まれる数値（0.866対0.835）と性能差の理由（ノイズへの敏感さ）を正確に網羅しています。さらに、根拠テキストに基づいたノイズの具体的な内容まで補足されており、非常に質の高い回答です。
+Q0004,01_academic_papers,Saitoらの感情イベント認識モデルを、2020年以降に公開された最新の日本語Wikipediaダンプデータで再学習させた場合、ACPテストセットに対するAccuracyはどの程度向上しますか？,unanswerable,N/A,,,1909.00694.pdf,,"ご提示いただいたPDF資料に基づき、ご質問に回答いたします。
+
+結論から申し上げますと、**資料内には、2020年以降に公開された日本語Wikipediaデータを用いて再学習させた場合のAccuracy（正解率）の向上に関する具体的な数値や予測は記載されていません。**
+
+その理由は以下の通りです。
+
+1.  **資料の公開時期:** 本論文は2019年12月28日にarXivに投稿されたものであり（1ページ目の左端参照）、研究内で使用されているデータや実験結果はすべて2019年以前のものに基づいています。
+2.  **使用されたBERTの仕様:** 付録の「A.2 Settings of Encoder」において、BERTモデルは「日本語Wikipediaで学習されたモデル」を使用していると記されていますが（8ページ目）、これは2019年時点でのモデルを指しており、2020年以降のデータの影響については言及されていません。
+3.  **実験の範囲:** 資料内のTable 3およびTable 4に示されている評価結果は、特定のアルゴリズム（BiGRUやBERT）とデータセット（AL、CA、CO、ACP）の組み合わせによるものであり、学習データの鮮度（年次）による精度の変化を検証する内容は含まれていません。
+
+したがって、資料に基づいた回答としては、「2020年以降の最新データを用いた場合の向上幅については、資料内に記載がないため不明である」となります。","[{""Name"":""1909.00694.pdf"",""Page"":""4""},{""Name"":""1909.00694.pdf"",""Page"":""1""},{""Name"":""1909.00694.pdf"",""Page"":""1""},{""Name"":""1909.00694.pdf"",""Page"":""5""},{""Name"":""1909.00694.pdf"",""Page"":""2""},{""Name"":""1909.00694.pdf"",""Page"":""3""}]",1,0,"[{""file_name"":""1909.00694.pdf"",""pages"":[""1"",""2"",""3"",""4"",""5""]}]",1,0,0,0.0000,unanswerable,30315,3,13109,7941,,,,1,1,システムは資料の公開時期や内容を正確に把握した上で、質問に対する情報が記載されていないことを正しく回答しており、ハルシネーションは認められません。
+Q0005,01_academic_papers,PO-EMOのドイツ語サブセットにおいて、BERTベースの感情分類実験で達成された最高のF1-microスコアはいくらですか？,answerable,simple,ドイツ語サブセットにおける感情分類実験では、最大で0.52のF1-microスコアが達成されました。,"identifying aesthetic emotions is challenging in our data, with up to .52 F1-micro on the German subset.",2003.07723.pdf,1,"PO-EMOのドイツ語サブセットにおいて、BERTベースの感情分類実験で達成された最高のF1-microスコアは **.520** です。
+
+この結果に関する詳細は以下の通りです（PDFの「6. Modeling」セクションおよびTable 6に基づく）：
+
+*   **最高のスコア:** .520 (F1-micro)
+*   **使用されたモデル:** **DBMDZ** (german-dbmdz-uncasedモデル)
+*   **評価の詳細:** このモデルは、検証セット（validation set）とテストセット（test set）の両方で.520というバランスの取れた結果を示しました。
+
+論文内では、詩における美的感情（aesthetic emotions）の特定は非常に困難なタスクであると述べられており、その中でもDBMDZが最も優れたパフォーマンスを示したことが報告されています。","[{""Name"":""2003.07723.pdf"",""Page"":""1""},{""Name"":""2003.07723.pdf"",""Page"":""8""}]",1,1,"[{""file_name"":""2003.07723.pdf"",""pages"":[""1"",""8""]}]",1,1,1,0.9014,answerable,25641,3,13504,5155,5,5,5,5,,システムの回答は参照解答と一致する0.52という数値を正確に提示しており、根拠テキストの内容を完全に反映しています。さらに、モデル名などの詳細な補足情報も提供されており、非常に質の高い回答です。
+Q0006,01_academic_papers,PO-EMOのデータセット構築において、専門家アノテーターが合意形成のために使用したINCePTIONプラットフォームとはどのようなものですか？,answerable,reasoning,INCePTIONは、機械学習による支援機能と知識指向のインタラクティブなアノテーション機能を備えたプラットフォームです。,"We used the INCePTION platform for annotation (Klie et al., 2018). ... Machine-assisted and knowledge-oriented interactive annotation.",2003.07723.pdf,3,"PDFの内容に基づき、PO-EMOのデータセット構築において使用されたINCePTIONプラットフォームについて説明します。
+
+INCePTIONプラットフォームは、PO-EMOの構築において、**専門家アノテーターが詩の感情アノテーションを行うために使用されたインタラクティブなプラットフォーム**です。
+
+PDFの記述に基づくと、主な特徴や役割は以下の通りです：
+
+*   **アノテーションの実施環境**: 言語学や文学を専攻する専門家アノテーター（大学生3名）が、ドイツ語および英語の詩に対して感情ラベルを付与する作業の基盤として利用されました（Section 4.1, p. 3）。
+*   **知識指向・対話型システム**: 引用文献（Klie et al., 2018）によると、「機械学習による支援（Machine-assisted）」および「知識指向（knowledge-oriented）」の対話型アノテーション機能を提供するプラットフォームと定義されています（Section 4.1, p. 3; Bibliography, p. 11）。
+*   **アノテーションのワークフロー**: ドイツ語の詩から開始し、約16（後に32）の詩を1バッチとする「バッチ単位」でのアノテーション作業に活用されました（Section 4.1, p. 3）。
+
+PO-EMOプロジェクトでは、このプラットフォーム上での作業を通じてアノテーター間の合意形成やガイドラインの改善を繰り返し行い、最終的にκ = .70という高い一致率（合意）を得ることに成功しています。","[{""Name"":""2003.07723.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""2003.07723.pdf"",""pages"":[""3""]}]",1,1,1,0.8815,answerable,27870,3,13214,5712,5,5,5,5,,システムの回答は参照解答の核心である「機械学習支援」と「知識指向」を正確に含んでおり、根拠テキストに基づいた詳細な補足情報も提供されています。質問に対する回答として非常に完全性が高く、信頼できる内容です。
+Q0007,01_academic_papers,PO-EMOプロジェクトで定義された9つの美的感情ラベルのうち、Schindlerら(2017)の「Amusement」因子に対応し、面白さや笑いを誘う感情を指すラベルは何ですか？,answerable,reasoning,そのラベルは「Humor」です。これはSchindlerら(2017)のAmusement因子（funny/cheerful）に基づいており、詩の行や連によって面白さを感じたり笑ったりすることを意味します。,Humor (found it funny/amusing): Implies feeling amused by the line/stanza or if it makes one laugh. ... Amusement funny/cheerful,2003.07723.pdf,4,"ご提示いただいた資料に基づき、回答いたします。
+
+PO-EMOプロジェクト（Reference 5の研究に関連）において、面白さや笑いを誘う感情を指すラベルは **Humor** です。
+
+根拠は以下の通りです。
+
+*   **Reference 2** の結果（Results）セクションにおいて、アノテーター間の一致度を測定した感情ラベルの一つとして **Humor** が明記されています。
+*   **Reference 5**（謝辞）において、ラベルの概念化（conceptualization of labels）に関して、質問にある **Ines Schindler** 氏の協力があったことが記されています。
+
+資料内には9つのラベルすべての一覧は掲載されていませんが、Reference 2で挙げられているラベル（Annoyance, Sadness, Awe/Sublime, Beauty/Joy, Humor）の中で、「面白さや笑い」という定義に合致するのは **Humor** のみです。",null,0,0,[],0,0,0,0.8729,answerable,30844,3,13006,9281,5,5,5,5,,システムの回答は正解である「Humor」を正確に特定しており、根拠テキストの内容とも完全に一致しています。Schindler氏の関与についても言及されており、質問に対する回答として十分な情報が含まれています。
+Q0008,01_academic_papers,PO-EMOの専門家アノテーションにおいて、ドイツ語と英語のそれぞれのコーパスで最も頻繁に出現した感情ラベルの上位2つは何ですか？,answerable,multi_chunk,ドイツ語と英語の両方のコーパスにおいて、最も頻繁に出現した感情は「Sadness」と「Beauty/Joy」です。,"Concerning frequency distribution for emotion labels, both experts and crowds name Sadness and Beauty/Joy as the most frequent emotions",2003.07723.pdf,7,"ご提示いただいた資料に基づき、ご質問に回答します。
+
+提供された資料（Reference 1〜5）の中には、ドイツ語と英語のコーパスそれぞれにおいて、最も頻繁に出現した感情ラベルの上位2つを明示する具体的な統計データや数値は記載されていません。
+
+資料から確認できる関連情報は以下の通りです：
+
+*   **Reference 2**において、抽出されたサンプル（59個の4行詩）に基づき、「**Sadness**（悲しみ）」が専門家とクラウドワーカーの両方において最も頻繁（the most frequent）な感情であったと述べられています。
+*   しかし、これはあくまで特定のサンプルに関する記述であり、ドイツ語と英語それぞれのコーパス全体における上位2つのラベルについては言及されていません。
+*   **Reference 1**では、ドイツ語のサブセットにおける感情分類のF1スコア（0.52）については触れられていますが、感情ラベルの頻度分布は示されていません。
+
+したがって、提供された資料のみでは、ドイツ語と英語の各コーパスで最も頻繁に出現した上位2つの感情ラベルを特定することはできません。",null,0,0,[],0,0,0,0.8738,unanswerable,24805,3,12847,2728,1,2,1,1,,根拠テキストにはSadnessとBeauty/Joyが最も頻繁な感情であると明記されていますが、システムの回答は「特定できない」と誤った結論を出しています。根拠テキストの内容を正しく読み取れておらず、参照解答とも一致しません。
+Q0009,01_academic_papers,PO-EMOのドイツ語コーパス（ANTI-K）に含まれる731の連は、何年から何年までのタイムラインに分散していますか？,answerable,multi_chunk,1575年から1936年までの新高ドイツ語のタイムラインに分散しています。,The 158 poems we consider (731 stanzas) are dispersed over 51 authors and the New High German timeline (1575–1936 A.D.).,2003.07723.pdf,3,"提供された資料に基づき回答いたします。
+
+提供された4つの資料（Reference 1〜5）の中には、PO-EMOのドイツ語コーパス（ANTI-K）に含まれる連（stanzas）のタイムラインや、それが何年から何年までのものかという具体的な年代に関する記述はありませんでした。
+
+Reference 3において、詩の美的知覚に関するクラウドソーシング実験で「英語の4行の連（English 4-line stanzas）」を使用したという言及はありますが、ドイツ語コーパスの詳細については記載されていません。",null,0,0,[],0,0,0,0.7978,unanswerable,23594,3,12642,2170,1,1,1,1,,根拠テキストには1575年から1936年という具体的な年代が明記されているにもかかわらず、システムは「記述がない」と誤った回答をしており、情報の抽出に完全に失敗しています。
+Q0010,01_academic_papers,PO-EMOの感情分類モデルとして使用されたDBMDZモデルは、具体的にどのGPUハードウェアを使用してトレーニングされましたか？,unanswerable,N/A,,,2003.07723.pdf,,"提供されたPDF資料に基づき、ご質問にお答えします。
+
+ご質問にある「DBMDZモデル」についての記述は、提供された資料内には**存在しません**。
+
+資料（3ページ、セクションV-B ""Experimental Settings""）に記載されている、この研究で使用されたモデルのトレーニング環境およびモデルの詳細は以下の通りです。
+
+*   **GPUハードウェア**: **NVIDIA GeForce GTX 1080 Ti** (各モデルをシングルGPUで実行)
+*   **使用されたモデル**: **BERT-base** (Googleが中国語の一般コーパスで事前学習したパラメータを直接採用)
+*   **ディープラーニングライブラリ**: Keras (TensorFlowバックエンド)
+
+資料内では、感情分類（PO-EMO）やDBMDZモデルに関する言及はなく、主に臨床テキスト構造化（QA-CTS）のためのBERT-baseモデルの使用について説明されています。","[{""Name"":""1908.06606.pdf"",""Page"":""3""}]",0,0,"[{""file_name"":""1908.06606.pdf"",""pages"":[""3""]}]",0,0,0,0.0000,unanswerable,26545,3,13856,5195,,,,1,1,システムは質問されたDBMDZモデルに関する記述が資料内に存在しないことを正しく指摘し、回答を拒否しています。
+Q0011,01_academic_papers,"In the study of Reddit communities, how is the 'acculturation gap' A(ct) formally defined in terms of cross-entropy?",answerable,simple,"The acculturation gap A(ct) is defined as the relative difference between the cross-entropy of comments by active users in a community-month (ct) and the cross-entropy of singleton comments by outsiders, relative to the active users' cross-entropy.","A(ct) = (E[H(d, SLMct)]_Vs - E[H(d, SLMct)]_Va) / E[H(d, SLMct)]_Va. Vs denotes the distribution over singleton comments, Va denotes the distribution over comments from users active in ct.",1705.09665.pdf,7,"Based on the provided document, the **acculturation gap** $A(c_t)$ for a community-month $c_t$ is formally defined as the **relative difference** between the cross-entropy of comments by active users and the cross-entropy of comments by ""outsiders"" (singleton commenters).
+
+According to **Section 4** (page 7), the formula is:
+
+$$A(c_t) = \frac{\mathbb{E}_{d \sim \mathcal{V}_s}[H(d, \text{SLM}_{c_t})] - \mathbb{E}_{d \sim \mathcal{V}_a}[H(d, \text{SLM}_{c_t})]}{\mathbb{E}_{d \sim \mathcal{V}_a}[H(d, \text{SLM}_{c_t})]}$$
+
+### Key Components of the Definition:
+*   **$H(d, \text{SLM}_{c_t})$**: The cross-entropy of a particular comment (utterance) $d$ relative to the community's **Snapshot Language Model (SLM)**. As defined in Equation 1 (page 6), this measure captures how linguistically ""close"" an utterance is to the community's typical language at that time.
+*   **$\mathcal{V}_a$**: The distribution of comments from **active users** (defined as those with at least 5 comments in that community/month).
+*   **$\mathcal{V}_s$**: The distribution of **singleton comments** from outsiders (users who only commented once in that specific community but are active on Reddit elsewhere).
+*   **$\mathbb{E}$**: The expected value of the cross-entropy over these respective distributions.
+
+### Interpretation:
+A **positive** acculturation gap indicates that established/active members match the community's specific language more closely (lower cross-entropy) than outsiders do. The study finds that this gap is particularly large in communities that are highly **distinctive** or extremely **dynamic** (Section 4, page 7).","[{""Name"":""1705.09665.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1705.09665.pdf"",""pages"":[""7""]}]",1,1,1,0.9502,answerable,29325,3,14338,5846,5,5,5,5,,システムの回答は、根拠テキストにある数式を正確に再現し、各変数の定義（アクティブユーザーとシングルトンコメントの分布）も詳細に説明しています。参照解答の内容を完全に網羅しており、非常に正確で包括的な回答です。
+Q0012,01_academic_papers,"According to Figure 2, how do the 'Seahawks' and 'Cooking' Reddit communities differ in terms of their monthly retention rates and their positions on the distinctiveness axis?",answerable,multi_chunk,"Both 'Seahawks' and 'Cooking' exhibit higher monthly retention rates than generic communities. However, 'Seahawks' is characterized as a highly dynamic community (volatile language), while 'Cooking' is described as having a stable identity with highly distinctive language that remains consistent over time.","Communities like Seahawks (a football team) and Cooking use highly distinctive language... Seahawks uses very dynamic language... the content of Cooking remains stable over time... more distinctive communities, like Cooking and Naruto, exhibit moderately higher monthly retention rates",1705.09665.pdf,"3, 5","Based on the provided course materials, **Figure 2 is not included** in the text. However, Reference 1 provides a textual description of the differences between the 'Seahawks' and 'Cooking' communities regarding these dimensions:
+
+*   **Monthly Retention Rates:** Reference 1 notes that **Seahawks** ""maintains a devoted set of users from month to month."" In contrast, the text does not explicitly state the retention rate for **Cooking**, though it contrasts Seahawks' devoted user base with communities like 'pics,' which are dominated by transient users.
+*   **Distinctiveness:** Discussions in the **Cooking** community are characterized as **""highly distinctive""** because they focus on specific, unique topics (such as ""risotto"") that are seldom discussed elsewhere. While the text does not explicitly plot **Seahawks** on the distinctiveness axis, it characterizes that community's language as **""highly dynamic""** rather than focusing on its distinctiveness, noting that its discussions shift rapidly over time.
+
+In summary, according to Reference 1, **Cooking** is defined by its highly distinctive interests, while **Seahawks** is highlighted for its devoted (retained) user base and highly dynamic, rapidly shifting discussions.",null,0,0,[],0,0,0,0.9235,partial,31216,3,12801,6185,3,4,3,3,,システムの回答は、Cookingの保持率がSeahawksと同様に高いという点や、Seahawksもまた高い独自性（distinctive language）を持つという根拠テキストの重要な記述を見落としています。また、図表がないことを理由に一部の比較を曖昧にしていますが、根拠テキストから導き出せる情報の網羅性が不足しています。
+Q0013,01_academic_papers,"Based on the Random Forest regressor analysis in Section 3.1, what was the resulting R2 value when combining identity-based features with standard activity-based features to predict user retention?",answerable,reasoning,"Combining features from both the identity-based typology and the activity-based baseline resulted in a statistically significant improvement, achieving an R2 of 0.60.","However, combining features from both models results in a large and statistically significant improvement over each independent model (MSE = 0.0038, R2 = 0.60, p < 0.001)",1705.09665.pdf,5,"Based on the provided course materials, it is not possible to answer this question.
+
+While **Reference 4** mentions that community distinctiveness and dynamicity are ""highly associated with user retention rates"" and refers to a ""Section 3"" and a ""colored heatmap,"" the provided excerpts do not include Section 3.1 or the specific results of a Random Forest regressor analysis, such as the R2 value.",null,0,0,[],0,0,0,0.7614,unanswerable,25523,3,12406,4168,1,1,1,1,,根拠テキストにR2 = 0.60という明確な回答が含まれているにもかかわらず、システムは回答不可能と誤って判断しています。質問に対する直接的な回答が欠落しており、評価は最低点となります。
+Q0014,01_academic_papers,What specific linguistic preprocessing step did Justine Zhang and William L. Hamilton implement to prevent a small number of highly active Reddit users from skewing the word frequency estimates Pct(w)?,answerable,reasoning,"To prevent dominance by a few users, the researchers counted each unique word only once per user, ignoring any subsequent or successive uses of that same word by the same individual.","in order to prevent a few highly active users from dominating our frequency estimates, we count each unique word once per user, ignoring successive uses of the same word by the same user.",1705.09665.pdf,4,"Based on the provided course materials, the specific preprocessing step implemented to prevent a small number of highly active users from skewing the language models is the use of a controlled sampling method for constructing **snapshot language models (SLMs)**.
+
+According to **Reference 4**, the researchers used the following procedure:
+1.  **User Sampling:** They randomly sampled 200 active users (defined as those with at least 5 comments in a specific community and month).
+2.  **Equal Contribution:** For each of these 200 users, they selected exactly **5 random 10-word spans from 5 unique comments**.
+
+This approach ensures that each sampled user contributes an identical amount of linguistic data, preventing the word frequency estimates from being dominated by the most prolific posters. To further ensure robustness, they constructed 100 of these SLMs for each community-month pair using bootstrap-resampling (Reference 4).",null,0,0,[],0,0,0,0.8587,answerable,27367,3,12598,6776,1,1,1,1,,システムの回答は、根拠テキストに記載されている『単語をユーザーごとに1回のみカウントする』という手法ではなく、全く別のサンプリング手法（SLM）について説明しており、事実関係が異なります。
+Q0015,01_academic_papers,Does the Reddit dataset used in this study include private subreddits or direct messages exchanged between users from 2013 to 2014?,unanswerable,N/A,,,1705.09665.pdf,,"Based on the provided course materials, it is not possible to answer this question.
+
+The references do not provide information about whether private subreddits or direct messages were included in the dataset. Reference 2 discusses the methodology for analyzing community-level measures (such as ""distinctiveness"" and ""dynamicity"") using Pointwise Mutual Information (PMI) and mentions specific communities like ""BabyBumps,"" ""Seahawks,"" ""Cooking,"" and ""pics,"" but it does not specify the privacy settings of the subreddits or mention the use of direct messages. Furthermore, while the materials discuss temporal variation, they do not explicitly list the specific years (such as 2013 to 2014) for the Reddit data analyzed.",null,0,0,[],0,0,0,0.0000,unanswerable,23578,3,13217,2152,,,,1,1,システムは提供された資料に情報がないことを正しく認識し、回答を拒否しています。また、参照資料の内容に触れつつも、質問に対する直接的な回答は避けており、ハルシネーションは認められません。
+Q0016,01_academic_papers,QA-CTSタスクにおける提案モデルの性能評価において、BERT-BaseおよびQANetと比較した際のEM-score（Exact Match）の結果はどうなっていますか？,answerable,simple,提案モデルのEM-scoreは91.84%であり、QANetの85.45%およびBERT-Baseの86.20%を上回る最高性能を達成しました。,Table IV indicates that our proposed model achieved the best performance both in EM-score and F1-score with EM score of 91.84% and F1-score of 93.75%.,1908.06606.pdf,4,"PDFの内容に基づき、QA-CTSタスクにおける提案モデル、BERT-Base、およびQANetのEM-score（Exact Match）の比較結果を回答します。
+
+### EM-scoreの比較結果
+表IV（TABLE IV）およびセクションV-Cの記述によると、各モデルのEM-scoreは以下の通りです。
+
+*   **提案モデル (Our Model): 91.84%**
+*   **BERT-Base: 86.20%**
+*   **QANet: 85.45%**
+
+### 詳細な評価
+1.  **BERT-Baseとの比較**: 提案モデルはBERT-Baseに対して**5.64%**のスコア向上を達成し、最も優れた性能を示しました。
+2.  **QANetとの比較**: 提案モデルはQANetを**6.39%**上回る大幅な改善を実現しました。
+3.  **QANetとBERT-Baseの比較**: QANetはF1-scoreではBERT-Baseを上回りましたが、EM-scoreにおいてはBERT-Baseを**0.75%**下回る結果となりました。
+
+以上の結果から、提案モデルは既存の強力なベースラインモデルと比較して、最も高い完全一致率（Exact Match）を達成していることが示されています（Page 4, Section V-C および Table IV）。","[{""Name"":""1908.06606.pdf"",""Page"":""4""},{""Name"":""1908.06606.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1908.06606.pdf"",""pages"":[""4""]}]",1,1,1,0.9374,answerable,19557,1,4524,5590,5,5,5,5,,システムの回答は、参照解答に含まれる全ての数値を正確に網羅しており、根拠テキストに基づいた詳細な比較分析も提供されています。BERT-BaseやQANetとの具体的な数値差まで言及されており、非常に高い精度と完全性を備えています。
+Q0017,01_academic_papers,Ruijin Hospitalのデータセットを用いた実験において、腫瘍サイズ（Tumor Size）、近位切除断端（Proximal Resection Margin）、遠位切除断端（Distal Resection Margin）の3つの質問タイプを合計したテストインスタンスの総数はいくつですか？,answerable,reasoning,テストセットにおける各質問タイプの数は、近位切除断端が290、遠位切除断端が270、腫瘍サイズが255であり、これらを合計すると815インスタンスになります。,"TABLE I STATISTICS OF DIFFERENT TYPES OF QUESTION ANSWER INSTANCES ... Total 1,899 (Training Set) 815 (Test Set)",1908.06606.pdf,3,"添付された資料に基づき、ご質問に回答します。
+
+Ruijin Hospital（瑞金医院）のデータセットを用いた実験において、3つの質問タイプを合計したテストインスタンスの総数は **815** です。
+
+内訳は以下の通りです（PDF 3ページの「TABLE I」より引用）：
+
+*   **Proximal Resection Margin（近位切除断端）:** 290
+*   **Distal Resection Margin（遠位切除断端）:** 270
+*   **Tumor Size（腫瘍サイズ）:** 255
+*   **Total（合計）:** **815**
+
+また、同ページの「V. EXPERIMENTAL STUDIES」の「A. Dataset and Evaluation Metrics」セクションにおいても、注釈付きのインスタンスが「1,899の訓練インスタンス」と「815のテストインスタンス」に分割されたことが記載されています。","[{""Name"":""1908.06606.pdf"",""Page"":""3""},{""Name"":""1908.06606.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1908.06606.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9131,answerable,17318,1,3669,5847,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値と内訳を提示しています。質問に対する回答として過不足なく、非常に高い精度で構成されています。
+Q0018,01_academic_papers,QA-CTSタスクの提案モデルにおいて、臨床固有表現認識（CNER）モデルから得られた出力タグシーケンス（InqおよびInt）は、最終的な予測を行う前にどのようにBERTモデルの出力と統合されますか？,answerable,multi_chunk,まずCNERモデルから得られたInqとIntが統合されてInとなり、一方でBERTからコンテキスト表現ベクトルVsが得られます。その後、VsとInが結合（integrated together）され、フィードフォワードネットワーク（FFN）に入力されて開始・終了インデックスが計算されます。,"Inq and Int are then integrated together into In. ... Afterwards, Vs and In are integrated together and fed into a feed forward network to calculate the start and end index",1908.06606.pdf,2,"提供された資料に基づくと、ご質問の「QA-CTSタスク」における「InqおよびInt」というタグシーケンスや、それらがBERTの出力とどのように統合されるかについての具体的な記述は見当たりません。
+
+提供資料から確認できる関連情報は以下の通りです：
+
+*   **Reference 1** では、最終的な予測ステップにおいて、**「統合された表現 $H_i$ (integrated representation $H_i$)」** を使用して回答の開始位置と終了位置のインデックスを予測することが述べられています。この $H_i$ は、フィードフォワードネットワーク (FFN) を用いて $H_f$ へと圧縮・計算され、その後ソフトマックス関数によって確率スコアが算出されます。
+*   **Reference 2** では、BERTを質問回答（QA）などのダウンストリームタスクのためにファインチューニングできることが説明されています。
+*   **Reference 5** では、CORD-NERにおける臨床的な固有表現認識（NER）の手法やエンティティタイプについて説明されていますが、それらの出力をBERTと統合する具体的なプロセス（特にInqやIntといったタグ名）については言及されていません。
+
+結論として、提供された資料内には、CNERモデルから得られた特定のタグシーケンス（InqおよびInt）をBERTモデルの出力と統合する具体的な手法に関する情報は含まれていません。",null,0,0,[],0,0,0,0.8829,unanswerable,30133,3,13320,5851,1,1,1,1,,根拠テキストには質問に対する回答が直接記述されているにもかかわらず、システムは「具体的な記述は見当たりません」と回答しており、情報を正しく抽出できていません。
+Q0019,01_academic_papers,"In the experiments conducted by Tang and Lin, what was the specific cost of the Raspberry Pi 3 (Model B) used to evaluate the models?",answerable,simple,The Raspberry Pi (RPi) used in the setup costs $35 USD.,"For our setup, the RPi costs $35 USD, the CPU costs $350 USD, and the GPU costs $3000 USD.",1811.00942.pdf,3,"According to the paper, the cost of the **Raspberry Pi 3 (Model B)** used in the experiments was **$35 USD**.
+
+This information can be found in **Section 3.2 (Infrastructure)** on page 3, where the authors list the costs of their underlying hardware setup for comparison.","[{""Name"":""1811.00942.pdf"",""Page"":""3""},{""Name"":""1811.00942.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1811.00942.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9267,answerable,22647,3,12189,3713,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な金額（35ドル）を提示しています。また、セクション番号などの詳細なコンテキストも補足されており、非常に質の高い回答です。
+Q0020,01_academic_papers,"According to Table 2, what is the per-query latency (ms/q) for the QRNN model on the WikiText-103 dataset when deployed on a Raspberry Pi, and how does this compare to the KN-5 model's latency on the same platform?",answerable,reasoning,"On the Raspberry Pi, the QRNN model has a latency of 1240 ms/q for WikiText-103, while the KN-5 model has a latency of 264 ms/q, making the QRNN approximately 4.7 times slower.",4 KN-5 ... 264 ... 5 QRNN ... 1240 ... Table 2: Language modeling results on performance and model quality.,1811.00942.pdf,4,"According to Table 2 (page 4) of the document, the per-query latency and comparison for the models on a Raspberry Pi (RPi) are as follows:
+
+*   **QRNN (WikiText-103):** 1240 ms/q
+*   **KN-5 (WikiText-103):** 264 ms/q
+
+**Comparison:**
+The QRNN model is significantly slower than the KN-5 model when deployed on a Raspberry Pi. Specifically, the QRNN's latency of 1240 ms/q is approximately **4.7 times slower** than the KN-5's 264 ms/q. 
+
+The authors note in the ""Quality–performance tradeoff"" section (page 4) that while neural models like the QRNN provide better quality (lower perplexity), the `wt103-qrnn` model is ""completely unusable on phones"" because it takes over 1.2 seconds per next-word prediction, whereas the KN-5 remains relatively fast.","[{""Name"":""1811.00942.pdf"",""Page"":""4""},{""Name"":""1811.00942.pdf"",""Page"":""4""},{""Name"":""1811.00942.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""1811.00942.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9458,answerable,22859,3,12908,3889,5,5,5,5,,システムの回答は、QRNNとKN-5の具体的なレイテンシ数値および「4.7倍遅い」という比較結果を正確に提示しており、参照解答の内容を完全に網羅しています。また、根拠テキストに基づいた追加の文脈も提供されており、非常に高い品質です。
+Q0021,01_academic_papers,How does the perplexity reduction achieved by moving from Kneser-Ney (KN) smoothing to neural language models on the PTB dataset relate to the resulting increase in energy consumption on ARM-based hardware?,answerable,multi_chunk,A 2.5x reduction in perplexity on the PTB dataset using neural language models comes at the cost of a 32x increase in energy usage when evaluated on a Raspberry Pi (ARM architecture).,We find that a 2.5× reduction in perplexity on PTB comes at a staggering cost in terms of performance: inference with NLMs takes 49× longer and requires 32× more energy.,1811.00942.pdf,"1, 2","Based on the provided research paper, the relationship between perplexity reduction and energy consumption when moving from Kneser-Ney (KN) models to neural language models (NLMs) on ARM-based hardware (Raspberry Pi) is characterized by a significant performance tradeoff.
+
+The key findings for the **Penn Treebank (PTB)** dataset are as follows:
+
+*   **Perplexity Reduction:** Moving from the KN-5 model to a neural model (such as the QRNN or AWD-LSTM) results in a **2.5× reduction** in perplexity (from approximately 141.5 to 56.8 on the test set) (Section 5, p. 4; Table 2, p. 4).
+*   **Energy Consumption Increase:** This improvement in model quality comes at the cost of a **32× increase in energy usage** per query. Specifically, energy consumption jumps from **6 mJ/query** for KN-5 to nearly **300 mJ/query** for the neural models (Table 2, p. 4).
+*   **Latency Increase:** In tandem with energy usage, the latency increases by **49×**, rising from 7 ms/query (KN-5) to over 220 ms/query (NLMs) (Section 5, p. 4).
+
+**Context and Infrastructure:**
+The researchers utilized a **Raspberry Pi 3 (Model B)** as a surrogate for mobile phones because it shares the same **ARM architecture** (Cortex-A7) found in many smartphones (Section 3.2, p. 3). They conclude that while neural models achieve impressive drops in perplexity (60–80%), these gains require substantially higher computational complexity—such as large matrix multiplications—compared to the simple phrase lookups used by non-neural techniques (Section 1, p. 1; Section 4, p. 4).","[{""Name"":""1811.00942.pdf"",""Page"":""4""},{""Name"":""1811.00942.pdf"",""Page"":""4""},{""Name"":""1811.00942.pdf"",""Page"":""3""},{""Name"":""1811.00942.pdf"",""Page"":""3""},{""Name"":""1811.00942.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1811.00942.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9415,answerable,27904,3,13995,5329,5,5,5,5,,システムの回答は、参照解答にある『2.5倍のパープレキシティ削減』と『32倍のエネルギー消費増加』という主要な数値を正確に網羅しています。根拠テキストに基づいた詳細な補足情報（レイテンシやハードウェアの詳細）も含まれており、非常に高い精度で回答されています。
+Q0022,01_academic_papers,Does the research by Tang and Lin provide a specific comparison of the energy efficiency of the NVIDIA Titan V GPU versus the latest Apple A-series bionic chips for next-word prediction?,unanswerable,N/A,,,1811.00942.pdf,,"No, the research by Tang and Lin **does not** provide a comparison between the NVIDIA Titan V GPU and Apple A-series bionic chips.
+
+According to the paper, the hardware used for their evaluation was limited to the following:
+*   **Mobile Surrogate:** A **Raspberry Pi 3 (Model B)** running Raspbian Stretch. The authors note that the RPi serves as a ""close surrogate to mobile phones"" because it uses the same **Cortex-A7** architecture found in many phones (Section 3.2, page 3).
+*   **Desktop Environment:** An **Intel i7-4790k CPU** and an **NVIDIA Titan V GPU** (Section 3.2, page 3).
+
+While the authors discuss the viability of their models for ""modern smartphones"" in terms of energy capacity (citing Carroll et al., 2010), they did not utilize or test any Apple-specific hardware or A-series Bionic chips in their experiments. All energy efficiency data for mobile-related comparisons was derived from the Raspberry Pi setup (Table 2, page 4).","[{""Name"":""1811.00942.pdf"",""Page"":""3""},{""Name"":""1811.00942.pdf"",""Page"":""1""},{""Name"":""1811.00942.pdf"",""Page"":""4""}]",1,0,"[{""file_name"":""1811.00942.pdf"",""pages"":[""1"",""3"",""4""]}]",1,0,0,0.0000,unanswerable,25186,2,8088,4317,,,,1,1,システムは質問された比較が研究に含まれていないことを正しく指摘し、実際に使用されたハードウェア（Raspberry Pi等）を正確に列挙して回答を拒否できています。
+Q0023,01_academic_papers,"What specific F-score did the AdaBoost-based classifier achieve in detecting the NMT-Fake* reviews (b = 0.3, λ = −5) that native speakers found most difficult to identify?",answerable,simple,The AdaBoost-based classifier achieved an F-score of 97% in detecting those specific NMT-Fake* reviews.,"the fake reviews MTurk users had most difficulty detecting (b = 0.3, λ = −5) are detected with an excellent 97% F-score.",1805.02400.pdf,14,"Based on the provided PDF, the AdaBoost-based classifier achieved a class-averaged **F-score of 97%** in detecting the NMT-Fake* reviews ($b = 0.3, \lambda = -5$).
+
+The document highlights the following details regarding this performance:
+*   **Detection Effectiveness:** While native speakers (MTurk workers) found this specific variant the most difficult to identify—achieving a class-averaged F-score of only 47.6% (page 11)—the AdaBoost-based classifier proved very effective.
+*   **Specific Result:** As stated in **Section 5 (Defenses)** and the caption for **Figure 4**, the fake reviews that MTurk users had the most difficulty detecting ($b = 0.3, \lambda = -5$) are detected by the AdaBoost classifier with an ""excellent 97% F-score"" (page 14-15).
+*   **Features Used:** This high accuracy was achieved using a combination of word-level features (counts of punctuation, pronouns, and articles), POS-tag n-grams, and readability features such as the ""Automated Readability Index"" (page 14).","[{""Name"":""1805.02400.pdf"",""Page"":""15""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""15""]}]",1,1,1,0.9432,answerable,28809,3,13832,5541,5,5,5,5,,システムの回答は参照解答と一致する97%という数値を正確に提示しており、根拠テキストの内容を忠実に反映しています。また、人間との比較や使用された特徴量などの補足情報も含まれており、非常に完全性が高い回答です。
+Q0024,01_academic_papers,How does the training time for the NMT-based generative model compare to the char-LSTM model described by Yao et al. [1]?,answerable,reasoning,"The NMT model can be trained significantly faster, achieving a 90% reduction in training time compared to the char-LSTM model.","We demonstrate that our model can be trained faster (90% reduction in training time compared to [1], Section 3.3)",1805.02400.pdf,2,"According to the provided document, the training time for the **NMT-based generative model** is significantly shorter than that of the **char-LSTM model** proposed by Yao et al. [1].
+
+Key comparisons include:
+
+*   **Training Time Reduction:** The NMT model represents a **90% reduction in training time** compared to the char-LSTM state-of-the-art method (Section 3.2 and Section 3.3).
+*   **Specific Durations:** 
+    *   The **NMT model** was trained for **8 epochs**, with one epoch taking an average of **72 minutes** (approx. 9.6 hours total) on a commodity PC (Section 3.2). 
+    *   The **char-LSTM model** (reproduced as ""LSTM-Fake"") required approximately **72 hours** of training using the same graphics card and framework (Section 4.1).
+*   **Monetary Cost:** Due to the shortened training duration, the authors estimate the electricity cost for training the NMT model to be approximately **$1.30 USD** (Section 7, ""Cost of generating reviews"").","[{""Name"":""1805.02400.pdf"",""Page"":""2""},{""Name"":""1805.02400.pdf"",""Page"":""12""},{""Name"":""1805.02400.pdf"",""Page"":""16""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""12"",""16"",""2""]}]",1,1,1,0.9364,answerable,26548,3,13087,5966,5,5,5,5,,システムの回答は参照解答にある『90%の削減』という主要な数値を正確に含んでおり、さらに具体的な所要時間やコストなどの詳細な補足情報も根拠テキストに基づいて提供されています。質問に対する回答として非常に正確かつ完全です。
+Q0025,01_academic_papers,"Based on the user study with experienced participants, what were the respective detection rates (recall) for NMT-Fake* reviews versus LSTM-based reviews?",answerable,multi_chunk,"In the user study with experienced participants, the detection rate (recall) was 20% for NMT-Fake* reviews and 61% for LSTM-based reviews.","In average, detection rate (recall) is 20% for NMT-Fake* reviews, compared to 61% for LSTM-based reviews.",1805.02400.pdf,13,"Based on the comparative user study involving experienced participants (tech-savvy users with computer science education), the detection rates (recall) were as follows:
+
+*   **NMT-Fake\* reviews:** 20%
+*   **LSTM-based reviews:** 61%
+
+These findings are detailed in **Section 4.3 (Comparative user study)** on page 13. The study concluded that NMT-Fake\* reviews are significantly more difficult for experienced users to detect than those generated by the state-of-the-art LSTM model. Additionally, the average number of fakes detected out of 4 was **0.8 ± 0.7** for NMT-Fake\* and **2.5 ± 1.0** for LSTM-Fake (caption for **Fig. 3**, page 14).","[{""Name"":""1805.02400.pdf"",""Page"":""14""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""14""]}]",1,1,1,0.9499,answerable,26744,3,14024,4913,5,5,5,5,,システムの回答は参照解答と完全に一致する数値（20%と61%）を提示しており、根拠テキストの内容を正確に反映しています。また、質問に対する直接的な回答に加え、背景情報や統計的な補足も含まれており、非常に質が高いです。
+Q0026,01_academic_papers,"According to the 'Stay On-Topic' paper, what are the five specific metadata elements used to define the 'context' for the NMT model's input?",answerable,simple,"The context is defined as a clear-text sequence of the review rating, restaurant name, city, state, and food tags.","Our context is a clear-text sequence of: the review rating, restaurant name, city, state and food tags (e.g. Japanese, Italian).",1805.02400.pdf,2,"According to the paper ""Stay On-Topic: Generating Context-specific Fake Restaurant Reviews,"" the five specific metadata elements used to define the 'context' for the NMT model's input are:
+
+1.  **Review rating**
+2.  **Restaurant name**
+3.  **City**
+4.  **State**
+5.  **Food tags** (e.g., Japanese, Italian)
+
+The paper specifies that this ""context"" is provided as a clear-text sequence to the model (Page 2, Section 1). Furthermore, in Section 3.2 under the ""Context"" heading (Page 6), the authors note that the specific order of these elements—**[rating name city state tags]**—is kept constant during the training of the parallel corpus.","[{""Name"":""1805.02400.pdf"",""Page"":""2""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""2""]}]",1,1,1,0.9218,answerable,29315,3,12906,5209,5,5,5,5,,システムの回答は根拠テキストに記載されている5つの要素を正確に特定しており、参照解答の内容を完全に網羅しています。追加情報として提示された要素の順序についても根拠に基づいた正確な記述であり、非常に質の高い回答です。
+Q0027,01_academic_papers,"In the NMT-Fake* generation algorithm, what is the specific value assigned to the monotonic factor α and how does it affect the start penalty over time?",answerable,reasoning,"The value of α is set to 0.66, which causes the start penalty to decrease monotonically, specifically by 90% for every 5 words generated.",We set α ← 0.66 as it’s effect decreases by 90% every 5 words generated.,1805.02400.pdf,8,"Based on the provided document, here are the details regarding the monotonic factor $\alpha$ in the NMT-Fake* generation algorithm:
+
+### **Value of the Monotonic Factor $\alpha$**
+In the NMT-Fake* variant (specifically defined by the parameters $b = 0.3$ and $\lambda = -5$), the monotonic factor $\alpha$ is assigned the value **$2/3$** (or approximately **$0.66$**).
+*   **Algorithm 1** (page 7) explicitly sets `α = 2/3` for the generation of NMT-Fake* reviews.
+*   **Section 3.3** (page 8) under ""Start penalty"" confirms this, stating: ""We set $\alpha \leftarrow 0.66$.""
+
+### **Effect on the Start Penalty Over Time**
+The factor $\alpha$ is used to calculate a **start penalty** ($\lambda \alpha^i$), which is designed to avoid repetitive or generic sentence openings (e.g., ""Great food""). Its effects over time are as follows:
+
+1.  **Monotonic Decrease:** The penalty decreases monotonically for each subsequent token generated. As the token index $i$ increases, the term $\alpha^i$ becomes smaller (since $\alpha < 1$), thereby reducing the penalty applied to the language model (Section 3.3, page 8).
+2.  **Rate of Decay:** The document specifies that with $\alpha = 0.66$, the effect of the start penalty **decreases by 90% every 5 words** (tokens) generated (Section 3.3, page 8).
+3.  **Application in Pseudocode:** In **Algorithm 2** (page 9), the start penalty is applied in line 4: `log p̃ ← Discount(log p, I, λ · α^i, G)`. This shows that the penalty strength is directly tied to the power of $\alpha$ relative to the current position $i$ in the sequence.","[{""Name"":""1805.02400.pdf"",""Page"":""9""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""9""]}]",1,1,1,0.9207,answerable,33098,3,13426,6858,5,5,5,5,,システムの回答は、αの値（0.66）と、それが5単語ごとに90%減少するという主要な情報を正確に網羅しています。根拠テキストに基づいた詳細な補足説明も含まれており、非常に高い精度と完全性を備えています。
+Q0028,01_academic_papers,"What specific hardware components were used to train the NMT model, and how many restaurant reviews from the Yelp Challenge dataset were utilized in the parallel corpus?",answerable,multi_chunk,"The model was trained on a commodity PC with an i7-4790k CPU, 32GB RAM, and an NVidia GeForce GTX 980 GPU, using 2.9 million pairs of sentences from the Yelp Challenge dataset.","We train our NMT model on a commodity PC with a i7-4790k CPU (4.00GHz), with 32GB RAM and one NVidia GeForce GTX 980 GPU... This method produced 2.9 million pairs of sentences",1805.02400.pdf,6,"Based on the provided document, here are the specific hardware components and dataset details used to train the Neural Machine Translation (NMT) model:
+
+### **Hardware Components**
+The NMT model was trained on a **commodity PC** equipped with the following components:
+*   **CPU:** Intel i7-4790k (4.00GHz)
+*   **RAM:** 32GB
+*   **GPU:** One NVIDIA GeForce GTX 980
+(Source: **Section 3.2, Training Settings**, Page 6)
+
+### **Restaurant Reviews in the Parallel Corpus**
+The researchers utilized the Yelp Challenge dataset (Aug 2017), which contains 2.9 million restaurant reviews. From this data:
+*   **Total Parallel Corpus:** The method produced **2.9 million pairs of sentences** (context-review pairs) for the parallel corpus.
+*   **Distribution:** Before training, they reserved 15,000 reviews for validation and 3,000 for testing, using the **remaining 2,882,000 reviews** for the actual training of the model. 
+(Source: **Section 3.2, Dataset and Context**, Pages 5–6)","[{""Name"":""1805.02400.pdf"",""Page"":""12""},{""Name"":""1908.06606.pdf"",""Page"":""3""}]",1,0,"[{""file_name"":""1805.02400.pdf"",""pages"":[""12""]},{""file_name"":""1908.06606.pdf"",""pages"":[""3""]}]",1,0,0,0.9481,answerable,25621,3,11865,6568,5,5,5,5,,ハードウェア構成および290万件というデータセットの数値を正確に抽出しており、参照解答よりも詳細な内訳まで提供されています。根拠テキストの内容に忠実であり、質問に対する回答として完璧です。
+Q0029,01_academic_papers,What is the total number of features used by the NMT-Fake review detector for '1/2/3-grams of detailed part-of-speech tags' and 'Word unigrams' combined?,answerable,reasoning,"The combined total is 135,775 features (112,944 for detailed POS tags and 22,831 for word unigrams).","Word unigrams: 22,831; 1/2/3-grams of detailed part-of-speech tags: 112,944",1805.02400.pdf,21,"Based on the provided course materials, the total number of features used by the NMT-Fake review detector for these two categories is **135,775**.
+
+According to **Table 6** in **Reference 3**, the specific breakdown is as follows:
+*   **Word unigrams:** 22,831 features
+*   **1/2/3-grams of detailed part-of-speech tags:** 112,944 features
+
+**Total:** 22,831 + 112,944 = 135,775 features.",null,0,0,[],0,0,0,0.9338,answerable,22098,3,12751,1950,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値と内訳を提供しています。計算過程も示されており、質問に対して非常に丁寧かつ正確に回答されています。
+Q0030,01_academic_papers,How much did the authors estimate the electricity cost in USD for the 8-hour training period of the NMT model in California?,answerable,simple,The training of the NMT model requires approximately 1.30 USD.,"Assuming an electricity cost of 16 cents ⁄ kWh (California) and 8 hours of training, training the NMT model requires approximately 1.30 USD.",1805.02400.pdf,16,"Based on the provided document, the authors estimate the electricity cost for training the NMT model as follows:
+
+*   **Estimated Cost:** Approximately **1.30 USD**.
+*   **Basis of Estimate:** This figure is based on an assumed electricity cost of **16 cents / kWh** (California rates) for an **8-hour** training period.
+
+This information can be found on **page 16** under the ""Cost of generating reviews"" subsection of Section 7 (Discussion and Future Work).","[{""Name"":""1805.02400.pdf"",""Page"":""16""}]",1,1,"[{""file_name"":""1805.02400.pdf"",""pages"":[""16""]}]",1,1,1,0.9030,answerable,25187,3,12948,4292,5,5,5,5,,システムの回答は参照解答の数値を正確に反映しており、根拠テキストに基づいた詳細な内訳も提供されています。質問に対する回答として過不足なく、非常に高い精度で構成されています。
+Q0031,01_academic_papers,Does the 'Stay On-Topic' research provide a comparison of the NMT-Fake* model's performance when trained on the TripAdvisor dataset versus the Yelp dataset?,unanswerable,N/A,,,1805.02400.pdf,,"Based on the provided course materials, the research **does not** provide a comparison of the NMT-Fake* model's performance on a TripAdvisor dataset versus a Yelp dataset.
+
+The references only describe the use of the **Yelp Challenge dataset** for training and testing the model:
+*   **Reference 2** explicitly states that the ""Yelp Challenge dataset"" was used to fetch metadata (names, food tags, cities, and states) to create the parallel corpus for the NMT model.
+*   **Reference 3** confirms that the user study used ""real reviews from Yelp"" to test against the machine-generated reviews.
+*   **Reference 5** mentions a dataset of Chinese pathology reports, but this is unrelated to the fake review generation task.
+
+There is no mention of TripAdvisor in any of the provided documents.",null,0,0,[],0,0,0,0.0000,unanswerable,24287,3,12192,4343,,,,1,1,システムは質問に対して「情報がない」と正しく回答しており、提供されたリファレンスに基づきTripAdvisorに関する言及がないことを正確に指摘しています。
+Q0032,01_academic_papers,What was the specific hourly wage paid to the Amazon Mechanical Turk master workers who participated in the 20-job detection study?,unanswerable,N/A,,,1805.02400.pdf,,"Based on the provided course materials, there is no information regarding the specific hourly wage paid to Amazon Mechanical Turk workers, nor is there any mention of a ""20-job detection study.""
+
+While **Reference 2** discusses a crowdsourcing experiment to collect judgements for the aesthetic perception of poetry and **Reference 4** mentions the detection of machine-generated fake reviews, neither reference provides details on payment rates or specific worker designations like ""master workers.""",null,0,0,[],0,0,0,0.0000,unanswerable,27000,3,13631,4444,,,,1,1,システムは質問に対する情報が提供された資料内に存在しないことを正しく認識し、回答を拒否しているため。
+Q0033,01_academic_papers,"In the experiment described by David Tuckey et al., what specific embedding size and hidden state size were used for the baseline LSTM cells?",answerable,simple,The embedding size used is 128 and the hidden state size of the LSTM cells is 254.,The embedding size used is of 128 and the hidden state size of the LSTM cells is of 254.,1907.05664.pdf,2,"Based on the experiment described in the paper by Tuckey et al., the specific sizes used for the baseline LSTM cells are as follows:
+
+*   **Embedding size:** 128
+*   **Hidden state size:** 254
+
+These parameters were chosen to recreate the same settings as See et al. [2017] for training on the CNN/Daily Mail dataset.
+
+**Source:**
+*   **Section 2.2 (The Model)**, page 2: ""The embedding size used is of 128 and the hidden state size of the LSTM cells is of 254.""","[{""Name"":""1907.05664.pdf"",""Page"":""1""}]",1,1,"[{""file_name"":""1907.05664.pdf"",""pages"":[""1""]}]",1,1,1,0.9228,answerable,24395,3,12291,3633,5,5,5,5,,システムの回答は根拠テキストの数値を正確に抽出しており、参照解答と完全に一致しています。追加情報として出典元も明記されており、非常に信頼性の高い回答です。
+Q0034,01_academic_papers,"According to the methodology for validating saliency maps in this study, how does the degradation of generated summaries differ between deleting the 7% most important words versus the 7% least important words for the text in Figure 4?",answerable,reasoning,"When deleting the 7% most important words, there is a significant degradation where the decoder repeats the UNKNOWN token, whereas deleting the 7% least important words results in a summary that remains largely coherent.","We observe a significant difference in summary degradation between the two experiments, where the decoder just repeats the UNKNOWN token over and over.",1907.05664.pdf,4,"Based on the methodology described in Section 4.2 and the results illustrated in Figure 4 of the study, the degradation of the generated summaries differs significantly between the two settings:
+
+*   **Deleting the 7% most important words:** This results in **quick and severe degradation**. The summary loses its structure and meaning, and the decoder fails to generate coherent text, instead simply repeating the **UNKNOWN token (`<UNK>`)** ""over and over"" (Section 4.2, Page 4).
+*   **Deleting the 7% least important words:** This serves as the control experiment. In Figure 4, deleting these words results in a summary that remains **largely coherent and readable**, retaining the core information (e.g., ""the video was found by a source close to the investigation"") despite the missing tokens (Figure 4, Page 4).
+
+**Conclusion on Methodology:**
+The authors use this ""significant difference"" in degradation to argue that the saliency maps for the text in Figure 4 are **""truthful""** in regard to the network's computation, as they correctly identified the input features that were critical to the model's output (Section 4.2, Page 4).","[{""Name"":""1907.05664.pdf"",""Page"":""4""},{""Name"":""1907.05664.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1907.05664.pdf"",""pages"":[""4""]}]",1,1,1,0.9272,answerable,27743,3,12187,4500,5,5,5,5,,システムの回答は参照解答の内容を完全に網羅しており、最も重要な単語を削除した場合のUNKNOWNトークンの繰り返しと、最も重要でない単語を削除した場合の整合性の維持という対比を正確に記述しています。根拠テキストに基づいた詳細な補足も含まれており、非常に高い品質です。
+Q0035,01_academic_papers,How does the application of Layer-Wise Relevance Propagation (LRP) to the CNN/Daily Mail dataset in this research compare to the performance metrics of the pointer-generator networks described in See et al. [2017]?,unanswerable,N/A,,,1907.05664.pdf,,"Based on the provided research paper, the comparison between the application of Layer-Wise Relevance Propagation (LRP) and the performance of the pointer-generator networks in See et al. [2017] can be summarized as follows:
+
+### 1. Qualitative Performance Comparison
+The researchers reproduced the baseline model from See et al. [2017] and trained it on the CNN/Daily Mail dataset. They achieved results that were **""qualitatively equivalent""** to those of See et al. [2017] (Section 2.3, p. 2). However, they noted several performance issues in their generated summaries:
+*   **Factual Accuracy:** Wrong reproduction of factual details.
+*   **Vocabulary:** Replacing rare words with common alternatives.
+*   **Coherence:** Repeating ""non-sense"" after the third sentence.
+*   **Validity:** The authors admit their generated summaries are ""far from being valid summaries"" but were sufficient for testing LRP attribution (Section 2.3, p. 2).
+
+### 2. Application of LRP vs. Attention
+A key finding of this research is the disconnect between LRP saliency maps and the attention mechanisms used in See et al. [2017]:
+*   **Correlation:** The saliency maps generated via LRP were found to be **uncorrelated with the attention distribution** that participated in generating the output (Section 4.1, p. 3).
+*   **Consistency:** While attention distributions change drastically for each word in a summary, the 50 LRP saliency maps generated for a single text were ""almost identical,"" highlighting the same input words regardless of the specific output word (Section 4.1, p. 3).
+
+### 3. Future Research Directions
+The paper concludes by stating that applying LRP specifically to **pointer-generator networks** (the specific architecture variation emphasized in See et al. [2017]) is a goal for **future work**. The current study focused on the sequence-to-sequence attention model baseline to compare current results and justify the use of relevance averaging (Section 5, p. 4).
+
+### Summary of Metrics
+The paper does not provide traditional ROUGE scores or quantitative performance metrics to compare against See et al. [2017]. Instead, it focuses on the **""truthfulness"" of the attribution** (how well the saliency map represents the network's actual use of features) through counterfactual testing—deleting ""important"" words to observe summary degradation (Section 4.2, p. 4).","[{""Name"":""1907.05664.pdf"",""Page"":""2""},{""Name"":""1907.05664.pdf"",""Page"":""1""},{""Name"":""1907.05664.pdf"",""Page"":""1""},{""Name"":""1907.05664.pdf"",""Page"":""3""}]",1,0,"[{""file_name"":""1907.05664.pdf"",""pages"":[""1"",""2"",""3""]}]",1,0,0,0.0000,answerable,29663,3,12530,7467,,,,1,1,システムは、質問にあるLRPとSee et al. [2017]の性能指標の比較について、論文内に定量的データが存在しないことを正しく指摘し、将来の課題であると言及しているため。
+Q0036,01_academic_papers,Joren and Alvarez-Melis's research describes the RIPA metric as an alternative to WEAT; how is the relation vector 'b' specifically constructed in the RIPA metric?,answerable,simple,The relation vector 'b' in the RIPA metric is constructed from the first principal component of the differences between gender word pairs.,The relation vector is constructed from the first principal component of the differences between gender word pairs.,1910.14497.pdf,2,"Based on the provided research by Joren and Alvarez-Melis, the relation vector **$b$** in the RIPA (Relational Inner Product Association) metric is constructed in the following way:
+
+*   **Source Material:** It is derived from gender-specific word pairs, such as *(he, she)* or *(man, woman)*.
+*   **Mathematical Construction:** The vector is constructed from the **first principal component** of the differences between these gender word pairs.
+
+The RIPA metric uses this relation vector to formalize bias as the inner product association of a word vector $v$ with respect to this vector $b$. A RIPA value of zero indicates a lack of bias, while the direction (positive or negative) indicates the direction of the bias (Section 2, page 2).","[{""Name"":""1910.14497.pdf"",""Page"":""1""}]",1,1,"[{""file_name"":""1910.14497.pdf"",""pages"":[""1""]}]",1,1,1,0.9459,answerable,31870,3,12683,6915,5,5,5,5,,システムの回答は、関係ベクトルbがジェンダー単語対の差の第1主成分から構築されることを正確に述べており、参照解答および根拠テキストと完全に一致しています。追加の具体例や背景情報も正確で、質問に対して非常に包括的な回答となっています。
+Q0037,01_academic_papers,"In the fastText embedding experiments, how does the 'Composite NN + Prob' method compare to the 'Geometric' mitigation method in terms of the Neighborhood metric value?",answerable,reasoning,"The 'Composite NN + Prob' method achieves a Neighborhood metric value of 0.034, which is significantly lower (indicating less bias) than the 'Geometric' method's value of 0.328.",Geometric 0.096 0.328 ... Composite NN + Prob 0.372 0.034 ... Table 1: Remaining Bias (as measured by RIPA and Neighborhood metrics),1910.14497.pdf,4,"Based on the provided course materials, there is no mention of a ""Composite NN + Prob"" method or a specific ""Neighborhood metric value"" associated with it.
+
+Reference 5 mentions that the authors' framework is ""comparable to state-of-the-art alternatives according to measures of geometric bias mitigation"" and ""performs far better according to measures of neighborhood bias,"" but it does not provide the specific names of the methods being compared (other than the baseline SGNS) or the numerical values for these metrics. References 1, 2, 3, and 4 do not contain information regarding these specific mitigation methods or neighborhood metric comparisons.",null,0,0,[],0,0,0,0.8514,unanswerable,23879,3,13212,2153,1,1,1,1,,根拠テキストには質問に対する具体的な数値（0.034と0.328）が明記されているにもかかわらず、システムは「記載がない」と誤った回答をしており、情報の抽出に完全に失敗しています。
+Q0038,01_academic_papers,What specific loss functions are proposed for 'Probabilistic Bias Mitigation' and 'Nearest Neighbor Bias Mitigation' respectively to address word embedding bias?,answerable,multi_chunk,"For Probabilistic Bias Mitigation, the loss function is the sum over word pairs (a,b) in P of the difference between p(target|a) and p(target|b). For Nearest Neighbor Bias Mitigation, the loss function is the sum from i=0 to k/2 of the difference between p(target|mi) and p(target|fi).","loss = sum_{a,b in P} p(target|a) - p(target|b) ... loss = sum_{i=0}^{k/2} p(target|mi) - p(target|fi)",1910.14497.pdf,3,"Based on the provided course materials, here is the information regarding the methods and metrics mentioned:
+
+**Probabilistic Bias Mitigation**
+According to **Reference 1**, the authors propose a ""probabilistic view of word embedding bias"" and a ""novel method for mitigating bias which relies on probabilistic observations."" While the abstract states this method is more robust and maintains embedding quality, the provided excerpts **do not specify the exact mathematical loss function** used for this mitigation. **Reference 3** includes a formula involving Kullback-Leibler (KL) divergence and the minimization of $q$, but the text does not explicitly link this formula to the ""Probabilistic Bias Mitigation"" algorithm's loss function.
+
+**Nearest Neighbor Bias Mitigation**
+The provided materials do not propose a specific loss function for ""Nearest Neighbor Bias Mitigation."" Instead, **Reference 2** describes a **Neighborhood Metric** used to *quantify* bias rather than a loss function used to *train* or *mitigate* it. 
+*   **Metric Definition:** It measures the proportion of male socially-biased words among the $k$ nearest socially-biased male and female neighboring words. 
+*   **Calculation:** It uses the ratio of socially-biased male to socially-biased female words in a neighborhood (typically the 1000 most biased words). A value of 0.5 indicates an unbiased word, while values closer to 0 or 1 indicate stronger bias.
+
+**Other Related Metrics/Methods**
+**Reference 2** also details other measurement frameworks:
+*   **Geometric Bias Mitigation:** Uses cosine distances and projections onto a gender subspace ($v_B = \sum_{j=1}^k (v \cdot b_j)b_j$).
+*   **WEAT:** Uses a test statistic ($s(w, A, B)$) based on the difference between mean cosine similarities.
+*   **RIPA:** Uses the inner product association of a word vector with a relation vector $b$ (the first principal component of gender word pair differences).
+
+In summary, the provided materials describe the **metrics** used to evaluate bias in neighborhoods and probabilistic frameworks, but they **do not provide the specific loss functions** used to execute the mitigation for either method.",null,0,0,[],0,0,0,0.8755,unanswerable,24386,3,12495,4140,1,1,1,1,,システムの回答は、根拠テキストに数式が明記されているにもかかわらず「損失関数は提供されていない」と誤った結論を出しています。参照解答にある具体的な数式の説明も完全に欠落しており、情報の抽出に失敗しています。
+Q0039,01_academic_papers,Does the probabilistic framework presented by Joren and Alvarez-Melis include specific mitigation techniques for racial bias in BERT-based embeddings?,unanswerable,N/A,,,1910.14497.pdf,,"Based on the provided PDF, here is the answer to your question:
+
+No, the probabilistic framework presented by Joren and Alvarez-Melis does not include specific mitigation techniques for racial bias in BERT-based embeddings.
+
+The paper's scope is limited in the following ways:
+
+*   **Focus on Binary Gender Bias:** The authors explicitly state that for the purposes of their experiments and fair comparison, they ""focus on mitigating a binary gender bias"" (Section 1, page 2). While they note the framework could be extended to other types of bias (such as race or ethnicity mentioned in the Introduction), the specific techniques and results provided focus on gender.
+*   **Focus on Static Word Embeddings:** The research specifically evaluates the framework using **SGNS** (Skip-gram with negative-sampling) and **fastText** embeddings (Section 1, page 2; Section 4, page 3). 
+*   **Absence of BERT:** The PDF does not mention BERT or any other transformer-based contextualized embeddings. In the ""Discussion"" section (page 4), the authors suggest that ""experimenting with various embedding algorithms and network architectures"" is a goal for **future work**.
+
+In summary, while the authors acknowledge race as an axis of societal bias in their introduction, the framework and experiments described in this specific document are applied to gender bias in static word embeddings like fastText, not racial bias in BERT.","[{""Name"":""1910.14497.pdf"",""Page"":""4""},{""Name"":""1910.14497.pdf"",""Page"":""2""}]",1,0,"[{""file_name"":""1910.14497.pdf"",""pages"":[""2"",""4""]}]",1,0,0,0.0000,answerable,30951,3,13523,5419,,,,1,1,システムは質問された特定の技術（BERTや人種バイアス緩和）が文書に含まれていないことを正しく指摘し、文書の実際の範囲（性別バイアスや静的埋め込み）を正確に説明しています。
+Q0040,01_academic_papers,"In the wordsim-353 word pairs dataset translated for the Yoruba language, how many English words were translated using short phrases instead of single words?",answerable,simple,"In the Yoruba translation of the wordsim-353 dataset, 98 words were translated by short phrases instead of single words.",98 words were translated by short phrases instead of single words. This mostly affects words from science and technology,1912.02481.pdf,4,"Based on the provided course materials, there is no mention of the ""wordsim-353 word pairs dataset"" or the ""Yor’ub’a language."" Consequently, the materials do not contain information regarding how many English words were translated using short phrases instead of single words for that specific dataset and language.",null,0,0,[],0,0,0,0.8696,unanswerable,23567,3,12394,1471,1,1,1,1,,根拠テキストには質問に対する直接的な回答（98語）が記載されているにもかかわらず、システムは情報が存在しないと誤った回答をしています。
+Q0041,01_academic_papers,"Based on Table 3 and the experimental results for Twi, what is the percentage improvement in Spearman ρ correlation when moving from the F1 fastText pre-trained model to the C2 Curated Small Dataset?",answerable,reasoning,"The Spearman ρ correlation for Twi improves from 0.143 (F1) to 0.388 (C2), which represents an improvement of approximately 171.3% (or an increment of over 170% as noted in the text).","the curated embeddings improve the correlation with human judgements on the similarity task a ∆ρ = +0.25 or, equivalently, by an increment on ρ of 170% (Twi)",1912.02481.pdf,6,"Based on the provided PDF, specifically **Table 3** and the experimental results described in **Section 5.2.1**, here is the calculation for the percentage improvement for Twi:
+
+### 1. Data Points (from Table 3, page 5)
+*   **F1: Pre-trained Model (Wiki):** Spearman ρ = **0.143**
+*   **C2: Curated Small Dataset (Clean + noisy):** Spearman ρ = **0.388**
+
+### 2. Calculation of Percentage Improvement
+To find the percentage improvement, we use the formula: 
+$$\frac{\text{New Value} - \text{Old Value}}{\text{Old Value}} \times 100$$
+
+*   **Difference:** $0.388 - 0.143 = 0.245$
+*   **Calculation:** $(0.245 / 0.143) \times 100 \approx 171.3\%$
+
+### 3. Conclusion and Context
+The percentage improvement in Spearman ρ correlation for Twi when moving from the F1 pre-trained model to the C2 curated dataset is approximately **171.3%**.
+
+**Relevant Citations:**
+*   **Section 5.2.1 (page 6):** The authors note that the curated embeddings improve the correlation by ""an increment on ρ of **170% (Twi)**."" (The slight variance between 171.3% and the 170% cited in the text is due to rounding in the discussion).
+*   **Table 3 (page 5):** Provides the specific values (0.143 and 0.388) used for the comparison.
+*   **Section 5.2.1 (page 6):** Explains that the C2 dataset is the ""best option"" for Twi because the inclusion of Wikipedia articles (noisy text) doubles the vocabulary and reduces the model's bias toward religious texts without the same ambiguity penalties seen in Yorùbá.","[{""Name"":""1912.02481.pdf"",""Page"":""6""},{""Name"":""1912.02481.pdf"",""Page"":""5""}]",1,1,"[{""file_name"":""1912.02481.pdf"",""pages"":[""5"",""6""]}]",1,1,1,0.9094,answerable,26181,3,12597,6796,5,5,5,5,,システムの回答は参照解答と完全に一致しており、計算過程や根拠テキストの記述（170%）との整合性についても詳細に説明されています。数値の正確性と論理的な構成が非常に優れています。
+Q0042,01_academic_papers,How does the F1-score of the fine-tuned uncased Multilingual-bert using a Yoruba-specific vocabulary compare to the base pre-trained version on the Global Voices Yoruba NER task?,answerable,multi_chunk,"The fine-tuned version with Yoruba vocabulary achieves an F1-score of 60.1 ± 0.8, which is significantly higher than the base pre-trained Multilingual-bert's score of 27.1 ± 0.7.",Pre-trained uncased Multilingual-bert (Multilingual vocab) ... 27.1 ± 0.7. ... Fine-tuned uncased Multilingual-bert (Yoruba vocab) ... 60.1 ± 0.8.,1912.02481.pdf,7,"Based on the provided document, the comparison of the F1-scores on the Global Voices Yorùbá NER task is as follows:
+
+*   **Base Pre-trained Version:** The pre-trained uncased Multilingual-BERT (using a multilingual vocabulary) achieved an F1-score of **27.1 ± 0.7**.
+*   **Yorùbá-specific Vocabulary Version:** The fine-tuned uncased Multilingual-BERT using a Yorùbá-specific vocabulary achieved an F1-score of **60.1 ± 0.8**.
+
+**Comparison and Analysis:**
+1.  **Significant Improvement:** Utilizing a Yorùbá-specific vocabulary resulted in a substantial increase in performance, more than doubling the F1-score of the base model.
+2.  **Vocabulary Advantage:** The Yorùbá-specific vocabulary model outperformed the version that used a multilingual vocabulary (which had an F1-score of 56.4 ± 2.4) by **4%** (Section 5.2.3, page 7).
+3.  **Low-Resource Performance:** The authors note that while the base pre-trained embeddings perform poorly on low-resource languages (27.1 F1 in Yorùbá vs. 66.2 F1 in English), fine-tuning on even a limited amount of monolingual data with a language-specific vocabulary significantly improves the quality of the embeddings (Section 5.2.3, page 7).
+
+**Reference:** Table 5 (page 7) and Section 5.2.3, ""BERT Evaluation on NER Task.""","[{""Name"":""1912.02481.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1912.02481.pdf"",""pages"":[""7""]}]",1,1,1,0.9444,answerable,26178,3,13312,4926,5,5,5,5,,システムの回答は、参照解答に含まれる主要な数値（27.1および60.1）を正確に引用しており、比較結果も正しく述べています。根拠テキストに基づいた詳細な分析も加えられており、質問に対して非常に高い精度で回答しています。
+Q0043,01_academic_papers,"According to the description of the Yoruba language, what are the specific four diacritics used in Standard Yoruba and what is the function of the fourth one?",answerable,reasoning,"Standard Yoruba uses 4 diacritics: 3 are for marking tones (low, mid, high), and the fourth is a dot below used to indicate open phonetic variants of the letters 'e', 'o', and the long variant of 's'.","Standard Yoruba uses 4 diacritics, 3 are for marking tones while the fourth which is the dot below is used to indicate the open phonetic variants of letter ’e’ and ’o’",1912.02481.pdf,2,"Based on the provided course materials, there is no mention of the specific four diacritics used in Standard Yorùbá or the function of a fourth one.
+
+Reference 4 mentions that the researchers obtained ""fully-diacritized Yorùbá literature"" and notes that certain Twi corpora contain an ""uncommon addition of diacritics which are not standardised on certain vowels,"" but the materials do not list or describe the specific diacritics for the Yorùbá language.",null,0,0,[],0,0,0,0.8535,unanswerable,27920,3,13111,5419,1,1,1,1,,"根拠テキストには4つのダイアクリティカルマークとその機能（声調およびe, oの開音変種）が明記されていますが、システムの回答は「記載がない」と誤った否定をしており、情報を全く提供できていません。"
+Q0044,01_academic_papers,What was the total cost in USD for the Niger-Volta Language Technologies Institute to collect and diacritize the Lagos-NWU conversational speech corpus?,unanswerable,N/A,,,1912.02481.pdf,,"Based on the provided course materials, there is no information regarding the Niger-Volta Language Technologies Institute, the Lagos-NWU conversational speech corpus, or any specific costs in USD associated with data collection and diacritization.
+
+Reference 1 discusses spoken language identification using ConvNets and the VoxForge dataset. Reference 2 lists various legal corpora. Reference 3 provides vocabulary sizes and Spearman correlation data for Twi and Yorùbá embeddings. Reference 4 lists funding grants from Chinese institutions, and Reference 5 shows annotation examples from the CORD-19 and New York Times corpora. None of these references contain the specific details requested.",null,0,0,[],0,0,0,0.0000,unanswerable,21849,3,11366,1893,,,,1,1,システムは質問に対する情報が提供された資料内に存在しないことを正しく認識し、回答を適切に拒否している。
+Q0045,01_academic_papers,"In the study of Portuguese word embeddings by Santana et al., what was the specific accuracy obtained for predicting analogies after the application of the De-bias algorithm?",answerable,simple,"After the application of the De-bias algorithm, the accuracy obtained in predicting model analogies was 03.03%.",Table 1. Accuracy Obtained in Predicting Model Analogies ... After Debias 03.03 %,1810.04528.pdf,5,"Based on the study by Santana et al., the specific accuracy obtained for predicting analogies after the application of the De-bias algorithm was **03.03%**.
+
+According to **Table 1** (page 5), the accuracy dropped significantly from **18.18%** (Before Debias) to **03.03%** (After Debias). The authors note that the prediction of the model with bias is significantly better when using a 99% confidence factor, reinforcing the idea that removing bias can have a negative impact on the overall quality and predictive performance of the model (page 5, Section 5).","[{""Name"":""1810.04528.pdf"",""Page"":""5""}]",1,1,"[{""file_name"":""1810.04528.pdf"",""pages"":[""5""]}]",1,1,1,0.9137,answerable,16947,1,3482,5208,5,5,5,5,,システムの回答は参照解答と完全に一致する03.03%という数値を提示しており、正確です。根拠テキストに基づいた補足情報も提供されており、質問に対して非常に高い精度で回答しています。
+Q0046,01_academic_papers,"According to the research on Portuguese Word Embeddings, why did the authors choose the Continuous Bag-of-Words (CBOW) strategy over Skip-Gram for their proposal?",answerable,reasoning,"The authors chose the Continuous Bag-of-Words (CBOW) model because it was evaluated in a previous study [6] using a large, multi-genre Portuguese corpus that covers different expressions of the language, making it suitable for analyzing gender bias and stereotypes.",The authors of [6] claim to have collected a large corpus from several sources to obtain a multi-genre corpus representative of the Portuguese language. ... The latter [CBOW] was chosen for application in the present proposal.,1810.04528.pdf,3,"Based on the provided research paper, the authors chose the **Continuous Bag-of-Words (CBOW)** strategy for the following reasons:
+
+*   **Source Evaluation:** The authors relied on research by Hartmann et al. (cited as [6]), which evaluated several word embedding models trained on a large Portuguese corpus. In that evaluation, two Word2Vec strategies were compared: Skip-Gram (predicting neighboring words from a single word) and CBOW (predicting an omitted middle word from a sequence of context words).
+*   **Application in the Proposal:** The paper states that CBOW was specifically ""chosen for application in the present proposal"" (Section 3, page 3) following the findings in the cited literature regarding Portuguese embeddings. 
+*   **Representative Vectors:** The chosen model from Hartmann et al. utilized a large, multi-genre corpus that was tokenized and normalized to reduce vocabulary size. The authors mention that this approach was taken under the premise that such reduction ""provides more representative vectors,"" which allowed for a comprehensive analysis of gender bias and stereotypes in the Portuguese language (Section 3, page 3).
+
+In summary, the choice was guided by the effectiveness of the pre-trained Portuguese model provided in reference [6], which utilized the CBOW architecture to provide meaningful and representative word vectors for the study's experiments (Section 4 and 5, page 4).","[{""Name"":""1810.04528.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""1810.04528.pdf"",""pages"":[""3""]}]",1,1,1,0.9387,answerable,26234,3,13108,4994,5,5,5,5,,システムの回答は、参照解答に含まれる「先行研究[6]での評価」「多ジャンルのコーパス」「ジェンダーバイアス分析への適合性」という要点をすべて網羅しており、根拠テキストにも忠実です。
+Q0047,01_academic_papers,"Based on the experiments involving 934,966 words, how does the accuracy of the Portuguese word2vec model change from its initial state to its state after applying the de-biasing method described in Algorithm 1?",answerable,multi_chunk,"The model, which contains 934,966 words of dimension 300, saw its accuracy in predicting analogies drop significantly from 18.18% before de-biasing to 03.03% after the de-bias method was applied.",we use a model containing 934966 words of dimension 300 per vector representation. ... Table 1 presents the corresponding results. ... Before Debias 18.18 % After Debias 03.03 %,1810.04528.pdf,"4, 5","Based on the experiments detailed in the provided document (Section 5 and Table 1), the accuracy of the Portuguese word2vec model significantly decreases after applying the de-biasing method.
+
+The specific changes are as follows:
+
+*   **Initial State (Before Debias):** The model achieved an accuracy of **18.18%**.
+*   **Final State (After Debias):** The accuracy dropped to **03.03%**.
+
+**Analysis and Context:**
+*   **Significance:** Using a confidence factor of 99%, the researchers determined that the prediction of the model *with* bias is significantly better than the model after the reduction of bias (Page 5).
+*   **Reasoning:** The authors note that the removal of bias can produce a negative impact on the overall quality of the model, a finding consistent with other cited literature (Section 5, Page 5).
+*   **General Observation:** Even at its highest accuracy (before de-biasing), the authors observe that the hit rate for predicting related terms remains low (Page 5).
+
+The accuracy was measured using **Algorithm 1** (Page 4), which calculates the percentage of cases where the model correctly matches a female profession label when given a male profession and the gender analogy (e.g., `most_similar(positive=['ela', male], negative=['ele'])`).","[{""Name"":""1810.04528.pdf"",""Page"":""5""},{""Name"":""1810.04528.pdf"",""Page"":""4""},{""Name"":""1810.04528.pdf"",""Page"":""5""}]",1,1,"[{""file_name"":""1810.04528.pdf"",""pages"":[""4"",""5""]}]",1,1,1,0.9066,answerable,21297,2,8502,4843,5,5,5,5,,システムの回答は参照解答に含まれる数値を正確に網羅しており、根拠テキストに基づいた詳細な分析も提供されています。質問に対する回答として完璧であり、情報の欠落もありません。
+Q0048,01_academic_papers,What is the specific computational cost in terms of GPU hours required to train the Portuguese word2vec model used in Santana et al.'s analysis?,unanswerable,N/A,,,1810.04528.pdf,,"Based on the provided PDF, there is **no mention** of the specific computational cost in terms of GPU hours for the Portuguese word2vec model.
+
+The document provides the following details regarding the model:
+*   **Source:** It is a public pre-trained model provided by Hartmann et al. [Reference 6] (Page 1, 3, and 4).
+*   **Architecture:** It uses the Continuous Bag-of-Words (CBOW) strategy (Page 3 and 4).
+*   **Dimensions:** It contains 934,966 words with a dimension of 300 per vector representation (Page 4).
+*   **Corpus:** It was trained on a large, multi-genre Portuguese corpus (Page 3).
+
+The authors of this paper (Santana et al.) utilized this public repository rather than training the model themselves, and the specific training hardware requirements or durations (GPU hours) are not listed in the text.","[{""Name"":""1810.04528.pdf"",""Page"":""5""}]",1,0,"[{""file_name"":""1810.04528.pdf"",""pages"":[""5""]}]",1,0,0,0.0000,unanswerable,31763,3,18689,4209,,,,1,1,システムは文書内にGPU時間の記載がないことを正しく指摘し、モデルが外部の事前学習済みのものであるという事実に基づいて回答を拒否できています。
+Q0049,01_academic_papers,CzCDC 1.0データセットに含まれるチェコ共和国の憲法裁判所（Constitutional Court）の判決数は具体的に何件ですか？,answerable,simple,"CzCDC 1.0データセットには、チェコ憲法裁判所の判決が73,086件含まれています。","the sub-corpus of the Constitutional Court contains 73,086 decisions.",2002.02224.pdf,3,"提供された資料に基づくと、CzCDC 1.0データセットに含まれるチェコ共和国の憲法裁判所（Constitutional Court）の具体的な判決数についての記載はありません。
+
+資料から確認できる関連情報は以下の通りです：
+
+*   **Reference 2**の文献[19]において、「The Czech Court Decisions Corpus (CzCDC): Availability as the First Step」というタイトルの文献が挙げられており、このデータセットの存在自体は示されています。
+*   **Reference 4**では、チェコ共和国の最高裁判所（Supreme Court）、最高行政裁判所（Supreme Administrative Court）、および憲法裁判所（Constitutional Court）の判決データセットを取得し、抽出を自動化することの重要性について述べられていますが、具体的な収録件数には言及していません。
+*   **Reference 5**の表（Table 2）は「Global Voices Yorùbá corpus」に関するものであり、チェコの判決データとは無関係です。
+
+したがって、提供された資料内にはご質問の具体的な件数に関する情報は含まれていません。",null,0,0,[],0,0,0,0.8797,unanswerable,25827,3,12481,5068,1,1,1,1,,"根拠テキストには「73,086 decisions」と明記されているにもかかわらず、システムは「記載がない」と誤った回答をしており、情報の抽出に失敗しています。"
+Q0050,01_academic_papers,HaraštaらによるNLPパイプラインにおいて、チェコ最高裁判所（Supreme Court）が他の最高裁判所を引用した参照データのうち、実際にCzCDC 1.0内のテキストとリンクできた割合は、リンク前の参照総数に対して約何パーセントですか？,answerable,reasoning,"最高裁判所による引用総数（Table 2の合計：153,242 + 804 + 80,658 + 112,287 = 346,991件）に対し、テキストとリンクできた総数（Table 3の合計：140,355 + 658 + 76,003 = 217,016件）は約62.5%です。","Table 2: References sorted by categories, unlinked ... Table 3: References linked with texts in CzCDC",2002.02224.pdf,5,"提供されたPDF資料に基づき、ご質問に回答します。
+
+チェコ最高裁判所（Supreme Court）が他の最高裁判所（最高裁判所、最高行政裁判所、憲法裁判所）を引用した参照データのうち、実際にCzCDC 1.0内のテキストとリンクできた割合は、リンク前の参照総数に対して**約91.4%**です。
+
+算出の根拠は以下の通りです（資料5ページのTable 2およびTable 3のデータを使用）：
+
+1.  **リンク前の参照総数（Table 2より）**
+    最高裁判所（Supreme Court）が他の3つの最高裁判所を引用した合計数：
+    *   対 最高裁判所：153,242
+    *   対 最高行政裁判所：804
+    *   対 憲法裁判所：80,658
+    *   **合計：234,704件**
+
+2.  **CzCDC内のテキストとリンクできた数（Table 3より）**
+    *   対 最高裁判所：140,355
+    *   対 最高行政裁判所：658
+    *   対 憲法裁判所：76,003
+    *   **合計：217,016件**
+
+3.  **リンクできた割合の計算**
+    217,016 ÷ 234,704 ≒ 0.9246...
+
+ただし、資料5ページの「4 Results」の記述によると、最高裁判所の判決から抽出された参照総数は「471,319」であり、これには下級裁判所や欧州連合司法裁判所など「Rest（その他）」に分類されるものも含まれています。質問の意図が「最高裁判所が（自らを含む）3つの最高裁判所を引用したデータ」の中での割合である場合、上記の通り**約91.4%**（小数点第2位四捨五入）となります。","[{""Name"":""2002.02224.pdf"",""Page"":""1""},{""Name"":""2002.02224.pdf"",""Page"":""5""},{""Name"":""2002.02224.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""2002.02224.pdf"",""pages"":[""1"",""3"",""5""]}]",1,1,1,0.8918,answerable,32583,3,12697,8740,2,4,3,2,,"システムの回答は、分母の計算において「Rest（その他）」の112,287件を除外しており、参照解答の約62.5%と大きく異なる約91.4%という数値を算出しています。計算過程は論理的ですが、質問が求める「参照総数」の定義を誤認しているため、正確性の低い評価となります。"
+Q0051,01_academic_papers,CzCDC 1.0を用いた研究において、Haraštaらが構築したNLPパイプラインの「Strict agreement」におけるF1スコアは、[13]で提示された既存の参照認識モデルのF1スコアと比較してどのように変化しましたか？,answerable,multi_chunk,既存の参照認識モデル（court identifier）のF1スコアは.652でしたが、本研究のパイプライン全体では.724へと向上しました。,Reference recognition (court identifier) per [13] ... .652 ... Pipeline ... .724,2002.02224.pdf,4,"PDFの内容に基づき、ご質問に回答します。
+
+Haraštaらが構築したNLPパイプラインの「Strict agreement」におけるF1スコアは、[13]の既存モデルと比較して**向上（上昇）**しました。
+
+具体的な数値の変化は以下の通りです（Table 1: Model performanceより）：
+
+*   **[13]の既存モデル（Reference recognition）:** F1スコア **.652**
+*   **本論文のNLPパイプライン（Pipeline）:** F1スコア **.724**
+
+### 変化の背景と理由
+論文のSection 3.2（4ページ）によると、この性能向上の理由は以下の通りです。
+
+1.  **モデルの組み合わせによる相乗効果:** テキストセグメンテーションモデル[29]と参照認識モデル[13]をパイプラインとして組み合わせることで、参照認識モデルのパフォーマンスが向上しました。
+2.  **処理対象の限定:** セグメンテーションモデルを用いて、裁判文書全体ではなく、参照が含まれる可能性が高い「裁判上の論拠（court argumentation）」の部分のみを抽出して処理対象としたことが、初期の認識および分類におけるF1スコアの向上に寄与したと述べられています。
+
+引用元：Section 3.2, Table 1 (Page 4)","[{""Name"":""2002.02224.pdf"",""Page"":""4""},{""Name"":""2002.02224.pdf"",""Page"":""3""},{""Name"":""2002.02224.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""2002.02224.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9116,answerable,28592,3,14744,4588,5,5,5,5,,システムの回答は参照解答に含まれる数値を正確に引用しており、比較結果も正しく記述されています。さらに、根拠テキストに基づいた背景説明も補足されており、非常に質の高い回答です。
+Q0052,01_academic_papers,CzCDC 1.0データセットの構築において、チェコ共和国の地方裁判所（District Courts）の判決文を抽出するために使用された具体的な自然言語処理アルゴリズムは何ですか？,unanswerable,N/A,,,2002.02224.pdf,,"提供された資料に基づくと、ご質問の「CzCDC 1.0データセット」の構築、およびチェコ共和国の地方裁判所（District Courts）の判決文を抽出するために使用された具体的な自然言語処理アルゴリズムに関する情報は含まれていません。
+
+提供資料の各内容は以下の通りです。
+*   **Reference 1**: 法律引用分析（Legal Citation Analysis）の歴史や、オランダ、欧州連合、欧州人権裁判所などの判例研究について言及していますが、チェコの地方裁判所やCzCDC 1.0については触れていません。
+*   **Reference 2**: 臨床テキスト構造化（Clinical Text Structuring）という医療分野のタスクについて説明しています。
+*   **Reference 3, 4, 5**: 自然言語処理や機械学習に関する論文の参考文献リストであり、具体的なCzCDC 1.0の構築手法についての記述はありません。
+
+したがって、提供されたコース資料からは回答することができません。",null,0,0,[],0,0,0,0.0000,unanswerable,28731,3,14136,5403,,,,1,1,システムは提供された資料に該当する情報がないことを正しく認識し、各リファレンスの内容を正確に要約した上で回答を拒否しているため。
+Q0053,01_academic_papers,LAXARYモデルを用いて、210名の退役軍人のツイッター投稿からPTSDの有無を識別した際の精度（accuracy）は何%でしたか？,answerable,simple,LAXARYモデルによるPTSDの識別精度は約89%でした。,LAXARY can provide very high accuracy in filling up surveys towards identifying PTSD (≈ 89%),2003.07433.pdf,2,"PDFの内容に基づくと、LAXARYモデルを用いて210名の退役軍人のツイッター投稿からPTSDの有無を識別した際の精度（accuracy）は、**89%**です。
+
+この結果に関する詳細は以下の通りです：
+
+*   **精度 (Accuracy):** 89%（PTSDの検出において）
+*   **比較対象:** 先行研究であるCoppersmithらの手法（精度86%）を上回る結果となっています。
+*   **その他の指標:** PTSDの強度（Intensity）の推定において、平均二乗誤差 (MSE) 1.8を記録しています。
+*   **評価条件:** ユーザーがPTSDであると回答した最終週のデータの50%を辞書作成（学習）に使用し、残りの50%をテストに使用した際の結果です。
+
+（出典：Excerpt 1, Section VII-A. Results）","[{""Name"":""2003.07433.pdf"",""Page"":""6""},{""Name"":""2003.07433.pdf"",""Page"":""5""},{""Name"":""2003.07433.pdf"",""Page"":""5""},{""Name"":""2003.07433.pdf"",""Page"":""4""},{""Name"":""2003.07433.pdf"",""Page"":""4""}]",1,0,"[{""file_name"":""2003.07433.pdf"",""pages"":[""4"",""5"",""6""]}]",1,0,0,0.9312,answerable,28687,3,12395,4951,5,5,5,5,,システムの回答は参照解答と一致する89%という数値を正確に提示しており、根拠テキストの内容を忠実に反映しています。また、比較対象や評価条件などの補足情報も提供されており、非常に完全性の高い回答となっています。
+Q0054,01_academic_papers,"Dryhootch AmericaがPTSD評価に使用している3つの臨床調査ツール（DOSPERT, BSSS, VIAS）において、合計スコアの閾値が最も低く設定されているツールは何ですか？",answerable,reasoning,BSSS（Berlin Social Support Scales）です。表1（Table I）によると、DOSPERTの閾値は28、VIASの閾値は15であるのに対し、BSSSの閾値は13と最も低く設定されています。,"threshold 28 13 15 TABLE I DRYHOOTCH CHOSEN PTSD ASSESSMENT SURVEYS (D: DOSPERT, B: BSSS AND V: VIAS) DEMOGRAPHICS",2003.07433.pdf,3,"PDFの3ページ目にある「TABLE I: DRYHOOTCH CHOSEN PTSD ASSESSMENT SURVEYS (D: DOSPERT, B: BSSS AND V: VIAS) DEMOGRAPHICS」に基づき回答します。
+
+Dryhootch Americaが使用している3つのツールにおいて、合計スコア（total points）の閾値（threshold）が最も低く設定されているのは **BSSS** です。
+
+各ツールの閾値は以下の通りです：
+- **BSSS (B)**: **13**
+- **VIAS (V)**: 15
+- **DOSPERT (D)**: 28
+
+したがって、BSSSの閾値が13で最小となります。","[{""Name"":""2003.07433.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""2003.07433.pdf"",""pages"":[""3""]}]",1,1,1,0.9130,answerable,18243,1,3278,4381,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値比較が行われています。各ツールの具体的な閾値を列挙した上で結論を述べており、非常に分かりやすく完全な回答です。
+Q0055,01_academic_papers,LAXARYフレームワークにおいて、ツイッター投稿からPTSDの重症度を「High risk PTSD」、「Moderate risk PTSD」、「Low risk PTSD」、「No PTSD」の4段階に分類する際の具体的な判定基準を説明してください。,answerable,multi_chunk,"週ごとの調査結果に基づき、3つ全てのツール（DOSPERT, BSSS, VIAS）で閾値を超えた場合は「High risk」、2つのツールで超えた場合は「Moderate risk」、1つのツールのみで超えた場合は「Low risk」、全てのツールで閾値を下回った場合は「No PTSD」と定義されます。",High risk PTSD: If one individual veteran’s weekly PTSD assessment scores go above the threshold for all three... Moderate risk PTSD: ...any two of the three... Low risk PTSD: ...any one of the three... No PTSD: ...below the threshold for all three,2003.07433.pdf,3,"LAXARYフレームワークにおいて、ツイッター投稿の分析からPTSDの重症度を4段階（High risk, Moderate risk, Low risk, No PTSD）に分類する際の具体的な判定基準は以下の通りです。
+
+この判定は、臨床的に妥当性が確認されている3つの調査ツール（**DOSPERT**、**BSSS**、**VIAS**）について、LAXARYがツイッター投稿から算出した週次スコアが、それぞれの「しきい値（Threshold）」を超えているかどうかを基準としています。
+
+### 重症度判定基準
+
+*   **High risk PTSD（高リスク）**
+    *   **基準:** 個々のベテラン（退役軍人）の週次アセスメントスコアが、**3つの調査ツール（DOSPERT, BSSS, VIAS）すべて**において、それぞれのしきい値を超えた場合。
+    *   **状態:** 壊滅的な影響を避けるため、即時のメンタルサポートが必要な状況と定義されます。
+*   **Moderate risk PTSD（中リスク）**
+    *   **基準:** 週次アセスメントスコアが、**3つのツールのうち、いずれか2つ**でしきい値を超えた場合。
+    *   **状態:** リスクの進行を避けるため、綿密な観察とピアメンタリングが必要な状況です。
+*   **Low risk PTSD（低リスク）**
+    *   **基準:** 週次アセスメントスコアが、**3つのツールのうち、いずれか1つのみ**でしきい値を超えた場合。
+    *   **状態:** PTSDの軽い症状があるとみなされます。
+*   **No PTSD（PTSDなし）**
+    *   **基準:** 週次アセスメントスコアが、**3つのツールすべて**において、しきい値を下回った場合。
+
+### 参考：各ツールのしきい値（Table Iより）
+LAXARYがスコアを算出する際、以下のしきい値が基準として用いられています。
+*   **DOSPERT (D):** 28
+*   **BSSS (B):** 13
+*   **VIAS (V):** 15
+
+（出典：PDF 3ページ ""IV. DEMOGRAPHICS OF CLINICALLY VALIDATED PTSD ASSESSMENT TOOLS"" および ""Excerpt 1""）","[{""Name"":""2003.07433.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""2003.07433.pdf"",""pages"":[""3""]}]",1,1,1,0.9109,answerable,27665,3,13625,5242,5,5,5,5,,システムの回答は、参照解答および根拠テキストにある4段階の判定基準を正確かつ詳細に網羅しています。3つのツール名や具体的なしきい値の条件も正しく記述されており、非常に高い精度で回答されています。
+Q0056,01_academic_papers,"How many fine-grained entity types are covered in the CORD-NER dataset released on March 13, 2020?",answerable,simple,The CORD-NER dataset covers 75 fine-grained named entity types.,This CORD-NER dataset covers 75 fine-grained named entity types.,2003.12218.pdf,1,"Based on the provided PDF, the CORD-NER dataset released on March 13, 2020, covers **75 fine-grained entity types**.
+
+This information is detailed in the following sections of the document:
+*   **Abstract (Page 1):** ""This CORD-NER dataset covers 75 fine-grained entity types.""
+*   **Introduction (Page 1):** ""This dataset covers 75 fine-grained named entity types.""
+*   **NER Methods (Page 2):** ""Our entity type hierarchy covers 75 fine-grained named-entities types.""
+
+These types include common biomedical entities (such as genes, chemicals, and diseases) as well as new types specifically related to COVID-19 studies, such as coronaviruses, viral proteins, evolution, materials, substrates, and immune responses.","[{""Name"":""2003.12218.pdf"",""Page"":""1""}]",1,1,"[{""file_name"":""2003.12218.pdf"",""pages"":[""1""]}]",1,1,1,0.9380,answerable,24693,3,13115,3883,5,5,5,5,,システムの回答は参照解答と完全に一致する数値「75」を提示しており、根拠テキストに基づいた正確な情報を提供しています。また、出現箇所や具体例などの補足情報も含まれており、非常に完全性が高い回答です。
+Q0057,01_academic_papers,"Based on the performance comparison in Table 1, which specific SciSpacy model achieved the highest F1 score for the 'Disease' entity type, and how does it compare to the CORD-NER ('Ours') result?",answerable,reasoning,The SciSpacy (BC5CDR) model achieved an F1 score of 68.46 for the 'Disease' entity type. The CORD-NER ('Ours') system outperformed it with a higher F1 score of 71.89.,SciSpacy (BC5CDR) ... Disease ... F1 68.46 ... Ours ... Disease ... F1 71.89,2003.12218.pdf,2,"Based on Table 1 (page 2) of the provided document, the specific SciSpacy model that achieved the highest F1 score for the 'Disease' entity type is **SciSpacy (BC5CDR)**.
+
+### Performance Comparison:
+*   **SciSpacy (BC5CDR):** Achieved an F1 score of **68.46** for the 'Disease' type.
+*   **SciSpacy (BIONLP13CG):** Achieved an F1 score of **4.11** for the 'Disease' type.
+*   **CORD-NER ('Ours'):** Achieved an F1 score of **71.89** for the 'Disease' type.
+
+**Comparison:**
+The CORD-NER ('Ours') result **outperforms** the best SciSpacy model (BC5CDR) for diseases. Specifically, CORD-NER's F1 score of 71.89 is **3.43 points higher** than SciSpacy (BC5CDR)'s 68.46. 
+
+The authors note in Section 3.1 that while their annotation has worse performance on the 'Gene' type, it demonstrates ""much better performance on the chemical and disease types"" compared to the SciSpacy models.","[{""Name"":""2003.12218.pdf"",""Page"":""2""}]",1,1,"[{""file_name"":""2003.12218.pdf"",""pages"":[""2""]}]",1,1,1,0.9514,answerable,27463,3,13091,4931,5,5,5,5,,システムの回答は参照解答に含まれる数値を正確に網羅しており、比較結果も正しく記述されています。さらに、他のモデルとの比較や差分の計算、本文の記述の引用も含まれており、非常に完全性が高いです。
+Q0058,01_academic_papers,What is the specific dollar amount of the research sponsorship provided by the US DARPA KAIROS Program for the development of the CORD-NER system?,unanswerable,N/A,,,2003.12218.pdf,,"Based on the provided course materials, it is not possible to answer this question.
+
+While **Reference 5** acknowledges that the research was ""sponsored in part by US DARPA KAIROS Program No. FA8750-19-2-1004,"" the text does not mention a specific dollar amount for this sponsorship or any other funding mentioned in the documents (such as the SocialSim Program in **Reference 2**).",null,0,0,[],0,0,0,0.0000,unanswerable,24900,3,14136,1710,,,,1,1,システムは文書内に具体的な金額の記載がないことを正しく認識し、回答を拒否しているため、ハルシネーションは発生していません。
+Q0059,01_academic_papers,UniSentの構築において、英語の感情極性を他の1000以上の言語に投影するために使用されたパラレルコーパスの名称は何ですか？,answerable,simple,Parallel Bible Corpus (PBC)が使用されました。これは1242の言語で新約聖書の翻訳を含んでいます。,The dataset we will work with is the Parallel Bible Corpus (PBC). PBC consists of translations of the New Testament in 1242 languages,1904.09678.pdf,2,"UniSentの構築において、英語の感情極性を他の1000以上の言語に投影するために使用されたパラレルコーパスの名称は、**Parallel Bible Corpus (PBC)** です。
+
+PDFの記述に基づいた詳細は以下の通りです。
+
+*   **名称:** Parallel Bible Corpus (PBC)
+*   **内容:** 1242の言語における新約聖書の翻訳で構成されています。
+*   **特徴:** 現在自然言語処理の研究で使用されている他のどのパラレルコーパスよりも、桁違いに多い言語をカバーしています。
+*   **出典:** PDFの第2.1節「UniSent Required Resources」（2ページ）および第3.3節「Evaluation」（6ページ）に記載されています。","[{""Name"":""1904.09678.pdf"",""Page"":""2""},{""Name"":""1904.09678.pdf"",""Page"":""6""}]",1,1,"[{""file_name"":""1904.09678.pdf"",""pages"":[""2"",""6""]}]",1,1,1,0.9222,answerable,27796,3,13006,8227,5,5,5,5,,システムの回答は、コーパスの名称および言語数について参照解答と完全に一致しており、根拠テキストに基づいた正確な情報を提供しています。追加情報として出典箇所も明記されており、非常に高い品質です。
+Q0060,01_academic_papers,DomDriftメソッドにおいて、ソースドメインとターゲットドメイン間の単語のドメインシフト（λw'）を算出するために用いられる統計的な尺度を答えてください。,answerable,reasoning,カルバック・ライブラー（Kullback-Leibler）情報量（DKL）を用いて、ソースドメインとターゲットドメインにおける単語の距離分布の差を計算します。,"comparing, for each word in the UniSent lexica, its profile in the source P(wlt,ds , wΩs,t ) and target domain P(wlt,dt , wΩs,t ) using the Kullback-Leibler divergence.",1904.09678.pdf,4,"DomDriftメソッドにおいて、ソースドメインとターゲットドメイン間の単語のドメインシフト（$\lambda_w$）を算出するために用いられる統計的な尺度は、**カルバック・ライブラー情報量（Kullback-Leibler divergence / KL-divergence）**です。
+
+論文の「2.2 (ii) DomDrift: unsupervised measurement of domain drift」のセクション（3ページから4ページにかけて）に詳細が記載されています。
+
+### 算出のプロセス：
+1.  **単語プロファイルの作成**: ソースとターゲットの各埋め込み空間において、対象となる単語と他の共通単語との「L1正規化コサイン距離分布」を計算し、その単語のプロファイル（$P$）とします。
+2.  **シフト量の計算**: 算出したソースドメインのプロファイル $P(w_{l_t,d_s}, w_{\Omega_{s,t}})$ と、ターゲットドメインのプロファイル $P(w_{l_t,d_t}, w_{\Omega_{s,t}})$ を、**Kullback-Leibler divergence** を用いて比較します。
+
+数式では以下のように定義されています（4ページ）：
+$$\lambda_w = D_{KL}(P(w'_{l_t,d_s}, w_{\Omega_{s,t}}) || P(w'_{l_t,d_t}, w_{\Omega_{s,t}}))$$
+
+この尺度は、特定の単語の周辺語（近傍）がドメイン間でどれだけ変化したかを定量化し、ドメインの不一致による影響を軽減するための重みとして利用されます。","[{""Name"":""1904.09678.pdf"",""Page"":""4""},{""Name"":""1904.09678.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""1904.09678.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.9155,answerable,28761,3,13718,5555,5,5,5,5,,システムの回答は、参照解答および根拠テキストにある「カルバック・ライブラー情報量」を正確に特定しており、算出プロセスや数式についても詳細に補足されています。情報の欠落もなく、非常に高い精度で質問に答えています。
+Q0061,01_academic_papers,UniSentの評価実験において、スペイン語の単語「sensual」は聖書ドメインとTwitterドメインでそれぞれどのような感情極性を持つと説明されていますか？,answerable,multi_chunk,聖書ドメイン（Biblical texts）では「罪（sin）」の含みがあり負の極性を持ちますが、Twitterドメインでは「セクシー（sexy）」に関連付けられ正の極性を持ちます。,"in Biblical texts, the Spanish word sensual has the connotation of sin which has a negative polarity. But in the Twitter domain, the same word is associated with sexy, which has a positive polarity.",1904.09678.pdf,2,"提供された提供された講義資料（Reference 1〜5）の中には、スペイン語の単語「sensual」の感情極性や、その単語が聖書ドメインとTwitterドメインでどのように異なるかについての具体的な記述は見当たりません。
+
+資料に基づいた情報は以下の通りです：
+
+*   **Reference 1**では、UniSentが聖書などの並行コーパス（PBC）を用いて作成され、その後「DomDrift」という手法で新しいドメイン（Twitter等）に適応させることが説明されていますが、具体的な単語の例として「sensual」は挙げられていません。
+*   **Reference 2**の表1および表2では、スペイン語を含む各言語でのUniSentの評価結果（正確性やF1スコア）が示されていますが、個別の単語に関する分析結果は記載されていません。
+
+したがって、提供された資料から「sensual」の極性に関する具体的な説明を回答することはできません。",null,0,0,[],0,0,0,0.8382,unanswerable,23881,3,12779,4145,1,1,1,1,,根拠テキストには「sensual」の極性に関する具体的な説明が明記されているにもかかわらず、システムは見当たらないと回答しており、情報の抽出に完全に失敗しています。
+Q0062,01_academic_papers,Table 1に示された評価結果のうち、ドイツ語（German）においてConfidence Weighted UniSent Lexiconを用いた場合のmacro-F1スコアはいくらですか？,answerable,simple,ドイツ語におけるConfidence Weighted UniSent Lexiconのmacro-F1スコアは0.80です。,Table 1: ... German ... Confidence Weighted UniSent Lexicon (projection) ... macro-F1 0.80,1904.09678.pdf,7,"PDFのTable 1（7ページ）に示された評価結果に基づくと、ドイツ語（German）において**Confidence Weighted UniSent Lexicon**を用いた場合の**macro-F1スコアは 0.80** です。
+
+詳細は以下の通りです：
+
+*   **言語:** German（ドイツ語）
+*   **評価指標:** Confidence Weighted UniSent Lexicon (projection) macro-F1
+*   **数値:** 0.80
+
+なお、同テーブルによると、ドリフト重み付け（Confidence Weighted）を適用する前のUniSent Lexiconのmacro-F1スコアは0.81であり、ドイツ語に関しては重み付けによってスコアがわずかに低下、あるいは大きく改善しなかったことが示されています。この理由について、セクション4（Discussion and Conclusion）では、ドイツ語などの言語においてはターゲットドメインの埋め込み（embedding）を使用するだけでドメイン適応が十分であった可能性があると考察されています。","[{""Name"":""1904.09678.pdf"",""Page"":""7""},{""Name"":""1904.09678.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1904.09678.pdf"",""pages"":[""7""]}]",1,1,1,0.9271,answerable,24128,3,11878,4312,5,5,5,5,,質問に対する回答の数値は正確であり、根拠テキストに基づいた正しい情報を提供しています。追加の背景説明も文脈に即しており、非常に質の高い回答です。
+Q0063,01_academic_papers,UniSentプロジェクトにおいて、1000以上の言語の感情辞書を公開するためのクラウドストレージの月額利用料金はいくらに設定されていますか？,unanswerable,N/A,,,1904.09678.pdf,,"提供された資料の中には、UniSentプロジェクトにおけるクラウドストレージの月額利用料金に関する情報は記載されていません。
+
+参照資料5では、UniSentのリソースとして1,242言語をカバーする「Parallel Bible Corpus (PBC)」や、英語の感情辞書「WKWSCI」を使用することについては触れられていますが、プロジェクトの運用コストやストレージ料金についての記述はありません。",null,0,0,[],0,0,0,0.0000,unanswerable,25519,3,13827,3612,,,,1,1,システムは提供された資料に情報がないことを正しく認識し、回答を拒否しています。また、参照資料の内容に言及しつつも、質問の核心である料金については捏造を行っていません。
+Q0064,01_academic_papers,egvi (Ego-Graph Vector Induction) アルゴリズムにおいて、セマンティック・グラフを構築する際に「anti-edges」はどのように定義されていますか？,answerable,reasoning,anti-edgesは、ターゲット単語wに最も類似している単語wiと、wに類似しているがwiには最も類似していない単語（anti-pair）wiのペアとして定義されます。これらは意味的に異なる項目のペアであり、グラフ内で接続されるべきではないノードを示します。,The set of N nearest neighbours and their anti-pairs form a set of anti-edges i.e. pairs of most dissimilar nodes – those which should not be connected,2003.06651.pdf,3,"egvi (Ego-Graph Vector Induction) アルゴリズムにおいて、「anti-edges」は**セマンティック・グラフ（ego-graph）を構築する際、ターゲット語が持つ異なる意味（センス）を分離するために使用される、最も類似していない単語のペア**として定義されています。
+
+具体的な定義と手順は以下の通りです（PDF 3ページ、セクション3.2）：
+
+1.  **ベクトル演算による抽出**: ターゲット語 $w$ の $N$ 個の近傍語のリスト $N = \{w_1, w_2, ..., w_N\}$ に対して、ベクトル減算 $w - w_i$ を行い、近傍語 $w_i$ とは関連のない意味成分（$\delta_i$）を求めます。
+2.  **anti-pairの特定**: この成分 $\delta_i$ に対して最も類似しており、かつターゲット語 $w$ にも類似している単語 $\overline{w_i}$ を見つけます。これを $w_i$ の「anti-pair（対となるペア）」と呼びます。
+3.  **anti-edgesの形成**: このペア $(w_i, \overline{w_i})$ が「anti-edges」となります。これは「最も類似していないノードのペア」、すなわち**接続されるべきではないペア**を意味します。
+
+**主な役割:**
+*   **グラフのフィルタリング**: anti-pair（$\overline{w_i}$）がターゲット語の近傍語リスト $N$ に含まれていない場合、その語 $w_i$ はグラフの構築から除外されます（3ページ、手順4）。
+*   **ノイズの除去**: グラフ構築時に、ある単語とその anti-pair の間にエッジ（辺）がある場合、それは異なる意味に属する単語間のノイズとみなされ、削除されます（3ページ、手順5）。
+*   **センスのラベル付け**: 各クラスター内で最も多くの anti-edges に属している単語が、そのセンスを代表する「キーワード」として選ばれます（4ページ、Labelling of Induced Senses）。
+
+例えば、ターゲット語が ""python"" の場合、""Java""（プログラミング言語）に対する anti-pair は ""snake""（動物）となり、これらが anti-edge を構成します。","[{""Name"":""2003.06651.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""2003.06651.pdf"",""pages"":[""4""]}]",1,1,1,0.9156,answerable,30880,3,13873,9169,5,5,5,5,,システムの回答は、参照解答にあるanti-edgesの定義を正確に捉えているだけでなく、根拠テキストに基づいた具体的な特定手順や役割まで詳細に補完しています。ターゲット語の近傍語とその対となるペアの関係性を正しく説明しており、非常に高い品質です。
+Q0065,01_academic_papers,158言語向けの単語意味インベントリを構築するために、ZhoresクラスターではどのようなGPUが使用され、1言語あたりの平均構築時間はどのくらいでしたか？,answerable,multi_chunk,ZhoresクラスターではNvidia Tesla V100グラフィックカードが使用されました。1言語あたりの構築時間は最大10時間で、平均して6.5時間かかりました。,"empowered with Nvidia Tesla V100 graphic cards. ... The construction of inventories for one language takes up to 10 hours, with 6.5 hours on average.",2003.06651.pdf,4,"提供されたコース資料（Reference 3）に基づくと、回答は以下の通りです。
+
+158言語向けの単語意味インベントリの構築において、Zhoresクラスターでは**Nvidia Tesla V100**グラフィックカード（GPU）が使用されました。
+
+また、1言語あたりの構築時間は、最大で10時間、平均で**6.5時間**でした。
+
+（Reference 3「4.1. Construction of Sense Inventories」より）",null,0,0,[],0,0,0,0.9481,answerable,22903,3,12271,2249,5,5,5,5,,システムの回答は、使用されたGPUの型番および構築時間の平均値と最大値の両方を正確に抽出しており、参照解答および根拠テキストの内容と完全に一致しています。
+Q0066,01_academic_papers,"SemEval-2013 Task 13のデータセットを用いた評価において、egvi (fastText, K=200) モデルのF.B-Cubedスコアは、SenseGram (word2vec) と比較してどのようになっていますか？",answerable,simple,"egvi (fastText, K=200) のF.B-Cubedスコアは0.541であり、SenseGram (word2vec) の0.615よりも低い値となっています。","SenseGram (word2vec) 0.615, egvi (fastText, K=200) 0.541 (Table 2)",2003.06651.pdf,7,"提供された資料に基づき回答いたします。
+
+提供されたコース資料（Reference 1〜5）の中には、SemEval-2013 Task 13のデータセットを用いた評価結果や、egviモデルとSenseGram (word2vec) モデルのF.B-Cubedスコアを比較した具体的な数値・データは含まれていません。
+
+資料で確認できる内容は以下の通りです。
+*   **Reference 1 & 2**: egvi（Ego-Graph Vector Induction）という新しいアルゴリズムの仕組み、グラフ構築の手順、およびfastTextの埋め込みを利用していることについての説明。
+*   **Reference 3**: 日本語から英語への単語翻訳のパフォーマンスに関する表。
+*   **Reference 4**: CWE、fastText、BERTなどの埋め込み手法の解説。
+*   **Reference 5**: SemR-11データセットにおける単語ごとの平均語義（sense）数の比較表。
+
+したがって、ご質問のF.B-Cubedスコアの比較については、提供された資料から回答することはできません。",null,0,0,[],0,0,0,0.8389,unanswerable,29074,3,14851,5534,1,1,1,1,,根拠テキストには質問に対する直接的な回答（数値と比較結果）が含まれているにもかかわらず、システムは「資料に含まれていない」と誤った回答をしています。参照解答と正反対の内容であり、評価は最低点となります。
+Q0067,01_academic_papers,egviシステムにおいて、日本語のテキストをトークナイズするために採用されている具体的なツール名は何ですか？,answerable,simple,"日本語のトークナイズにはMecab (Kudo, 2006) が使用されています。","For Japanese, we use Mecab (Kudo, 2006).",2003.06651.pdf,4,"ご提示いただいた資料の中には、「egvi」という名称のシステムに関する記述や、そのシステムが日本語のテキストをトークナイズするために使用している具体的なツール名についての情報は含まれていません。
+
+ただし、資料内で日本語のトークナイズに言及している箇所としては、以下の点が確認できます。
+
+*   **Reference 4**において、画像キャプションのデータセット（STAIRなど）に含まれる日本語を含む各言語の文章をトークナイズするために、**「Moses SMT Toolkit」**を使用したという記述があります。
+
+> ""We use Moses SMT Toolkit to tokenize sentences and select words occurring more than five times in our vocabulary for each language."" (Reference 4)
+
+このReference 4は画像キャプションやバイリンガル辞書誘導に関する実験についての記述であり、ご質問の「egviシステム」に直接関連するものかどうかは提供された資料からは判断できません。資料に基づいた回答としては、「egvi」というシステムおよびその日本語トークナイズツールに関する情報は提供されていないとなります。",null,0,0,[],0,0,0,0.8578,unanswerable,30334,3,12596,10678,1,1,1,1,,根拠テキストには日本語のトークナイズにMecabを使用すると明記されていますが、システムの回答は情報が含まれていないと誤った主張をしています。また、無関係なMoses SMT Toolkitを引用しており、正確性と忠実性の両面で著しく不適切です。
+Q0068,01_academic_papers,158言語のWSDシステムにおいて、fastTextの学習に使用されたWikipediaとCommonCrawlのデータセットの正確な合計ファイルサイズ（GB単位）はいくらですか？,unanswerable,N/A,,,2003.06651.pdf,,"提供された資料に基づき、ご質問に回答いたします。
+
+提供された資料の中には、158言語のWSD（語義曖昧性解消）システムの構築にGraveら（2018年）によるfastTextの学習済みモデル（Reference 2）が使用されていることは記載されていますが、その学習に使用されたWikipediaおよびCommonCrawlのデータセットの**正確な合計ファイルサイズ（GB単位）についての記載はありません。**
+
+資料から確認できる関連情報は以下の通りです：
+*   このシステムは158言語に対応しており、Graveら（2018年）の事前学習済みfastText単語分散表現に基づいています（Reference 2）。
+*   このシステムは、単語分散表現のみから語義インベントリを誘導するegviという新しいアルゴリズムを使用しています（Reference 1, Reference 2）。
+
+以上の通り、データセットの具体的なギガバイト（GB）単位のサイズについては、提供された資料の範囲内ではお答えすることができません。",null,0,0,[],0,0,0,0.0000,unanswerable,24497,3,13826,2914,,,,1,1,システムは提供された資料に具体的なファイルサイズの記載がないことを正しく認識し、回答を適切に拒否しています。
+Q0069,01_academic_papers,"VoxForgeデータセットを用いた言語識別タスクにおいて、1D-ConvNetモデルに「mixup」を適用しなかった場合の6言語（En, Es, Fr, De, Ru, It）に対する平均精度は何パーセントですか？",answerable,simple,1D-ConvNetモデルにmixupを適用しなかった場合の6言語に対する平均精度は93.7%です。,"In the audio domain (using raw audio waveform as input), 1D-ConvNet achieved a mean accuracy of 93.7% with a standard deviation of 0.3% on running k-fold cross validation.",1910.04269.pdf,11,"PDFの記述に基づき、ご質問にお答えします。
+
+VoxForgeデータセットを用いた6言語（En, Es, Fr, De, Ru, It）に対する、1D-ConvNetモデルで「mixup」を適用しなかった場合の平均精度は、**93.7%**です。
+
+この結果は、PDF内の**Table 4**（11ページ）および**Table 1**（4ページ）に示されています。Table 4の「Languages」が6言語（En, Es, Fr, De, Ru, It）の行を確認すると、ネットワーク「1D ConvNet」で「Mixup」が「No」の場合の精度（Accuracy）が「93.7」と記載されています。
+
+また、11ページの本文（Section 4）においても、「オーディオ・ドメイン（生の音声波形を訓練データとして使用）において、1D-ConvNetはk-分割交差検証で93.7%の平均精度を達成した」と述べられています。","[{""Name"":""1910.04269.pdf"",""Page"":""13""},{""Name"":""1910.04269.pdf"",""Page"":""4""}]",1,0,"[{""file_name"":""1910.04269.pdf"",""pages"":[""13"",""4""]}]",1,0,0,0.9235,answerable,27258,3,13316,6845,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値（93.7%）を提示しています。また、表番号やセクションの詳細な補足説明も含まれており、非常に高い完全性を備えています。
+Q0070,01_academic_papers,Spoken Language Identification using ConvNetsの研究において、1D-ConvNetモデルの「Kernel Size」を9に設定した場合、精度と計算リソースのトレードオフについてどのような観察結果が得られましたか？,answerable,reasoning,カーネルサイズを9に設定すると、計算時間とパラメータ数が増加するというコストはかかりますが、入力内のより長いパターンを捉えることができるため、より高い精度が得られることが観察されました。,We observe that a kernel size of 9 gives better accuracy at the cost of increased computation time and larger number of parameters. A large kernel size is able to capture longer patterns in its input,1910.04269.pdf,6,"ご提示いただいたPDF資料に基づき、1D-ConvNetモデルにおいて「Kernel Size（カーネルサイズ）」を9に設定した場合の観察結果について回答します。
+
+1D-ConvNetモデルのハイパーパラメータ最適化に関するセクション（6ページ、3.4 Model Details: 1D ConvNet）において、以下の観察結果が述べられています。
+
+*   **精度（Accuracy）の向上**: カーネルサイズを{3, 5, 7, 9}の範囲で変化させた結果、カーネルサイズを**9**に設定した際に**より高い精度（better accuracy）**が得られました。これは、受容野（receptive field）が広くなることで、入力データ内のより長いパターンを捉えることが可能になるためです。
+*   **計算リソースとのトレードオフ**: 高い精度が得られる一方で、**計算時間の増加（increased computation time）**および**パラメータ数の増大（larger number of parameters）**というコストが生じることが観察されています。
+
+結論として、カーネルサイズを9に設定することは、計算リソースの消費増大という代償を払いつつ、入力データの長い特徴を捉えることで分類精度を向上させるというトレードオフの関係にあることが示されています。","[{""Name"":""1910.04269.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1910.04269.pdf"",""pages"":[""7""]}]",1,1,1,0.9473,answerable,27256,3,13214,4993,5,5,5,5,,システムの回答は根拠テキストの内容を正確に反映しており、精度向上と計算リソース増大のトレードオフ関係を過不足なく説明しています。参照解答と比較しても遜色なく、論理構成も非常に明快です。
+Q0071,01_academic_papers,VoxForgeデータセットに含まれる1言語あたりのサンプル数と、モデルのトレーニングおよびバリデーションに使用されたサンプルの総数をそれぞれ答えてください。,answerable,multi_chunk,"1言語あたり1,500サンプルが含まれており、合計7,200サンプルがトレーニングに、1,800サンプルがバリデーションに使用されました。","Our dataset consists of 1,500 samples for each of six languages. ... we trained our model on 7,200 samples and validated it on 1800 samples comprising six languages.",1910.04269.pdf,11,"ご提示いただいたPDF資料に基づき、ご質問にお答えします。
+
+VoxForgeデータセットにおけるサンプル数は以下の通りです（セクション3.7および4、11ページ参照）。
+
+*   **1言語あたりのサンプル数:** 1,500サンプル
+*   **トレーニングに使用されたサンプルの総数:** 7,200サンプル
+*   **バリデーションに使用されたサンプルの総数:** 1,800サンプル
+
+**補足:**
+この研究では6つの言語を対象としており、各言語1,500サンプルのうち1,200サンプルがトレーニング用、残りの300サンプルがバリデーション用に割り当てられています（$1,200 \times 6 = 7,200$、および $300 \times 6 = 1,800$）。","[{""Name"":""1910.04269.pdf"",""Page"":""11""},{""Name"":""1910.04269.pdf"",""Page"":""2""}]",1,1,"[{""file_name"":""1910.04269.pdf"",""pages"":[""11"",""2""]}]",1,1,1,0.9252,answerable,22652,2,8109,4042,5,5,5,5,,システムの回答は参照解答の数値を正確に網羅しており、根拠テキストに基づいた論理的な補足も加えられています。質問に対する回答として過不足なく、非常に高い精度です。
+Q0072,01_academic_papers,2D-ConvNetモデルにおいて、log-Melスペクトラムのカラーチャネル間の相互依存性を見つけ出し、各チャネルに重要度を適応的に割り当てるために導入されたネットワークは何ですか？,answerable,simple,Channel Attention（チャネル・アテンション）ネットワークです。,We added Channel Attention networks so as to help the model to find inter-dependencies among color channels of log-Mel spectra. It adaptively assigns importance to each color channel,1910.04269.pdf,8,"提供された教材に基づき、ご質問にお答えします。
+
+提供された5つの参考文献（Reference 1〜5）を確認しましたが、2D-ConvNetモデルにおけるlog-Melスペクトラムのチャネル間相互依存性や、各チャネルへの適応的な重要度割り当てについて記述されている箇所は見当たりませんでした。
+
+資料の内容は主に以下の通りです：
+*   **Reference 1**: テキスト要約におけるLayer Wise Relevance Propagation (LRP) とサリエンシーマップの妥当性について。
+*   **Reference 2 & 5**: 欠損値処理、デノイジングオートエンコーダー、感情分類、Transformer（Attention Is All You Need）などの文献目録。
+*   **Reference 3**: 多言語翻訳、画像キャプション生成、CNNを用いた画像認識などの文献目録。
+*   **Reference 4**: 感情分類のルールベース手法と深層学習手法（CNN, BiLSTM, BERT等）の比較。
+
+したがって、提供された教材の中には、ご質問にある特定のネットワーク（一般的にはSqueeze-and-Excitation Networkなどが該当する手法ですが）に関する記述は含まれていません。",null,0,0,[],0,0,0,0.8128,unanswerable,30536,3,13927,5292,1,1,1,1,,システムの回答は、根拠テキストに明記されているChannel Attentionネットワークの存在を見落とし、情報が含まれていないと誤った判断をしています。参照解答と正反対の内容であり、評価は最低点となります。
+Q0073,01_academic_papers,Bartzら(2017)が提案したハイブリッドCRNNモデルと、本論文で提案された1D-ConvNetモデルのサンプリングレートおよび入力データの次元数の違いを説明してください。,answerable,reasoning,"本論文の1D-ConvNetはサンプリングレート8kHz、入力サイズ(batch size, 1, 80000)の生波形を使用しますが、Bartzらのモデルはlog-Melスペクトラムを特徴量として使用しており、具体的な入力次元数の直接的な比較は本テキスト内では1D-ConvNet側に限定されています。","As the sampling rate is 8 kHz and audio length is 10 s, hence the input is raw audio to the models with input size of (batch size, 1, 80000). ... Bartz et al. [1] proposed ... extracting spatial features from log-Mel spectra",1910.04269.pdf,"3, 6","ご提示いただいた論文の内容に基づき、Bartzら（2017）のハイブリッドCRNNモデルと、本論文で提案された1D-ConvNetモデルのサンプリングレートおよび入力データの次元数の違いについて説明します。
+
+### 1. サンプリングレートの違い
+*   **1D-ConvNet（本論文）**: 全ての言語の生音声（raw audio）ファイルを**8 kHz**でサンプリングしています（Section 3.2, p.5）。
+*   **Bartzら（2017）のモデル**: 提示された抜粋および本文中には、Bartzらの研究における具体的なサンプリングレート数値についての直接的な記載はありません。ただし、本論文のモデルが8 kHzを採用した理由は「人間の声の平均的な周波数は約300 Hzであり、ナイキスト＝シャノンのサンプリング定理によれば8 kHzあれば有用な周波数は全て保存されるため」と説明されています（Section 3.2, p.5）。
+
+### 2. 入力データの次元数（形式）の違い
+入力データの性質が根本的に異なります。
+
+*   **1D-ConvNet（本論文）**:
+    *   **入力形式**: 生音声の波形（raw audio waveforms）を直接入力として使用します。
+    *   **次元数**: **(batch size, 1, 80000)** です。
+    *   **詳細**: オーディオの長さを10秒に固定しており、8 kHz × 10s = 80,000サンプルとなるため、この次元数になっています（Section 3.4, p.6）。
+
+*   **Bartzら（2017）のモデル**:
+    *   **入力形式**: 生音声から変換された**log-Mel spectrogram（対数メルスペクトログラム）**を画像として入力に使用します。
+    *   **詳細**: 彼らの第1のアーキテクチャでは、生音声から抽出したlog-Melスペクトルから空間的特徴をCNNで抽出し、その後RNNで時間的特徴を捉える構成をとっています。また、第2のアーキテクチャではInception-v3を用いて特徴抽出を行っています（Excerpt 2 / Section 2, p.3）。具体的な画像サイズ（次元数）については、この節では言及されていません。
+
+### まとめ
+大きな違いは、Bartzらのモデルが前処理として**log-Melスペクトログラム（画像）**を生成して入力とするのに対し、本論文の1D-ConvNetは前処理の計算コストを避けるために**生音声の波形（1次元データ）**をそのまま入力としている点にあります（Section 2, p.2）。","[{""Name"":""1910.04269.pdf"",""Page"":""6""},{""Name"":""1910.04269.pdf"",""Page"":""3""}]",1,1,"[{""file_name"":""1910.04269.pdf"",""pages"":[""3"",""6""]}]",1,1,1,0.9367,partial,36544,3,15368,9445,5,5,5,5,,システムの回答は参照解答の内容を完全に網羅しており、根拠テキストに基づいた正確な数値（8kHz、80000）と特徴量の違い（生波形 vs log-Mel）を詳細に説明できています。Bartzらのモデルに関する具体的な数値がテキスト内に存在しない点についても、適切に言及されています。
+Q0074,01_academic_papers,本論文のSpoken Language Identificationシステムにおいて、Googleの「Wav2Vec 2.0」フレームワークと比較した場合の推論速度の差はどの程度ですか？,unanswerable,N/A,,,1910.04269.pdf,,"提供された教材に基づくと、ご質問にお答えするための十分な情報がありません。
+
+提供された資料（Reference 1〜5）の中には、Googleの「Wav2Vec 2.0」フレームワークに関する記述や、それを用いた推論速度の比較データは一切含まれていません。
+
+資料で言及されているモデルや性能に関する主な情報は以下の通りです：
+
+*   **Reference 2** では、CRNN、Inception-v3、GMM、TDNNなどのモデルを用いた言語識別（LI）の精度（Accuracy）について述べられていますが、推論速度に関する具体的な数値（msなど）の比較は記載されていません。
+*   **Reference 3 および 4** では、言語モデリングにおけるKN-5、AWD-LSTM、QRNNの性能と計算要件（レイテンシやエネルギー使用量）のトレードオフについて表（Table 2）で示されていますが、これらは「Wav2Vec 2.0」との比較ではありません。
+
+したがって、本論文のシステムとWav2Vec 2.0との推論速度の差を提示することは不可能です。",null,0,0,[],0,0,0,0.0000,unanswerable,28431,3,13926,6216,,,,1,1,システムは提供された資料に該当する情報がないことを正しく認識し、回答を拒否しています。また、資料内の他のモデルに関する言及についても正確に把握しており、ハルシネーションは見られません。
+Q0075,01_academic_papers,VoxForgeデータセットを用いた実験において、2D-ConvNetモデルのトレーニングに使用されたGPUの具体的なモデル名（例：NVIDIA V100）と、学習にかかった総時間を教えてください。,unanswerable,N/A,,,1910.04269.pdf,,"ご提示いただいたPDF資料に基づき、ご質問に回答いたします。
+
+ご質問にある「VoxForgeデータセット」および「2D-ConvNetモデル」に関する記述は、提供されたPDF内には存在しません。この資料は、中国語の病理診断報告書を用いた**QA-CTS（Question Answering based Clinical Text Structuring）**に関する研究論文です。
+
+資料の「V. EXPERIMENTAL STUDIES（実験研究）」のセクションに記載されている、本研究の実験環境および学習時間は以下の通りです。
+
+*   **GPUのモデル名**: **NVIDIA GeForce GTX 1080 Ti** (各モデルをシングルGPUで実行)
+*   **学習にかかった総時間**: 資料内に学習にかかった**具体的な総時間の記載はありません**。
+
+ただし、学習の設定に関する以下の情報は記載されています（第3ページ、Section V-B）：
+*   **ライブラリ**: Keras (TensorFlowバックエンド)
+*   **最適化アルゴリズム**: Adam (学習率: $5 \times 10^{-5}$)
+*   **バッチサイズ**: 3または4（グラフィックメモリの不足による制限）
+*   **事前学習モデル**: BERT-base (Googleが事前学習した中国語一般コーパスのパラメータを直接採用)
+
+この論文が対象としているのは、VoxForge（音声データセット）ではなく、瑞金病院（Ruijin Hospital）から収集された「中国語の病理報告書（Chinese pathology reports）」データセットです。","[{""Name"":""1908.06606.pdf"",""Page"":""3""}]",0,0,"[{""file_name"":""1908.06606.pdf"",""pages"":[""3""]}]",0,0,0,0.0000,unanswerable,26951,3,12784,4992,,,,1,1,システムは質問にあるVoxForgeや2D-ConvNetが資料内に存在しないことを正しく指摘し、資料内の実際の実験環境を提示した上で、学習時間の記載がないことも正確に回答しています。
+Q0076,01_academic_papers,Multi30kデータセットのタスク2において、ドイツ語の画像キャプションは1画像あたり何個付与されていますか？,answerable,simple,Multi30kデータセットのタスク2では、各画像に対して独立して5つのドイツ語の記述が注釈されています。,"In task 2, the image is independently annotated with 5 descriptions in English and German respectively.",1906.00378.pdf,4,"PDFの記述に基づき、回答いたします。
+
+Multi30kデータセットのタスク2（task 2）において、ドイツ語の画像キャプションは**1画像あたり5個**付与されています。
+
+根拠となる情報は、PDFの4ページ目「4.1 Datasets」セクションに以下の通り記載されています：
+> ""In task 2, the image is independently annotated with **5 descriptions** in English and **German** respectively.""
+> （タスク2では、画像に対して英語とドイツ語でそれぞれ独立に5個の記述が注釈付けされています。）
+
+また、同ページの「Table 1: Statistics of image caption datasets」においても、Multi30kのGerman（ドイツ語）の統計として、images（画像数）が14,500に対しcaptions（キャプション数）が72,500となっており、計算上も1画像あたり5個（72,500 ÷ 14,500 = 5）であることが示されています。","[{""Name"":""1906.00378.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1906.00378.pdf"",""pages"":[""4""]}]",1,1,1,0.9433,answerable,16091,1,3935,5430,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値を提供しています。さらに、統計データを用いた補足説明も加えられており、非常に信頼性の高い回答となっています。
+Q0077,01_academic_papers,提案されているマルチリンガル・キャプションモデルにおいて、ソース言語の単語xtを生成する確率を計算する際、デコーダの隠れ状態htxは何によって機能しますか？,answerable,reasoning,デコーダの隠れ状態htxは、Hochreiter and Schmidhuber (1997) によるLSTM（Long Short-Term Memory）によって機能します。,"where hxt is the hidden state of the decoder at step t, which is functioned by LSTM (Hochreiter and Schmidhuber 1997):",1906.00378.pdf,3,"ご質問ありがとうございます。提出されたPDFに基づき、提案されているマルチリンガル・キャプションモデルのデコーダの隠れ状態$h^x_t$の機能について回答します。
+
+### 回答
+提案モデルにおいて、ソース言語の単語$x_t$を生成する際のデコーダの隠れ状態$h^x_t$は、**LSTM（Long Short-Term Memory）によって機能（算出）されます**（3ページ、式(4)）。
+
+具体的には、以下の要素を入力として機能します：
+1. **前のステップの単語の埋め込みベクトル** ($w^x_{t-1}$)
+2. **アテンション機構によって動的に特定された文脈画像特徴** ($c^x_t$)
+3. **前のステップの隠れ状態** ($h^x_{t-1}$)
+
+### 詳細なプロセス（PDF 3ページ、セクション3.1より）
+*   **生成確率の計算**: ステップ$t$における単語$x_t$の生成確率 $P(x_t|a, x_{<t})$ は、この隠れ状態 $h^x_t$ を用いて $softmax(h^x_t W_x)$ として計算されます（式(3)）。
+*   **文脈画像特徴 ($c^x_t$) との関係**: $c^x_t$ は、1つ前のステップの隠れ状態 $h^x_{t-1}$ と画像特徴 $a_k$ を入力とする全結合ニューラルネットワーク $f_a$ を用いたアテンション機構によって算出されます（式(5), (6)）。
+
+このように、$h^x_t$ は過去の言語情報と言語に関連付けられた視覚情報の両方を保持し、次の単語を予測するための中心的な役割を果たしています。","[{""Name"":""1906.00378.pdf"",""Page"":""3""},{""Name"":""1906.00378.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1906.00378.pdf"",""pages"":[""3"",""4""]}]",1,1,1,0.8888,answerable,28693,3,13381,5659,5,5,5,5,,システムの回答は参照解答にあるLSTMの情報を正確に含んでおり、根拠テキストに基づいた詳細な補足説明も提供されています。質問に対する直接的な回答に加え、数式や入力要素の背景も網羅されており、非常に高い品質です。
+Q0078,01_academic_papers,BERGSMAデータセットとMMIDデータセットを用いた実験において、提案モデルの「linguistic + visual」特徴を融合させた場合のP@1スコアは、それぞれのデータセットでいくらですか？,answerable,multi_chunk,BERGSMAデータセットでは76.6、MMIDデータセットでは45.2です。,Table 4: Performance of German to English word translation. ... linguistic + visual 0.819 76.6 ... 0.529 45.2,1906.00378.pdf,6,"添付されたPDF資料に基づき、ご質問に回答いたします。
+
+BERGSMAデータセットとMMIDデータセットを用いた実験において、提案モデルの「linguistic + visual」特徴を融合させた場合のP@1スコアは以下の通りです。
+
+*   **BERGSMAデータセット**: **76.6**
+*   **MMIDデータセット**: **45.2**
+
+これらの数値は、PDFの6ページ目にある「Table 4: Performance of German to English word translation.」の「proposed model」の行、および「linguistic + visual」の列から確認できます。","[{""Name"":""1906.00378.pdf"",""Page"":""6""},{""Name"":""1906.00378.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1906.00378.pdf"",""pages"":[""6"",""7""]}]",1,1,1,0.8895,answerable,24390,3,12601,4147,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値を提示しています。また、表の名称や参照箇所についても言及されており、非常に丁寧で完全な回答です。
+Q0079,01_academic_papers,フランス語から英語への単語翻訳（French to English word translation）において、提案された「linguistic+visual」モデルは、CNN-avgmaxベースラインと比較してMRR値でどの程度の差がありますか？,answerable,reasoning,提案モデルのMRRは0.494であり、CNN-avgmaxの0.474と比較して0.02の差（向上）があります。,Table 7: Performance of French to English word translation on the MMID dataset. ... CNN-avgmax 0.474 ... linguistic+visual 0.494,1906.00378.pdf,7,"PDFの表7「Performance of French to English word translation on the MMID dataset」（7ページ）に基づくと、提案された「linguistic+visual」モデルとベースラインである「CNN-avgmax」のMRR値の差は以下の通りです。
+
+*   **linguistic+visual (提案モデル):** 0.494
+*   **CNN-avgmax (ベースライン):** 0.474
+
+したがって、MRR値における差は **0.020** です。
+
+また、本文（7ページ、セクション4.5）では、この融合モデルがベースライン手法に対してMRR値で **4.2%の相対的な改善（relative gains）** を達成したと述べられています。","[{""Name"":""1906.00378.pdf"",""Page"":""7""}]",1,1,"[{""file_name"":""1906.00378.pdf"",""pages"":[""7""]}]",1,1,1,0.9006,answerable,27976,3,13561,4385,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値（0.494と0.474）およびその差（0.02）を提示しています。さらに、相対的な改善率（4.2%）という補足情報も提供されており、非常に質の高い回答です。
+Q0080,01_academic_papers,この研究で提案されたマルチリンガル・キャプションモデルを、Google Cloud Vision APIと連携させてリアルタイム翻訳を行う際のAPI利用料金はいくらですか？,unanswerable,N/A,,,1906.00378.pdf,,,null,0,0,[],0,0,0,0.0000,,13527,0,0,0,,,,,,
+Q0081,01_academic_papers,AraNetで使用されているBERT-Base Multilingual Casedモデルのパラメータ数と、事前学習に含まれる言語数はそれぞれいくつか？,answerable,simple,パラメータ数は1億1000万（110M）、事前学習に含まれる言語数はアラビア語を含む104言語です。,The model is trained on 104 languages (including Arabic) ... and has 110M parameters in entire model.,1912.13072.pdf,2,"ご質問の「AraNetで使用されているBERT-Base Multilingual Casedモデルのパラメータ数」および「事前学習に含まれる言語数」については、**提供された資料の中には記載されていません。**
+
+資料から確認できる範囲の情報は以下の通りです：
+
+*   **AraNetについて**: Reference 5によれば、AraNetはBERT（Bidirectional Encoder Representations from Transformers）をベースとした、アラビア語のソーシャルメディア分析（年齢、方言、性別、感情、皮肉、センチメントの予測）のためのツールキットであると説明されています。
+*   **言語数に関する他の記述**: Reference 3では、158言語に対応した「オンザフライWSD（語義曖昧性解消）システム」の構築について述べられていますが、これはAraNetとは別のシステムに関する説明です。
+
+したがって、提供されたコース資料のみに基づいた場合、BERT-Base Multilingual Casedモデルの具体的なパラメータ数と言語数を回答することは不可能です。",null,0,0,[],0,0,0,0.8416,unanswerable,27248,3,13212,7417,1,1,1,1,,根拠テキストにはパラメータ数（110M）と言語数（104言語）が明記されているにもかかわらず、回答は「記載されていない」と誤った判断をしており、情報を全く提供できていません。
+Q0082,01_academic_papers,AraNetの感情分析（Sentiment Analysis）タスクにおいて、BERTモデルを訓練する際の学習率（learning rate）とエポック数はどのように設定されているか？,answerable,reasoning,学習率は2e-6、エポック数は15に設定されています。これは他のタスク（学習率2e-5）とは異なるPyTorch実装による例外的な設定です。,"An exception is the sentiment analysis task, where we used a PyTorch implementation with the same hyper-parameters but with a learning rate 2e − 6. ... train for 15 epochs",1912.13072.pdf,3,"ご提示いただいたPDF資料に基づき、ご質問に回答いたします。
+
+まず、資料内には「AraNet」という名称のモデルについての直接的な記述はありませんが、研究の主軸である**QA-CTS（Question Answering based Clinical Text Structuring）タスク**におけるBERTモデルの設定について、セクションV-B（3ページ目）に以下の通り記載されています。
+
+### 学習率（Learning Rate）
+学習率は **$5 \times 10^{-5}$** に設定されています。
+*   これは、Adamアルゴリズムのデフォルト設定から変更して適用されています。
+
+### エポック数（Epochs）
+提供された資料内には、**具体的なエポック数の数値に関する記述はありません。**
+
+### その他の関連設定
+*   **最適化アルゴリズム:** Adamアルゴリズム（学習率以外はデフォルト設定）
+*   **バッチサイズ:** グラフィックスメモリの不足により、**3または4**に設定。
+*   **使用モデル:** BERT-base（Googleが中国語の一般コーパスで事前学習したパラメータを直接採用）。
+*   **トレーニングメカニズム:** 「Two-Stage Training Mechanism」を採用しており、まず新しい予測層でファインチューニングを行った後、モデル全体を低い学習率で再訓練（retrain）しています。
+
+（出典：Section V. EXPERIMENTAL STUDIES - B. Experimental Settings, Page 3）","[{""Name"":""1908.06606.pdf"",""Page"":""3""}]",0,0,"[{""file_name"":""1908.06606.pdf"",""pages"":[""3""]}]",0,1,0,0.8479,unanswerable,26744,3,12461,5647,1,1,1,1,,システムの回答は、根拠テキストに明記されている学習率（2e-6）とエポック数（15）を完全に見落としており、全く異なるタスクの設定を引用しています。質問に対する正解情報が一つも含まれていないため、最低評価となります。
+Q0083,01_academic_papers,AraNetが対応している6つの予測タスク（年齢、方言、性別、感情、皮肉、感情分析）の中で、開発セット（DEV）において最も高い正解率（accuracy）を記録したタスクと、その数値を答えなさい。,answerable,multi_chunk,皮肉検出（Irony detection）タスクで、BERTモデルが81.64%の正解率を記録しています。,"BERT model significantly outperforms the small-GRU, acquiring 81.64% acc. and 81.62% F1 score. (Table 6)",1912.13072.pdf,5,"AraNetが対応している6つの予測タスクのうち、開発セット（DEV）において最も高い正解率（accuracy）を記録したタスクとその数値は以下の通りです。
+
+*   **最も高い正解率を記録したタスク：** 皮肉（Irony）検出
+*   **数値：** 81.64%
+
+PDF内の各タスクにおける開発セット（DEV）の最高正解率は以下の通り報告されています。
+
+1.  **皮肉（Irony）:** **81.64%** (Table 6, Page 5)
+2.  **感情分析（Sentiment）:** 80.24% (Section 3.5, Page 5)
+3.  **性別（Gender）:** 65.32% (Gender_combモデル / Table 3, Page 4)
+4.  **感情（Emotion）:** 61.43% (Section 3.3, Page 4)
+5.  **年齢（Age）:** 50.95% (Table 2, Page 4)
+6.  **方言（Dialect）:** 49.39% (Section 3.2, Page 4) ※MADAR共有タスク2における最高精度として言及。","[{""Name"":""1912.13072.pdf"",""Page"":""4""}]",1,1,"[{""file_name"":""1912.13072.pdf"",""pages"":[""4""]}]",1,1,1,0.8877,answerable,28957,3,12803,7561,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値（81.64%）を提示しています。また、他のタスクとの比較数値も補足されており、質問に対する完全性が非常に高いです。
+Q0084,01_academic_papers,AraNetツールキットを商用利用する場合のライセンス費用と、API経由での利用料金は月額いくらに設定されているか？,unanswerable,N/A,,,1912.13072.pdf,,"提供された資料に基づくと、ご質問の回答は以下の通りです。
+
+ご提供いただいた資料には、AraNetツールキットの商用利用に関するライセンス費用や、API経由での月額利用料金についての記載はありません。
+
+Reference 1によると、AraNetは研究の加速とタスク間のモデル比較を容易にすることを目的として「公開（publicly release）」されると言及されていますが、具体的な料金設定や商用利用の条件については触れられていません。",null,0,0,[],0,0,0,0.0000,unanswerable,22647,3,12666,1833,,,,1,1,システムは提供された資料に料金に関する記載がないことを正しく指摘し、回答を拒否しているためハルシネーションは認められません。
+Q0085,01_academic_papers,"In the weGAN model for cross-corpus word embeddings, what is the specific role of the unit vector ekm_i in the minimax problem described by equation (8)?",answerable,reasoning,"In equation (8), ekm_i is a unit vector where only the km_i-th component is one and all others are zero, representing the label of document d_m_i with respect to classifier C. It is used to calculate the log-likelihood of the classifier's prediction, which is equivalent to the Kullback-Leibler divergence.",ekm_i is a unit vector with only the km_i-th component being one and all other components being zeros. Note that log(eT km_i C(fG(dm_i))) is equivalent to KL(ekm_i ||C(fG(dm_i))),1712.09127.pdf,4,"Based on the provided course materials, there is no mention of a ""weGAN"" model or a unit vector $e_{km_i}$.
+
+The materials in **Reference 1** describe a model called **deGAN**, which is used for generating document embeddings for multi-corpus text data. This reference includes equations (12) through (15), but does not contain an ""equation (8)"" or the specific vector you are asking about. 
+
+The other references cover neural language models, attack models for crowd-turfing (**Reference 3**), and data integration analysis for medical measurements (**Reference 4**). Consequently, the provided documents are insufficient to answer your question regarding the specific role of $e_{km_i}$ in the weGAN model.",null,0,0,[],0,0,0,0.8063,unanswerable,26022,3,13724,4150,1,1,1,1,,根拠テキストには質問に対する直接的な回答（ekm_iの定義と役割）が含まれているにもかかわらず、システムは「記載がない」と誤った回答をしており、情報を全く抽出できていません。
+Q0086,01_academic_papers,"According to the experimental results for the CNN data set in Table 1, what were the mean values for weGAN-RI and weGAN-accuracy?",answerable,simple,"For the CNN data set, the mean value for weGAN-RI was 68.45% and the mean value for weGAN-accuracy was 92.36%.",mean 67.88% 68.45% 92.05% 92.36% ... Table 1: A comparison between word2vec and weGAN in terms of the Rand index and the classification accuracy for the CNN data set.,1712.09127.pdf,10,"Based on the experimental results for the **CNN data set** presented in **Table 1** (page 10), the mean values are as follows:
+
+*   **weGAN-RI (Mean):** 68.45%
+*   **weGAN-accuracy (Mean):** 92.36%
+
+These results represent the average performance over 5 randomized runs comparing word2vec and the proposed weGAN model.","[{""Name"":""1712.09127.pdf"",""Page"":""14""}]",1,0,"[{""file_name"":""1712.09127.pdf"",""pages"":[""14""]}]",1,0,0,0.9298,answerable,25942,3,12492,6035,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値を提示しています。質問に対する回答として過不足なく、補足情報も適切です。
+Q0087,01_academic_papers,How does the deGAN model architecture distinguish between general topics and corpus-specific topics when generating document embeddings from noise?,answerable,reasoning,"The deGAN model uses two separate hidden vectors: h0 represents general topics across all corpora, while hm represents specific topics unique to each individual corpus Cm. Both are derived from the noise vector n using different weight matrices (W0h and Wmh).","We consider two hidden vectors, h0 for general topics and hm for specific topics per corpus, hm = a1(Wmh n), h0 = a1(W0h n).",1712.09127.pdf,6,"Based on the provided PDF, the **deGAN** (document embedding GAN) model distinguishes between general and corpus-specific topics by utilizing a generator architecture that splits a noise vector into two distinct hidden representations (Section 3.2, p. 6).
+
+### 1. Dual Hidden Vectors
+The model transforms a noise vector $n$ into two separate hidden vectors to represent different levels of thematic information:
+*   **General Topics ($h^0$):** This vector represents topics shared across all corpora. It is calculated as $h^0 = a_1(W_h^0 n)$.
+*   **Specific Topics ($h^m$):** This vector represents topics unique to a specific corpus $C^m$. It is calculated as $h^m = a_1(W_h^m n)$.
+
+### 2. Integration in the Generator
+The generator $\mathcal{G}^m$ then maps these two vectors to a generated document embedding using the following formula (Equation 13, p. 6):
+$$o_m = a_2(W_o^m h^m + w_o^0 h^0)$$
+By combining the corpus-specific weights ($W_o^m$) with the shared general weights ($w_o^0$), the model creates an embedding that reflects both the universal and the unique characteristics of the text data.
+
+### 3. Training via the Discriminator
+The discriminator $\mathcal{D}$ reinforces this distinction by classifying documents into $2M$ categories: $M$ categories for the original corpora and $M$ categories for the artificial examples generated by $\mathcal{G}^1, \dots, \mathcal{G}^M$ (p. 7). 
+
+Through the minimax training process, the generator is forced to minimize the probability that the discriminator identifies the embedding as ""fake"" (category $M+m$) while maximizing the probability that the discriminator identifies it as belonging to the specific target corpus $C^m$ (Section 3.2, p. 7). This ensures the generated embeddings accurately reflect the specific topics of each individual corpus.","[{""Name"":""1712.09127.pdf"",""Page"":""3""}]",1,0,"[{""file_name"":""1712.09127.pdf"",""pages"":[""3""]}]",1,0,0,0.9205,answerable,31018,3,14849,8006,5,5,5,5,,システムの回答は参照解答の内容を完全に網羅しており、数式や変数の定義も根拠テキストと一致しています。さらに、生成プロセスや識別器の役割についても補足されており、質問に対する回答として非常に質が高いです。
+Q0088,01_academic_papers,"Based on the comparisons across the CNN, TIME, and 20 Newsgroups data sets, which specific GAN model consistently achieved higher classification accuracy in supervised learning tasks?",answerable,multi_chunk,"The weGAN model consistently outperformed deGAN in classification accuracy across the CNN (92.36% vs 92.29%), TIME (84.76% vs 85.38% - note: deGAN was higher here), and 20 Newsgroups (89.90% vs 89.32%) data sets. The conclusion states weGAN outperformed deGAN in 3 out of 4 data sets.","The weGAN model outperforms deGAN in terms of supervised learning for 3 out of 4 data sets, and is thereby recommended.",1712.09127.pdf,14,"Based on the data provided in the PDF, the comparison between the **weGAN** and **deGAN** models reveals the following regarding classification accuracy:
+
+*   **CNN Data Set:** **weGAN** achieved a mean accuracy of **92.36%** (Table 1, p. 10), while **deGAN** achieved **92.29%** (Table 3, p. 11).
+*   **TIME Data Set:** **deGAN** achieved a higher mean accuracy of **85.38%**, compared to **weGAN** at **84.76%** (Table 5, p. 12).
+*   **20 Newsgroups Data Set:** **weGAN** achieved a higher mean accuracy of **89.90%**, while **deGAN** achieved **89.32%** (Table 8, p. 14).
+*   **Reuters-21578 Data Set:** **weGAN** also outperformed with an accuracy of **95.10%** compared to **deGAN** at **94.86%** (Table 9, p. 14).
+
+**Conclusion:**
+The **weGAN** model consistently achieved higher classification accuracy in **3 out of the 4** data sets (CNN, 20 Newsgroups, and Reuters-21578). Consequently, the authors state in the conclusion that ""The weGAN model outperforms deGAN in terms of supervised learning for 3 out of 4 data sets, and is thereby recommended"" (Section 5, p. 14).","[{""Name"":""1712.09127.pdf"",""Page"":""14""},{""Name"":""1712.09127.pdf"",""Page"":""11""}]",1,1,"[{""file_name"":""1712.09127.pdf"",""pages"":[""11"",""14""]}]",1,1,1,0.9550,answerable,26952,3,13522,5492,5,5,5,5,,システムの回答は参照解答に含まれる数値を正確に網羅しており、根拠テキストに基づいた結論も正しく導き出されています。質問で指定された3つのデータセットに加え、4つ目のデータセットについても言及しており、非常に完全性が高いです。
+Q0089,01_academic_papers,What are the two specific applications of Generative Adversarial Nets (GANs) for multiple text corpora proposed by Baiyang Wang and Diego Klabjan?,answerable,simple,"The two applications are: (1) the creation of consistent cross-corpus word embeddings given different word embeddings per corpus, and (2) the generation of robust bag-of-words document embeddings for each corpora.",there can be two applications of GANs: (1) the creation of consistent cross-corpus word embeddings given different word embeddings per corpus; (2) the generation of robust bag-of-words document embeddings,1712.09127.pdf,1,"Based on the provided PDF, Baiyang Wang and Diego Klabjan propose two specific applications of Generative Adversarial Nets (GANs) for multiple text corpora:
+
+1.  **weGAN (Training cross-corpus word embeddings):** This model is designed to create a consistent set of cross-corpus word embeddings by combining different word embeddings from multiple corpora. The goal is to produce refined word embeddings that resemble each existing per-corpus embedding while also incorporating document labeling information through a semi-supervised approach (Section 3.1, pages 1, 4).
+2.  **deGAN (Generating document embeddings):** This model generates robust document embeddings (such as bag-of-words or tf-idf) for multiple corpora within a single GAN framework. It uses a generator that considers both general ""cross-corpus"" topics and specific ""per-corpus"" topics. The discriminator in this model is trained to classify documents into their respective original or artificial categories across all corpora (Section 3.2, pages 1, 6).
+
+The authors demonstrate that both applications lead to improvements in **supervised learning problems**, such as document classification (Section 4, pages 1, 14).","[{""Name"":""1712.09127.pdf"",""Page"":""2""},{""Name"":""1712.09127.pdf"",""Page"":""6""},{""Name"":""1712.09127.pdf"",""Page"":""11""}]",1,1,"[{""file_name"":""1712.09127.pdf"",""pages"":[""11"",""2"",""6""]}]",1,1,1,0.9094,answerable,20187,2,7720,5224,5,5,5,5,,システムの回答は参照解答および根拠テキストの内容を完全に網羅しており、weGANやdeGANといった具体的なモデル名や詳細な仕組みまで補足されているため、非常に正確で完全な回答と言えます。
+Q0090,01_academic_papers,"In the deGAN experiments, what specific value was used for the learning rate of the generator G, and why was it chosen?",answerable,reasoning,The learning rate for the generator G in deGAN was set to 0.001. This lower value was chosen because the initial training phase of deGAN can be unstable.,"for the generator G, we apply a learning rate of 0.001, because the initial training phase of deGAN can be unstable.",1712.09127.pdf,9,"Based on the provided course materials, there is no mention of the specific value used for the learning rate of the generator $G$ in the deGAN experiments, nor is there an explanation for why a particular value was chosen.
+
+Reference 2 describes the mathematical framework for the deGAN (Section 3.2), including the construction of generators $G_1, \dots, G_M$ and the minimax problem used for training, but it does not list specific hyperparameter values like the learning rate. While Reference 5 mentions learning rates for other models (e.g., $30$ for NT-ASGD and $10^{-3}$ for Adam), these pertain to QRNN and WT103 models, not the deGAN.",null,0,0,[],0,0,0,0.8493,unanswerable,23159,3,12907,2312,1,1,1,1,,根拠テキストには学習率が0.001であると明記されているにもかかわらず、システムの回答は「記載がない」と誤った情報を述べており、事実と完全に矛盾しています。
+Q0091,01_academic_papers,"What was the total number of training, validation, and testing documents used for the Reuters-21578 data set evaluation in this study?",answerable,simple,"The Reuters-21578 data set was divided into 5,497 training documents, 692 validation documents, and 2,207 testing documents.","We then divided these documents into 5,497 training documents, from which 692 validation documents are held out, and 2,207 testing documents.",1712.09127.pdf,14,"Based on the provided document, the details for the **Reuters-21578** data set evaluation are as follows:
+
+*   **Training Documents:** 5,497
+*   **Validation Documents:** 692 (held out from the training set)
+*   **Testing Documents:** 2,207
+
+**Total Documents:** 8,396
+
+These figures are specified in **Section 4.4** (page 14), which describes the Reuters-21578 data set as a collection of newswire articles. For the study, the authors considered eight specific categories (""earn,"" ""acq,"" ""crude,"" ""trade,"" ""money-fx,"" ""interest,"" ""money-supply,"" and ""ship"") and divided the data into the subsets listed above.","[{""Name"":""1712.09127.pdf"",""Page"":""9""}]",1,0,"[{""file_name"":""1712.09127.pdf"",""pages"":[""9""]}]",1,0,0,0.9307,answerable,26028,3,13213,4609,5,5,5,5,,システムの回答は根拠テキストにある数値を正確に抽出しており、参照解答の内容を完全に網羅しています。合計値の算出やカテゴリ情報の補足も正確で、非常に質の高い回答です。
+Q0092,01_academic_papers,Does the weGAN model utilize the Wasserstein loss function with a 1-Lipschitz discriminator to improve training stability for the CNN data set?,unanswerable,N/A,,,1712.09127.pdf,,"Based on the provided course materials, it is not possible to fully answer your question because the materials do not contain information regarding a ""weGAN"" model or a ""CNN data set.""
+
+However, Reference 1 does provide details regarding the **Wasserstein GAN (WGAN)**:
+
+*   **Model Purpose:** The Wasserstein GAN was proposed because the probabilistic structure of a standard GAN can be unstable to train (Reference 1).
+*   **Mechanism:** It improves stability by applying a **1-Lipschitz function** as a discriminator (Reference 1).
+*   **Loss Function:** The minimax problem for a Wasserstein GAN is defined as:
+    $\min_G \max_{f: \|f\|_L \leq 1} V(f, G) := E_x[f(x)] - E_z[f(G(z))]$ (Reference 1).
+
+While Reference 5 mentions training a network with over 21 million parameters to generate summaries, it does not identify the model as a ""weGAN"" or specify the use of a Wasserstein loss function. References 2, 3, and 4 also do not mention the weGAN model or the CNN data set.",null,0,0,[],0,0,0,0.0000,unanswerable,23816,3,12660,2640,,,,1,1,システムは質問に含まれるweGANやCNNデータセットが提供資料に存在しないことを明示し、類似のWGANに関する情報のみを参考として提示しており、ハルシネーションは認められません。
+Q0093,01_academic_papers,What is the full name of the Stacked DeBERT model proposed by Gwenaelle Cunha Sergio and Minho Lee?,answerable,simple,Stacked DeBERT stands for Stacked Denoising Bidirectional Encoder Representations from Transformers.,"we propose Stacked DeBERT, short for Stacked Denoising Bidirectional Encoder Representations from Transformers.",2001.00137.pdf,1,"The full name of the proposed **Stacked DeBERT** model is **Stacked Denoising Bidirectional Encoder Representations from Transformers**.
+
+According to the provided document, the model is described as follows:
+*   **Definition:** It is a novel encoding scheme designed to improve robustness in ""incomplete data"" (text with missing or incorrect words) for tasks like intent and sentiment classification (Page 1, Abstract; Page 6, Section 2).
+*   **Structure:** The model ""combines the power of BERT... and the strength of denoising strategies"" by stacking novel denoising transformers onto an embedding layer with vanilla transformers (Page 5).
+*   **Purpose:** It aims to reconstruct hidden embeddings from noisy input to obtain richer representations, outperforming standard BERT in scenarios involving user-generated text (like Twitter) or Speech-to-Text (STT) errors (Pages 1 and 6).","[{""Name"":""2001.00137.pdf"",""Page"":""1""},{""Name"":""2001.00137.pdf"",""Page"":""7""},{""Name"":""2001.00137.pdf"",""Page"":""6""},{""Name"":""2001.00137.pdf"",""Page"":""18""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""1"",""18"",""6"",""7""]}]",1,1,1,0.9165,answerable,31707,3,16736,6299,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な名称を提供しています。さらに、モデルの構造や目的などの補足情報も根拠に基づいて詳細に説明されており、非常に質の高い回答です。
+Q0094,01_academic_papers,Which two specific datasets were utilized for the training and evaluation of the Stacked DeBERT model?,answerable,simple,The model was evaluated using the Chatbot Natural Language Understanding Evaluation Corpus and Kaggle’s Twitter Sentiment Corpus.,We consider two datasets for training and evaluation: the Chatbot Natural Language Understanding Evaluation Corpus and Kaggle’s Twitter Sentiment Corpus.,2001.00137.pdf,1,"Based on the provided document, the two specific datasets utilized for the training and evaluation of the **Stacked DeBERT** model are:
+
+1.  **Kaggle’s Twitter Sentiment Corpus (Sentiment140):** This dataset was used for the Twitter sentiment classification task. It consists of naturally noisy text (tweets) containing human errors. The researchers also used Amazon Mechanical Turk to obtain a ""corrected"" version of these tweets to help with training and evaluation (Section 3.1, page 10).
+2.  **Chatbot Natural Language Understanding (NLU) Evaluation Corpus:** This dataset was used for the intent classification task. It consists of sentences from a German Telegram chatbot. To simulate incomplete data, the researchers applied Text-to-Speech (TTS) and Speech-to-Text (STT) modules to create versions of the data with ""STT errors"" (Section 3.2, page 12-13).
+
+These datasets are explicitly identified in the **Abstract** (page 1) and further detailed in **Section 3: Dataset** (pages 10–13).","[{""Name"":""2001.00137.pdf"",""Page"":""24""},{""Name"":""2001.00137.pdf"",""Page"":""19""},{""Name"":""2001.00137.pdf"",""Page"":""20""}]",1,0,"[{""file_name"":""2001.00137.pdf"",""pages"":[""19"",""20"",""24""]}]",1,0,0,0.8938,answerable,15864,1,3490,5044,5,5,5,5,,システムの回答は参照解答にある2つのデータセットを正確に特定しており、根拠テキストの内容とも完全に一致しています。さらに、各データセットの詳細やセクション番号などの補足情報も提供されており、非常に完全性が高いです。
+Q0095,01_academic_papers,How does the iBLEU score relate to the amount of noise in incomplete text according to the Stacked DeBERT paper?,answerable,reasoning,The iBLEU score is calculated as 1 - BLEU; a higher iBLEU score indicates a higher level of noise in the incomplete text.,"the higher the iBLEU, the higher the noise. ... iBLEU = 1 − BLEU",2001.00137.pdf,14,"Based on the provided document, the **inverted BLEU (iBLEU)** score is a metric used to denote the level of noise in incomplete or incorrect text. Its relationship to noise is defined as follows:
+
+*   **Positive Correlation with Noise:** The paper states that the iBLEU score is more indicative of the amount of noise than the regular BLEU metric. Specifically, **the higher the iBLEU score, the higher the amount of noise** in the incomplete text (Section 3.2, page 14).
+*   **Mathematical Definition:** It is calculated by subtracting the regular BLEU score from 1:
+    $$iBLEU = 1 - BLEU$$
+*   **Range:** The score ranges from **0 to 1**, where a score of **0 indicates no noise** (complete data) and higher values represent an increasing quantity of missing or incorrect words (Section 3.2, page 14; Section 5.1, page 21).
+
+In the study's experiments, for example, the ""complete"" dataset has an iBLEU of 0.00, while the noisier *macsay-witai* dataset has a higher iBLEU of 0.50, reflecting its greater level of corruption compared to the *gtts-witai* dataset (0.44) (Table 7, page 20).","[{""Name"":""2001.00137.pdf"",""Page"":""20""},{""Name"":""2001.00137.pdf"",""Page"":""15""},{""Name"":""2001.00137.pdf"",""Page"":""19""},{""Name"":""2001.00137.pdf"",""Page"":""14""},{""Name"":""2001.00137.pdf"",""Page"":""21""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""14"",""15"",""19"",""20"",""21""]}]",1,1,1,0.9528,answerable,25926,3,12516,6107,5,5,5,5,,システムの回答は参照解答の定義と計算式を完全に網羅しており、根拠テキストの内容とも正確に一致しています。さらに、具体的な数値例を挙げることで、ノイズ量とスコアの関係性をより分かりやすく補足しています。
+Q0096,01_academic_papers,"In the context of the Twitter Sentiment Classification task, what was the F1-micro score improvement of Stacked DeBERT over the conventional BERT model on the original (Inc) dataset?",answerable,reasoning,"Stacked DeBERT achieved an F1-micro score of 80.00% compared to BERT's 72.00%, representing an 8% improvement.",Table 6: ... BERT 72.00 ... Stacked DeBERT (ours) 80.00,2001.00137.pdf,18,"In the context of the Twitter Sentiment Classification task, the **F1-micro score improvement** of Stacked DeBERT over the conventional BERT model on the original (**Inc**) dataset was **8.00%**.
+
+According to the results detailed in the PDF:
+*   **BERT** achieved an F1-micro score of **72.00%** on the Inc dataset (Table 6, page 18).
+*   **Stacked DeBERT** achieved an F1-micro score of **80.00%** on the same dataset (Table 6, page 18).
+*   The text confirms this **8% improvement** in Section 4.3 (page 17), stating that the model ""achieves accuracy of 80% against BERT’s 72%,"" and further summarizes this specific gain in Table 10 (page 25).","[{""Name"":""2001.00137.pdf"",""Page"":""19""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""19""]}]",1,1,1,0.9457,answerable,28076,3,12748,8754,5,5,5,5,,システムの回答は参照解答と完全に一致しており、根拠テキストに基づいた正確な数値（72.00%と80.00%）およびその差分（8%）を正しく提示しています。
+Q0097,01_academic_papers,"What are the shapes of the latent-space representation vectors z1, z2, and z used in the Stacked DeBERT denoising transformers layer?",answerable,simple,"The shapes are (Nbs, 128, 128) for z1, (Nbs, 32, 128) for z2, and (Nbs, 12, 128) for z.","extracting more abstract features into lower dimension vectors z1, z2 and z with shape (Nbs, 128, 128), (Nbs, 32, 128), and (Nbs, 12, 128), respectively.",2001.00137.pdf,9,"Based on the provided PDF, specifically the description of the **Denoising transformers layer** on **page 9**, the shapes of the latent-space representation vectors are as follows:
+
+*   **$z_1$**: $(N_{bs}, 128, 128)$
+*   **$z_2$**: $(N_{bs}, 32, 128)$
+*   **$z$**: $(N_{bs}, 12, 128)$
+
+In these dimensions, **$N_{bs}$** represents the batch size, the second value represents the decreasing dimensionality of the abstract features (compressed from the original BERT embedding size of 768), and **128** represents the maximum sequence length in a sentence.","[{""Name"":""2001.00137.pdf"",""Page"":""9""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""9""]}]",1,1,1,0.9062,answerable,28890,3,13825,5720,5,5,5,5,,システムの回答は参照解答および根拠テキストと完全に一致しており、各ベクトルの形状を正確に記述しています。さらに、各次元の意味についても補足説明がなされており、非常に質が高い回答です。
+Q0098,01_academic_papers,"Comparing the Twitter and Chatbot datasets, which one showed a larger performance improvement margin with Stacked DeBERT, and what reason is suggested for this difference?",answerable,multi_chunk,"The Twitter dataset showed a larger improvement (+8.00) compared to the Chatbot dataset (+0.94 to +1.89). This is likely because BERT was pre-trained on Wikipedia and Book Corpus, making it less robust to the highly informal and noisy nature of Twitter data compared to STT errors.",Twitter dataset shows major improvements whilst the latter shows only minor improvements. ... Twitter has arguably more noise when compared to BERT’s original training data,2001.00137.pdf,"24, 25","Based on the provided document, the comparison between the two datasets is as follows:
+
+### **Larger Performance Improvement Margin**
+The **Twitter Sentiment Classification dataset** showed a significantly larger performance improvement margin when using Stacked DeBERT compared to the Chatbot dataset. According to **Section 5.3**, the Twitter dataset showed ""major improvements,"" while the Chatbot dataset showed only ""minor improvements"" (page 24). Specifically, Table 10 shows an improvement margin of **+8.00** for the Twitter (Inc) dataset, compared to only **+0.94** and **+1.89** for the Chatbot variants (page 25).
+
+### **Suggested Reasons for the Difference**
+The authors suggest two primary reasons for this performance gap:
+
+1.  **Similarity to BERT’s Training Data:** BERT was originally trained on the Wikipedia and Book Corpus. Although Twitter text is informal and noisy, studies suggest that social media text maintains a relatively small grammatical disparity and a more similar basic sentence structure to edited text (like Wikipedia) than text affected by Speech-to-Text (STT) errors. This ""different word composition"" in STT-affected sentences makes it harder for the model to perform as well (pages 24–25).
+2.  **In-Class Performance Gaps:** In the Twitter dataset, there was a larger gap in performance between the two classes in the baseline BERT model. This provided more room for Stacked DeBERT to achieve better overall accuracy through a trade-off in class performance—specifically by significantly improving the performance of the ""positive"" class (page 25).
+3.  **Test Set Size:** The authors also mention that a larger test set in the Chatbot corpus might have influenced the smaller detected improvement margin (page 26).","[{""Name"":""2001.00137.pdf"",""Page"":""24""},{""Name"":""2001.00137.pdf"",""Page"":""18""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""18"",""24""]}]",1,1,1,0.9326,answerable,29004,3,13010,5856,5,5,5,5,,システムの回答は、Twitterデータセットの方が改善幅が大きいこととその具体的な数値（+8.00）を正確に示しており、参照解答にあるBERTの学習データとの差異に関する理由も詳細に網羅されています。
+Q0099,01_academic_papers,What specific hardware and optimization settings were used to fine-tune the conventional BERT-Base Uncased model for the Chatbot Intent Classification Corpus?,answerable,reasoning,The model was fine-tuned on 2 Titan X GPUs for 3 epochs using the Adam Optimizer with a learning rate of 2 * 10^-5 and a train batch size of 8.,"fine-tuned with our dataset on 2 Titan X GPUs for 3 epochs with Adam Optimizer, learning rate of 2 * 10−5 ... train batch size is ... 8 for the Chatbot Intent Classification Corpus.",2001.00137.pdf,17,"Based on the provided document, there appears to be a misunderstanding in the student's question regarding the specific model and dataset used. The PDF does **not** mention a ""Chatbot Intent Classification Corpus"" or a ""BERT-Base Uncased"" model. Instead, the research focuses on **Question Answering based Clinical Text Structuring (QA-CTS)** using a **BERT-base** model pre-trained on a **Chinese general corpus**.
+
+According to the ""Experimental Settings"" (Section V, Part B, page 3), the hardware and optimization settings used for their specific task are as follows:
+
+### **Hardware**
+*   **GPU:** A single NVIDIA GeForce GTX 1080 Ti.
+
+### **Optimization & Hyperparameters**
+*   **Algorithm:** Adam algorithm.
+*   **Learning Rate:** $5 \times 10^{-5}$ (all other Adam parameters were kept at default settings).
+*   **Batch Size:** Set to 3 or 4 (specifically limited due to a lack of graphical memory).
+*   **Pre-trained Weights:** Parameters directly adopted from those pre-trained by Google in the Chinese general corpus.
+
+### **Fine-tuning Process (Two-Stage Training)**
+As described in Section IV, Part D (page 3), the researchers used a two-stage mechanism to fine-tune the model:
+1.  **Stage 1:** Fine-tune the BERT model with a new prediction layer first to improve contextualized representation.
+2.  **Stage 2:** Deploy the proposed model, load the weights from the first stage, attach named entity information layers, and retrain the entire model.","[{""Name"":""1908.06606.pdf"",""Page"":""3""}]",0,0,"[{""file_name"":""1908.06606.pdf"",""pages"":[""3""]}]",0,0,0,0.8314,unanswerable,26950,3,12714,5832,1,1,1,1,,システムの回答は、根拠テキストに明記されている『Chatbot Intent Classification Corpus』や『2 Titan X GPUs』といった情報を否定し、全く別の実験設定（GTX 1080 Ti等）を提示しています。参照解答と完全に矛盾しており、根拠テキストを正しく参照できていません。
+Q0100,01_academic_papers,"Based on the confusion matrix analysis, how does Stacked DeBERT's performance on class 1 (positive) in the Twitter Inc dataset compare to the baseline BERT model?",answerable,multi_chunk,"In the Twitter Inc dataset, BERT's true class 1 performance was approximately 50% (0.52), whereas Stacked DeBERT improved this accuracy to 72% (0.72).","In the Inc dataset, the true class 1 in BERT performs with approximately 50%. However, Stacked DeBERT is able to improve that to 72%",2001.00137.pdf,19,"Based on the confusion matrix analysis provided in the document, Stacked DeBERT significantly outperforms the baseline BERT model on class 1 (positive sentiment) in the Twitter Inc dataset:
+
+*   **BERT Performance:** In the original Twitter dataset (Inc), the baseline BERT model performs with an accuracy of approximately **50%** (specifically **52%** as shown in Figure 3) for the true class 1.
+*   **Stacked DeBERT Performance:** The proposed Stacked DeBERT model improves this accuracy to **72%** on the same dataset.
+
+**Key Comparison Points:**
+*   **Accuracy Increase:** Stacked DeBERT provides a **20 percentage point improvement** in identifying class 1 compared to the baseline BERT.
+*   **Trade-off:** This improvement comes at the cost of a ""small decrease in performance of class 0"" (negative sentiment), where Stacked DeBERT's accuracy is 88% compared to BERT's 92% (Section 4.3, Figure 3, and Section 5.2).
+*   **Reasoning:** The researchers believe this improvement is possible because Stacked DeBERT better balances the accuracy of each class, specifically targeting lower-performing classes to improve overall model robustness in the presence of noisy data (Section 6, page 26).
+
+**Reference:** Section 4.3, ""Results on Sentiment Classification from Incorrect Text,"" and Figure 3, page 19.","[{""Name"":""2001.00137.pdf"",""Page"":""19""}]",1,1,"[{""file_name"":""2001.00137.pdf"",""pages"":[""19""]}]",1,1,1,0.9216,answerable,28990,3,13867,6630,5,5,5,5,,システムの回答は参照解答の数値を正確に網羅しており、根拠テキストに基づいた詳細な比較や背景情報も補完されているため、非常に質が高い。
+Q0101,01_academic_papers,What was the total cost in USD for employing Amazon Mechanical Turk workers to correct the Sentiment140 dataset for the Stacked DeBERT study?,unanswerable,N/A,,,2001.00137.pdf,,"Based on the provided course materials, there is no mention of the total cost in USD for employing Amazon Mechanical Turk workers, nor is there any mention of a ""Stacked DeBERT"" study or the ""Sentiment140"" dataset.
+
+While Reference 2 and Reference 4 do mention Amazon Mechanical Turk (MTurk) and user studies, they pertain to different research:
+*   **Reference 2** provides classification reports for an MTurk study regarding ""NMT-Fake"" review detection and discusses features used in an NMT-Fake review detector.
+*   **Reference 4** acknowledges Tommi Gröndahl and participants of a user study but does not provide financial details or reference the specific study mentioned in your question.
+
+Therefore, the provided materials are insufficient to answer your question.",null,0,0,[],0,0,0,0.0000,unanswerable,23727,3,13616,2719,,,,1,1,システムは提供された資料に該当する情報がないことを正しく認識し、回答を拒否しています。また、参照した資料の内容についても正確に言及しており、ハルシネーションは認められません。
+Q0102,01_academic_papers,Does the Stacked DeBERT model outperform the GPT-3 model on the Chatbot Natural Language Understanding Evaluation Corpus?,unanswerable,N/A,,,2001.00137.pdf,,"Based on the provided PDF, there is no mention of the **GPT-3** model. Therefore, it is not possible to determine if Stacked DeBERT outperforms GPT-3 based on this text.
+
+The paper evaluates the **Stacked DeBERT** model against the following baseline models on the Chatbot Natural Language Understanding (NLU) Evaluation Corpus (Section 4.1, page 15):
+
+*   **BERT** (The primary baseline)
+*   **NLU Service Platforms:** Rasa (with Spacy and Tensorflow backends), Google Dialogflow, and SAP Conversational AI.
+*   **Semantic Hashing** with a classifier.
+
+**Findings against listed baselines (Table 7, page 20):**
+*   **Complete Data:** Stacked DeBERT achieves an F1-micro score of **99.06%**, which is equal to Rasa (tensorflow) and Semantic Hashing, and higher than BERT (98.11%).
+*   **Noisy Data (STT Errors):** Stacked DeBERT **outperforms all listed baseline models** when noise is present. Specifically:
+    *   On **gtts-witai** noise: It achieves **97.17%**, outperforming the next best baseline (BERT) by 0.94%.
+    *   On **macsay-witai** noise: It achieves **96.23%**, outperforming the next best baseline (BERT/SAP) by 1.89%.
+
+In summary, while the model shows superior robustness and performance compared to **BERT** and several other NLU services, the PDF does not contain data regarding **GPT-3**.","[{""Name"":""2001.00137.pdf"",""Page"":""20""},{""Name"":""2001.00137.pdf"",""Page"":""22""},{""Name"":""2001.00137.pdf"",""Page"":""15""},{""Name"":""2001.00137.pdf"",""Page"":""1""},{""Name"":""2001.00137.pdf"",""Page"":""13""}]",1,0,"[{""file_name"":""2001.00137.pdf"",""pages"":[""1"",""13"",""15"",""20"",""22""]}]",1,0,0,0.0000,unanswerable,27924,3,13621,7198,,,,1,1,システムはGPT-3に関する情報が文書内に存在しないことを正しく指摘し、回答を拒否しています。また、文書に含まれる実際の比較対象（BERT等）を正確に列挙しており、ハルシネーションは認められません。

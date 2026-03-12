@@ -170,8 +170,10 @@ class LibrarianServicer:
                 "missing_keywords": [],
                 "search_directives": [],   # Phase 4: SubAgent-C の検索戦略指示
                 "tried_queries": [],       # Phase 4: 全ループを通じて試したクエリ履歴
-                "current_queries": [],
+                "current_text_queries": [],
+                "current_vector_queries": [],
                 "current_rationale": "",
+                "search_languages": ["en"],
                 "search_results": [],
                 "new_chunk_ids": [],
                 "useful_chunk_ids": [],
@@ -198,7 +200,14 @@ class LibrarianServicer:
                     if interrupt_payload:
                         break
 
-                queries: list[str] = interrupt_payload.get("queries", [])
+                queries_text: list[str] = interrupt_payload.get("queries_text", [])
+                queries_vector: list[str] = interrupt_payload.get("queries_vector", [])
+                # backward compat: 旧payloadは queries のみ
+                legacy_queries: list[str] = interrupt_payload.get("queries", [])
+                if not queries_text:
+                    queries_text = legacy_queries
+                if not queries_vector:
+                    queries_vector = legacy_queries
                 rationale: str = interrupt_payload.get("rationale", "")
                 exclude_chunk_ids: list[str] = interrupt_payload.get("exclude_chunk_ids", [])
                 current_loop = state_snapshot.values.get("loop_count", 1)
@@ -206,15 +215,16 @@ class LibrarianServicer:
                 logger.info(
                     "SearchAction 送信",
                     **obs_fields(request_id),
-                    queries=queries,
+                    queries_text=queries_text,
+                    queries_vector=queries_vector,
                     loop=current_loop,
                     exclude_count=len(exclude_chunk_ids),
                 )
 
                 # SearchAction を Professor へ送信
                 search_action = librarian_pb2.SearchAction(
-                    queries_text=queries,
-                    queries_vector=queries,  # ベクトル検索も同じクエリを使用
+                    queries_text=queries_text,
+                    queries_vector=queries_vector,
                     rationale=rationale,
                     exclude_chunk_ids=exclude_chunk_ids,  # B-2: 既読チャンクを除外
                 )

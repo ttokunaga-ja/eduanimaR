@@ -44,8 +44,10 @@ def _make_state(**overrides) -> AgentState:
         "missing_keywords": [],
         "search_directives": [],   # Phase 4 追加
         "tried_queries": [],       # Phase 4 追加
-        "current_queries": [],
+        "current_text_queries": [],
+        "current_vector_queries": [],
         "current_rationale": "",
+        "search_languages": ["en"],
         "search_results": [],
         "new_chunk_ids": [],
         "useful_chunk_ids": [],
@@ -64,71 +66,78 @@ def _make_state(**overrides) -> AgentState:
 class TestBuildSearchQueries:
     def test_Gemini未初期化時はユーザークエリをそのまま返す(self, sample_user_query: str) -> None:
         """Gemini クライアントが None のとき、フォールバックでユーザークエリを返す。"""
-        queries = build_search_queries(
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=0,
         )
-        assert queries == [sample_user_query]
+        assert text_queries == [sample_user_query]
+        assert vector_queries == [sample_user_query]
 
     def test_missing_keywordsなし初回ループはユーザークエリを返す(self, sample_user_query: str) -> None:
         """missing_keywords が None の場合はユーザークエリをそのまま返す。"""
-        queries = build_search_queries(
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=0,
             missing_keywords=None,
         )
-        assert queries == [sample_user_query]
+        assert text_queries == [sample_user_query]
+        assert vector_queries == [sample_user_query]
 
     def test_missing_keywordsありでもフォールバックはユーザークエリを返す(
         self, sample_user_query: str
     ) -> None:
         """Gemini 未初期化時は missing_keywords があってもフォールバック。"""
-        queries = build_search_queries(
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=2,
             missing_keywords=["量子力学", "シュレーディンガー"],
         )
-        assert queries == [sample_user_query]
+        assert text_queries == [sample_user_query]
+        assert vector_queries == [sample_user_query]
 
     def test_interpreted_queryが提供されても型は正しい(self, sample_user_query: str) -> None:
-        """interpreted_query があっても戻り値は list[str]。"""
-        queries = build_search_queries(
+        """interpreted_query があっても戻り値は tuple[list[str], list[str]]。"""
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=0,
             interpreted_query="シュレーディンガー方程式の基本的な意味と解釈",
         )
-        assert isinstance(queries, list)
-        assert all(isinstance(q, str) for q in queries)
+        assert isinstance(text_queries, list)
+        assert isinstance(vector_queries, list)
+        assert all(isinstance(q, str) for q in text_queries)
+        assert all(isinstance(q, str) for q in vector_queries)
 
     def test_search_directivesありでもフォールバックはユーザークエリを返す(
         self, sample_user_query: str
     ) -> None:
         """Gemini 未初期化時は search_directives があってもフォールバック。"""
-        queries = build_search_queries(
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=2,
             search_directives=["Look for evaluation metrics in Section 4"],
         )
-        assert queries == [sample_user_query]
+        assert text_queries == [sample_user_query]
+        assert vector_queries == [sample_user_query]
 
     def test_tried_queriesありでもフォールバックはユーザークエリを返す(
         self, sample_user_query: str
     ) -> None:
         """Gemini 未初期化時は tried_queries があってもフォールバック。"""
-        queries = build_search_queries(
+        text_queries, vector_queries = build_search_queries(
             user_query=sample_user_query,
             loop_count=1,
             tried_queries=["previous query 1", "previous query 2"],
         )
-        assert queries == [sample_user_query]
+        assert text_queries == [sample_user_query]
+        assert vector_queries == [sample_user_query]
 
 
 # ─── judge_sufficiency ────────────────────────────────────────────────
 
 
 class TestJudgeSufficiency:
-    def test_ループ上限超過で強制終了_5tuple(self) -> None:
-        """loop_count > max_loops のとき 5-tuple (False, 0.0, [], [], []) を返す。"""
+    def test_ループ上限超過で強制終了_6tuple(self) -> None:
+        """loop_count > max_loops のとき 6-tuple (False, 0.0, [], [], [], []) を返す。"""
         result = judge_sufficiency(
             user_query="テスト質問",
             new_chunks=[{"chunk_id": "c1", "content": "内容"}],
@@ -136,17 +145,18 @@ class TestJudgeSufficiency:
             loop_count=5,  # > max_loops=4
             max_loops=4,
         )
-        assert len(result) == 5
-        is_suf, ratio, kw, directives, revised = result
+        assert len(result) == 6
+        is_suf, ratio, kw, directives, revised, languages = result
         assert is_suf is False
         assert ratio == 0.0
         assert kw == []
         assert directives == []
         assert revised == []
+        assert languages == []
 
     def test_ループ上限ちょうどでは強制終了しない(self) -> None:
         """Bug #1 修正確認: loop_count == max_loops のとき強制終了しない（LLM を呼ぼうとする）。"""
-        # Gemini 未初期化 → フォールバック (False, 0.0, [], [], []) が返るが
+        # Gemini 未初期化 → フォールバック (False, 0.0, [], [], [], []) が返るが
         # 上限超過ではなくフォールバック由来であることを確認
         result = judge_sufficiency(
             user_query="テスト質問",
@@ -156,11 +166,11 @@ class TestJudgeSufficiency:
             max_loops=4,
         )
         # Gemini 未初期化なのでフォールバック値が返るが、
-        # 上限超過の強制終了ではなく通常のフォールバックであることを確認（長さは5）
-        assert len(result) == 5
+        # 上限超過の強制終了ではなく通常のフォールバックであることを確認（長さは6）
+        assert len(result) == 6
 
-    def test_チャンクが空のとき_5tuple_False(self) -> None:
-        """new_chunks も kept_chunks も空のとき (False, 0.0, [], [], []) を返す。"""
+    def test_チャンクが空のとき_6tuple_False(self) -> None:
+        """new_chunks も kept_chunks も空のとき (False, 0.0, [], [], [], []) を返す。"""
         result = judge_sufficiency(
             user_query="テスト質問",
             new_chunks=[],
@@ -168,16 +178,17 @@ class TestJudgeSufficiency:
             loop_count=1,
             max_loops=4,
         )
-        assert len(result) == 5
-        is_suf, ratio, kw, directives, revised = result
+        assert len(result) == 6
+        is_suf, ratio, kw, directives, revised, languages = result
         assert is_suf is False
         assert ratio == 0.0
         assert kw == []
         assert directives == []
         assert revised == []
+        assert languages == []
 
-    def test_Gemini未初期化時はフォールバック_5tuple(self) -> None:
-        """Gemini クライアントが None のとき (False, 0.0, [], [], []) を返す。"""
+    def test_Gemini未初期化時はフォールバック_6tuple(self) -> None:
+        """Gemini クライアントが None のとき (False, 0.0, [], [], [], []) を返す。"""
         result = judge_sufficiency(
             user_query="テスト質問",
             new_chunks=[{"chunk_id": "c1", "content": "内容"}],
@@ -185,16 +196,17 @@ class TestJudgeSufficiency:
             loop_count=1,
             max_loops=4,
         )
-        assert len(result) == 5
-        is_suf, ratio, kw, directives, revised = result
+        assert len(result) == 6
+        is_suf, ratio, kw, directives, revised, languages = result
         assert is_suf is False
         assert ratio == 0.0
         assert isinstance(kw, list)
         assert isinstance(directives, list)
         assert isinstance(revised, list)
+        assert isinstance(languages, list)
 
-    def test_戻り値が5タプル(self) -> None:
-        """戻り値が (bool, float, list, list, list) の 5-tuple である。"""
+    def test_戻り値が6タプル(self) -> None:
+        """戻り値が (bool, float, list, list, list, list) の 6-tuple である。"""
         result = judge_sufficiency(
             user_query="テスト",
             new_chunks=[],
@@ -202,12 +214,13 @@ class TestJudgeSufficiency:
             loop_count=2,
             max_loops=4,
         )
-        assert len(result) == 5
+        assert len(result) == 6
         assert isinstance(result[0], bool)
         assert isinstance(result[1], float)
         assert isinstance(result[2], list)
         assert isinstance(result[3], list)
         assert isinstance(result[4], list)
+        assert isinstance(result[5], list)
 
     def test_tried_queriesを受け取れる(self) -> None:
         """tried_queries パラメータを受け付けること（型エラーなし）。"""
@@ -219,7 +232,7 @@ class TestJudgeSufficiency:
             max_loops=4,
             tried_queries=["query 1", "query 2"],
         )
-        assert len(result) == 5
+        assert len(result) == 6
 
 
 # ─── should_continue_node ─────────────────────────────────────────────
@@ -279,15 +292,15 @@ class TestShouldContinueNode:
         )
         assert should_continue_node(state) == "complete"
 
-    def test_ループ1では新規チャンク0件でもno_progress終了しない(self) -> None:
-        """loop_count=1 は no-progress 判定の対象外（初回検索は失敗しても再試行する）。"""
+    def test_ループ1では新規チャンク0件ならno_progress終了する(self) -> None:
+        """loop_count=1 かつ new_chunk_ids 空なら no-progress として complete を返す。"""
         state = _make_state(
             loop_count=1,
             max_loops=4,
             is_sufficient=False,
             new_chunk_ids=[],
         )
-        assert should_continue_node(state) == "generate_queries"
+        assert should_continue_node(state) == "complete"
 
     def test_ループ2以降でも新規チャンクありなら再検索(self) -> None:
         """new_chunk_ids が空でなければ no-progress 終了しない。"""
@@ -320,11 +333,13 @@ class TestNodeGenerateQueries:
         result = node_generate_queries(state)
         assert result["loop_count"] == 1
 
-    def test_current_queriesが生成される(self, sample_user_query: str) -> None:
+    def test_current_text_queriesとcurrent_vector_queriesが生成される(self, sample_user_query: str) -> None:
         state = _make_state(user_query=sample_user_query, loop_count=0)
         result = node_generate_queries(state)
-        assert isinstance(result["current_queries"], list)
-        assert len(result["current_queries"]) >= 1
+        assert isinstance(result["current_text_queries"], list)
+        assert isinstance(result["current_vector_queries"], list)
+        assert len(result["current_text_queries"]) >= 1
+        assert len(result["current_vector_queries"]) >= 1
 
     def test_current_rationaleが生成される(self, sample_user_query: str) -> None:
         state = _make_state(user_query=sample_user_query, loop_count=0)

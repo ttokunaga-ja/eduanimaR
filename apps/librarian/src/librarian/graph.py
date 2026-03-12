@@ -51,6 +51,7 @@ Triaging（A-3）:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, TypedDict
 
 import structlog
@@ -65,6 +66,13 @@ class _QueryItem(TypedDict):
     """クエリ生成の Structured Output スキーマ。"""
 
     query: str  # 検索クエリ文字列（rationale フィールド削除: レイテンシ削減）
+
+
+class _QueryBundleResult(TypedDict):
+    """全文検索用/ベクトル検索用を分離したクエリ生成結果。"""
+
+    text_queries: list[str]    # 全文検索用（短いキーワード句）
+    vector_queries: list[str]  # ベクトル検索用（自然言語クエリ）
 
 
 class _FilterResult(TypedDict):
@@ -94,6 +102,7 @@ class _SufficiencyResult(TypedDict):
                                   #      "Find the evaluation metrics in Section 4"]
     revised_criteria: list[str]   # completion_criteria の修正版
                                   # 空の場合は現在の criteria を維持
+    query_languages: list[str]    # 次ループで使う検索クエリ言語（例: ["en"], ["en", "ja"]）
 
 
 # ─── Gemini クライアント（モジュールレベルシングルトン） ─────────────
@@ -289,8 +298,10 @@ class AgentState(TypedDict):
     all_seen_chunk_ids: list[str]   # set → list（JSON 直列化対応）
 
     # 現在ループのクエリ情報（node_generate_queries → node_wait_for_search へ）
-    current_queries: list[str]
+    current_text_queries: list[str]
+    current_vector_queries: list[str]
     current_rationale: str
+    search_languages: list[str]   # クエリ生成に使う言語リスト（例: ["en"], ["en", "ja"]）
 
     # 検索結果（interrupt 後に Command(resume=...) で注入）
     search_results: list[dict]
@@ -322,7 +333,8 @@ def build_search_queries(
     interpreted_query: str = "",
     search_directives: list[str] | None = None,
     tried_queries: list[str] | None = None,
-) -> list[str]:
+    search_languages: list[str] | None = None,
+) -> tuple[list[str], list[str]]:
     """
     Gemini Structured Output でユーザークエリから検索クエリ群を生成する（Phase 4改善）。
 
@@ -347,25 +359,33 @@ def build_search_queries(
         tried_queries: 全ループで試みたクエリ履歴（重複防止用）
 
     Returns:
-        queries: 検索クエリのリスト
+        (text_queries, vector_queries)
+        - text_queries: 全文検索向けの短いキーワード句
+        - vector_queries: ベクトル検索向けの自然言語クエリ
     """
     model_name = get_model_for_level(thinking_level)
+    default_languages = search_languages or ["en"]
     if _gemini_client is None or model_name is None:
         # フォールバック: LLM なし（Gemini 未初期化時）
-        return [user_query]
+        return [user_query], [user_query]
+
+    languages_text = ", ".join(default_languages)
 
     # プロンプト構築
     if loop_count == 0:
         # 初回: interpreted_query が提供されている場合はそちらを優先
         query_text = interpreted_query if interpreted_query else user_query
         prompt = f"""You are an academic search query generator.
-Generate diverse search queries to find relevant course material chunks for the user's question.
+Generate both keyword-style text-search queries and natural-language vector-search queries.
 
 User question: {user_query}
 Interpreted question: {query_text}
+Target query languages: {languages_text}
 
-Generate 2-3 distinct search queries that approach the question from different angles.
-Queries should be concise and use academic terminology."""
+Output requirements:
+- text_queries: 2-3 short keyword phrases (2-6 words each), NOT full sentences
+- vector_queries: 2-3 natural language queries for semantic search
+Use academic terminology."""
     elif search_directives:
         # ループ2以降 + search_directives あり: SubAgent-C の指示を優先
         directives_str = "\n".join(f"- {d}" for d in search_directives)
@@ -377,13 +397,15 @@ Queries should be concise and use academic terminology."""
 The research coordinator has provided specific search directives for the next round.
 
 User question: {user_query}
+Target query languages: {languages_text}
 
 Search directives from research coordinator (follow these closely):
 {directives_str}{tried_str}
 
-Generate 2-3 search queries that follow the research coordinator's directives.
-Convert each directive into a concrete, targeted search query.
-Use academic terminology and be specific."""
+Generate both:
+- text_queries: 2-3 short keyword phrases (2-6 words each), NOT full sentences
+- vector_queries: 2-3 natural language queries
+Convert each directive into concrete queries and be specific."""
     elif missing_keywords:
         # ループ2以降 + missing_keywords のみ: 不足キーワードベース
         missing_str = "\n".join(f"- {kw}" for kw in missing_keywords)
@@ -395,11 +417,14 @@ Use academic terminology and be specific."""
 The previous search was insufficient. Generate refined queries to find the missing information.
 
 User question: {user_query}
+Target query languages: {languages_text}
 
 Missing information keywords:
 {missing_str}{tried_str}
 
-Generate 2-3 refined search queries that specifically target these missing keywords.
+Generate both:
+- text_queries: 2-3 short keyword phrases (2-6 words each), NOT full sentences
+- vector_queries: 2-3 natural language queries
 Approach the topic from different angles than before."""
     else:
         # フォールバック: missing_keywords も search_directives もない場合
@@ -409,13 +434,16 @@ Approach the topic from different angles than before."""
                         "\n".join(f"- {q}" for q in tried_queries)
         query_text = interpreted_query if interpreted_query else user_query
         prompt = f"""You are an academic search query generator.
-Generate diverse search queries to find relevant course material chunks for the user's question.
+Generate both keyword-style text-search queries and natural-language vector-search queries.
 
 User question: {user_query}
-Interpreted question: {query_text}{tried_str}
+Interpreted question: {query_text}
+Target query languages: {languages_text}{tried_str}
 
-Generate 2-3 distinct search queries from different angles not yet tried.
-Queries should be concise and use academic terminology."""
+Generate both:
+- text_queries: 2-3 short keyword phrases (2-6 words each), NOT full sentences
+- vector_queries: 2-3 natural language queries
+Use academic terminology."""
 
     try:
         from google.genai import types
@@ -425,7 +453,7 @@ Queries should be concise and use academic terminology."""
         seed = 42 + loop_count * 7
         gen_config_kwargs: dict = {
             "response_mime_type": "application/json",
-            "response_schema": list[_QueryItem],
+            "response_schema": _QueryBundleResult,
             # gemini_use.md: Temperature=1.0 MANDATORY for Gemini 3
             "temperature": 1.0,
             "seed": seed,
@@ -439,20 +467,47 @@ Queries should be concise and use academic terminology."""
             config=types.GenerateContentConfig(**gen_config_kwargs),
         )
         raw_text = response.text or ""
-        items: list[_QueryItem] = json.loads(raw_text)
-        queries = [item["query"] for item in items if item.get("query")]
-        if not queries:
-            return [user_query]
+
+        result: _QueryBundleResult = json.loads(raw_text)
+        text_queries = [q.strip() for q in result.get("text_queries", []) if q and q.strip()]
+        vector_queries = [q.strip() for q in result.get("vector_queries", []) if q and q.strip()]
+
+        # 全文検索向けクエリは文ではなくキーワード句に寄せる
+        normalized_text_queries: list[str] = []
+        for q in text_queries:
+            compact = re.sub(r"[\s\n\t]+", " ", q).strip()
+            compact = re.sub(r"[?!.。]+$", "", compact)
+            normalized_text_queries.append(compact)
+
+        text_queries = list(dict.fromkeys(normalized_text_queries))
+        vector_queries = list(dict.fromkeys(vector_queries))
+
+        if missing_keywords:
+            # reasoning 問題で不足キーワードを明示した短句を追加し、再検索の多様性を高める
+            keyword_phrase = " ".join(kw.strip() for kw in missing_keywords[:3] if kw.strip())
+            if keyword_phrase:
+                text_queries.append(keyword_phrase)
+                vector_queries.append(
+                    f"Find exact evidence for: {keyword_phrase}"
+                )
+
+        if not text_queries:
+            text_queries = [user_query]
+        if not vector_queries:
+            vector_queries = [user_query]
+
         logger.debug(
             "クエリ生成完了",
-            queries_count=len(queries),
+            text_queries_count=len(text_queries),
+            vector_queries_count=len(vector_queries),
             loop_count=loop_count,
             used_directives=bool(search_directives),
+            search_languages=default_languages,
         )
-        return queries
+        return text_queries, vector_queries
     except Exception as exc:
         logger.warning("クエリ生成失敗、フォールバック使用", error=str(exc))
-        return [user_query]
+        return [user_query], [user_query]
 
 
 # ─── SubAgent-B: 新規チャンクフィルタリング ──────────────────────────
@@ -559,7 +614,8 @@ def judge_sufficiency(
     thinking_level: str = "flash",
     completion_criteria: list[str] | None = None,
     tried_queries: list[str] | None = None,
-) -> tuple[bool, float, list[str], list[str], list[str]]:
+    search_languages: list[str] | None = None,
+) -> tuple[bool, float, list[str], list[str], list[str], list[str]]:
     """
     SubAgent-C: 研究コーディネーターとして充足度判断 + 検索戦略見直し + criteria修正を行う（Phase 4改善）。
 
@@ -593,26 +649,29 @@ def judge_sufficiency(
         tried_queries: 全ループで試みた検索クエリ履歴（重複防止用）
 
     Returns:
-        (is_sufficient, satisfied_ratio, missing_keywords, search_directives, revised_criteria)
+        (is_sufficient, satisfied_ratio, missing_keywords, search_directives, revised_criteria, query_languages)
         - is_sufficient: True なら CompleteAction へ（70%ルール適用済み）
         - satisfied_ratio: 充足割合（0.0〜1.0）
         - missing_keywords: 不足情報の短いキーワード（後方互換・補助用）
         - search_directives: 次のループでどう探すかの自然言語指示リスト
         - revised_criteria: completion_criteria の修正版（空なら現在の criteria を維持）
+        - query_languages: 次ループで使う検索言語（空なら現状維持）
     """
+    current_languages = search_languages or ["en"]
+
     # Bug #1 修正: >= → > （最終ループでも LLM を実行）
     if loop_count > max_loops:
         logger.info("ループ上限超過、強制終了", loop_count=loop_count, max_loops=max_loops)
-        return False, 0.0, [], [], []
+        return False, 0.0, [], [], [], []
 
     # 検索結果が空の場合はループ不要
     if not new_chunks and not kept_chunks:
-        return False, 0.0, [], [], []
+        return False, 0.0, [], [], [], []
 
     model_name = get_model_for_level(thinking_level)
     if _gemini_client is None or model_name is None:
         # フォールバック
-        return False, 0.0, [], [], []
+        return False, 0.0, [], [], [], []
 
     # 精鋭チャンク（過去のKeep済み）を構築（累積情報の概要）
     kept_summary_parts = []
@@ -670,6 +729,7 @@ Your role is to (1) judge whether collected evidence is sufficient, (2) direct t
 and (3) refine the completion criteria if they are misaligned.
 
 User question: {user_query}{criteria_section}{tried_queries_section}
+Current search languages: {current_languages}
 
 ## Already collected evidence (from previous loops):
 {kept_summary}
@@ -694,6 +754,10 @@ Evaluate the combined evidence and make THREE decisions:
 **Decision 3 - Criteria revision** (optional):
 - revised_criteria: revised completion criteria if current ones are misaligned with the question.
   Return empty list to keep current criteria unchanged.
+
+**Decision 4 - Query language update** (optional):
+- query_languages: languages to use for next-round query generation, e.g. ["en"], ["ja"], ["en", "ja"]
+  Infer from collected evidence language. If no change needed, return empty list.
 
 Be pragmatic: 70%+ coverage is sufficient for a good answer."""
 
@@ -725,11 +789,13 @@ Be pragmatic: 70%+ coverage is sufficient for a good answer."""
         missing_keywords = list(result.get("missing_keywords", []))
         search_directives = list(result.get("search_directives", []))
         revised_criteria = list(result.get("revised_criteria", []))
+        query_languages = list(result.get("query_languages", []))
 
         # 70%ルール: LLM が is_sufficient=False でも satisfied_ratio >= 0.7 なら充足
         if not is_sufficient and satisfied_ratio >= 0.7:
             is_sufficient = True
             search_directives = []  # 充足なので検索指示は不要
+            query_languages = []
             logger.info(
                 "70%ルール適用: 早期終了",
                 satisfied_ratio=satisfied_ratio,
@@ -743,12 +809,20 @@ Be pragmatic: 70%+ coverage is sufficient for a good answer."""
             missing_count=len(missing_keywords),
             directives_count=len(search_directives),
             criteria_revised=len(revised_criteria) > 0,
+            query_languages=query_languages,
             loop_count=loop_count,
         )
-        return is_sufficient, satisfied_ratio, missing_keywords, search_directives, revised_criteria
+        return (
+            is_sufficient,
+            satisfied_ratio,
+            missing_keywords,
+            search_directives,
+            revised_criteria,
+            query_languages,
+        )
     except Exception as exc:
         logger.warning("SubAgent-C 充足度判断失敗、フォールバック使用", error=str(exc))
-        return False, 0.0, [], [], []
+        return False, 0.0, [], [], [], []
 
 
 # ─── 並列評価（後方互換ラッパー）────────────────────────────────────
@@ -830,7 +904,7 @@ def evaluate_parallel(
                 ]
 
             try:
-                is_sufficient, satisfied_ratio, missing_keywords, _directives, _revised = future_c.result()
+                is_sufficient, satisfied_ratio, missing_keywords, _directives, _revised, _languages = future_c.result()
             except Exception as exc:
                 logger.warning("SubAgent-C 並列実行失敗", error=str(exc))
                 is_sufficient = False
@@ -873,8 +947,9 @@ def node_generate_queries(state: AgentState) -> dict:
     missing_keywords = state.get("missing_keywords") or []
     search_directives = state.get("search_directives") or []
     tried_queries = state.get("tried_queries") or []
+    search_languages = state.get("search_languages") or ["en"]
 
-    queries = build_search_queries(
+    text_queries, vector_queries = build_search_queries(
         user_query=state["user_query"],
         loop_count=loop_count,
         missing_keywords=missing_keywords if missing_keywords else None,
@@ -882,33 +957,37 @@ def node_generate_queries(state: AgentState) -> dict:
         interpreted_query=state.get("interpreted_query", ""),
         search_directives=search_directives if search_directives else None,
         tried_queries=tried_queries if tried_queries else None,
+        search_languages=search_languages,
     )
 
     # UX 向け rationale をローカルで生成（LLM 呼び出し不要）
     if loop_count == 0:
         rationale = (
-            f"「{queries[0][:30]}」に関連する資料を検索しています..."
-            if queries else "資料を検索しています..."
+            f"「{vector_queries[0][:30]}」に関連する資料を検索しています..."
+            if vector_queries else "資料を検索しています..."
         )
     else:
         rationale = (
-            f"「{queries[0][:30]}」に関する追加情報を検索しています..."
-            if queries else "資料を追加検索しています..."
+            f"「{vector_queries[0][:30]}」に関する追加情報を検索しています..."
+            if vector_queries else "資料を追加検索しています..."
         )
 
     # tried_queries に今回のクエリを追記（重複防止）
-    new_tried_queries = list(dict.fromkeys(tried_queries + queries))
+    new_tried_queries = list(dict.fromkeys(tried_queries + text_queries + vector_queries))
 
     logger.debug(
         "node_generate_queries",
         loop_count=loop_count + 1,
-        queries_count=len(queries),
+        text_queries_count=len(text_queries),
+        vector_queries_count=len(vector_queries),
         used_directives=bool(search_directives),
+        search_languages=search_languages,
         request_id=state["request_id"],
     )
 
     return {
-        "current_queries": queries,
+        "current_text_queries": text_queries,
+        "current_vector_queries": vector_queries,
         "current_rationale": rationale,
         "loop_count": loop_count + 1,
         "tried_queries": new_tried_queries,
@@ -932,7 +1011,9 @@ def node_wait_for_search(state: AgentState) -> dict:
     # interrupt: ここで実行が一時停止し、server.py に制御が戻る
     # server.py はこの payload を見て SearchAction を構築・送信する
     search_data = interrupt({
-        "queries": state["current_queries"],
+        "queries_text": state["current_text_queries"],
+        "queries_vector": state["current_vector_queries"],
+        "queries": state["current_vector_queries"],
         "rationale": state["current_rationale"],
         "exclude_chunk_ids": state["all_seen_chunk_ids"],
     })
@@ -995,7 +1076,7 @@ def node_subagent_c(state: AgentState) -> dict:
         if r.get("chunk_id") in new_chunk_ids_set
     ]
 
-    is_suf, satisfied_ratio, missing_kw, directives, revised_crit = judge_sufficiency(
+    is_suf, satisfied_ratio, missing_kw, directives, revised_crit, query_languages = judge_sufficiency(
         user_query=state["user_query"],
         new_chunks=new_chunks,
         kept_chunks=state.get("kept_chunks", []),
@@ -1004,6 +1085,7 @@ def node_subagent_c(state: AgentState) -> dict:
         thinking_level=state.get("thinking_level", "flash"),
         completion_criteria=state.get("completion_criteria") or None,
         tried_queries=state.get("tried_queries") or None,
+        search_languages=state.get("search_languages") or None,
     )
 
     logger.debug(
@@ -1013,6 +1095,7 @@ def node_subagent_c(state: AgentState) -> dict:
         missing_count=len(missing_kw),
         directives_count=len(directives),
         criteria_revised=len(revised_crit) > 0,
+        query_languages=query_languages,
         request_id=state["request_id"],
     )
 
@@ -1021,6 +1104,7 @@ def node_subagent_c(state: AgentState) -> dict:
         "satisfied_ratio": satisfied_ratio,
         "missing_keywords": missing_kw,
         "search_directives": directives,          # Phase 4: 次の検索戦略指示
+        "search_languages": query_languages if query_languages else state.get("search_languages", ["en"]),
         # revised_criteria は node_update_evidence で処理（completion_criteria 更新）
         # ここでは一時保存用に missing_keywords と並列保持する
         "completion_criteria": revised_crit if revised_crit else state.get("completion_criteria", []),
@@ -1116,8 +1200,9 @@ def should_continue_node(state: AgentState) -> str:
         logger.info("終了判定: エラー", request_id=state["request_id"])
         return "complete"
 
-    # no-progress early exit: ループ2以降で新規チャンクが0件ならそれ以上の検索は無意味
-    if state["loop_count"] >= 2 and len(state.get("new_chunk_ids", [])) == 0:
+    # no-progress early exit: ループ1以降で新規チャンクが0件ならそれ以上の検索は無意味
+    # 回答不能ケースの無駄ループを抑制する。
+    if state["loop_count"] >= 1 and len(state.get("new_chunk_ids", [])) == 0:
         logger.info(
             "終了判定: no-progress（新規チャンク0件）",
             loop_count=state["loop_count"],

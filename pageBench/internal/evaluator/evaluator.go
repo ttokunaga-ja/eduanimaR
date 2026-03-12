@@ -434,6 +434,7 @@ func evaluateRetrievedSources(sources []backend.Source, refFile, refPage string)
 
 	refFileNorm := normalizeFileNameForMatch(refFile)
 	refPageNorm := strings.TrimSpace(refPage)
+	refPages := parseReferencePages(refPageNorm)
 
 	for _, src := range sources {
 		name := strings.TrimSpace(src.Name)
@@ -451,11 +452,11 @@ func evaluateRetrievedSources(sources []backend.Source, refFile, refPage string)
 
 		if refFileNorm != "" && normalizeFileNameForMatch(name) == refFileNorm {
 			refFileFound = 1
-			if refPageNorm != "" && page == refPageNorm {
+			if isReferencePageMatch(page, refPages) {
 				refFilePageFound = 1
 			}
 		}
-		if refPageNorm != "" && page == refPageNorm {
+		if isReferencePageMatch(page, refPages) {
 			refPageFound = 1
 		}
 	}
@@ -481,6 +482,61 @@ func evaluateRetrievedSources(sources []backend.Source, refFile, refPage string)
 		return "[]", refFileFound, refPageFound, refFilePageFound
 	}
 	return string(bJSON), refFileFound, refPageFound, refFilePageFound
+}
+
+func parseReferencePages(refPage string) []string {
+	if strings.TrimSpace(refPage) == "" {
+		return nil
+	}
+	replacer := strings.NewReplacer("、", ",", "，", ",", ";", ",", "；", ",", "/", ",")
+	normalized := replacer.Replace(refPage)
+	parts := strings.Split(normalized, ",")
+	pages := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, p := range parts {
+		page := strings.TrimSpace(p)
+		if page == "" {
+			continue
+		}
+		if _, ok := seen[page]; ok {
+			continue
+		}
+		seen[page] = struct{}{}
+		pages = append(pages, page)
+	}
+	return pages
+}
+
+func isReferencePageMatch(retrievedPage string, refPages []string) bool {
+	retrieved := strings.TrimSpace(retrievedPage)
+	if retrieved == "" || len(refPages) == 0 {
+		return false
+	}
+	for _, ref := range refPages {
+		if retrieved == ref {
+			return true
+		}
+		// 物理ページと論文内ページのズレを吸収するため、±1 ページを許容する。
+		if isNearPage(retrieved, ref, 1) {
+			return true
+		}
+	}
+	return false
+}
+
+func isNearPage(a, b string, tolerance int) bool {
+	var pa, pb int
+	if _, err := fmt.Sscanf(a, "%d", &pa); err != nil {
+		return false
+	}
+	if _, err := fmt.Sscanf(b, "%d", &pb); err != nil {
+		return false
+	}
+	diff := pa - pb
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff <= tolerance
 }
 
 func normalizeFileNameForMatch(name string) string {

@@ -14,6 +14,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"google.golang.org/genai"
@@ -414,6 +415,13 @@ Evidence chunks used: %d
 
 Classify the answer quality and summarize what the course materials cover.`,
 		question, answerPreview, evidenceCount)
+	prompt += `
+
+Strict labeling rules for answerability:
+- Use "unanswerable" when the answer mainly says information is missing/insufficient/not found,
+  even if some evidence chunks were retrieved.
+- Use "partial" when some parts are answered but key requested facts are missing.
+- Use "answerable" only when the requested facts are substantially answered.`
 
 	config := &genai.GenerateContentConfig{
 		ResponseMIMEType: "application/json",
@@ -460,7 +468,51 @@ Classify the answer quality and summarize what the course materials cover.`,
 			"evidence_count", evidenceCount, "error", err)
 		return &ports.AnswerMeta{Answerability: fallbackAnswerability, DocumentSummary: ""}, nil
 	}
+	meta.Answerability = normalizeAnswerability(meta.Answerability, answer, evidenceCount)
 	return &meta, nil
+}
+
+func normalizeAnswerability(raw, answer string, evidenceCount int) string {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	if v != "answerable" && v != "unanswerable" && v != "partial" {
+		if evidenceCount == 0 {
+			v = "unanswerable"
+		} else {
+			v = "answerable"
+		}
+	}
+
+	if isRefusalStyleAnswer(answer) {
+		if v == "answerable" {
+			return "unanswerable"
+		}
+		if v == "partial" && evidenceCount == 0 {
+			return "unanswerable"
+		}
+	}
+
+	return v
+}
+
+func isRefusalStyleAnswer(answer string) bool {
+	text := strings.ToLower(strings.TrimSpace(answer))
+	if text == "" {
+		return false
+	}
+	patterns := []string{
+		`(?i)\b(no mention|not mentioned|not provided|not available|insufficient information)\b`,
+		`(?i)\b(cannot answer|can't answer|unable to answer|cannot determine)\b`,
+		`(?i)\b(the provided (materials|document|text).{0,40}(do not|does not).{0,30}(contain|include))\b`,
+		`(?i)(情報(が|は).{0,20}(ない|不足)|記載(が|は).{0,20}(ない|見当たらない))`,
+		`(?i)(回答(できません|不可)|判断(できません|不可))`,
+	}
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		if re.MatchString(text) {
+			return true
+		}
+	}
+	return false
 }
 
 // ─── ヘルパー ─────────────────────────────────────────────────────

@@ -125,22 +125,6 @@ LIMIT $3`
 // excludeIDs が空の場合は既存の sqlc クエリを使用（高速パス）。
 // excludeIDs が非空の場合は動的 SQL で既読チャンクを DB レベルで除外する。
 func (r *chunkRepo) SearchByText(ctx context.Context, subjectID uuid.UUID, query string, limit int, excludeIDs []uuid.UUID) ([]*domain.SearchResult, error) {
-	if len(excludeIDs) == 0 {
-		// 高速パス: sqlc 生成クエリ（除外なし）
-		rows, err := r.q.SearchChunksByText(ctx, sqlcgen.SearchChunksByTextParams{
-			PlaintoTsquery: query,
-			SubjectID:      subjectID,
-			Limit:          int32(limit),
-		})
-		if err != nil {
-			return nil, err
-		}
-		result := make([]*domain.SearchResult, len(rows))
-		for i, row := range rows {
-			result[i] = sqlcTextRowToSearchResult(row)
-		}
-		return result, nil
-	}
 	return r.searchByTextWithExcl(ctx, subjectID, query, limit, excludeIDs)
 }
 
@@ -154,6 +138,12 @@ func (r *chunkRepo) searchByTextWithExcl(ctx context.Context, subjectID uuid.UUI
 	for i, id := range excludeIDs {
 		placeholders[i] = fmt.Sprintf("$%d", i+4)
 		args = append(args, id)
+	}
+
+	exclusionClause := ""
+	if len(placeholders) > 0 {
+		exclusionClause = `
+  AND m.id NOT IN (` + strings.Join(placeholders, ", ") + `)`
 	}
 
 	sqlQuery := `SELECT
@@ -170,9 +160,16 @@ JOIN raw_files rf ON rf.id = m.raw_file_id
 WHERE rf.subject_id = $2
   AND rf.is_active = TRUE
   AND m.is_active = TRUE
-  AND to_tsvector('simple', m.content_markdown) @@ plainto_tsquery('simple', $1)
-  AND m.id NOT IN (` + strings.Join(placeholders, ", ") + `)
-ORDER BY ts_rank(to_tsvector('simple', m.content_markdown), plainto_tsquery('simple', $1)) DESC
+  AND (
+    to_tsvector('simple', m.content_markdown) @@ websearch_to_tsquery('simple', $1)
+    OR to_tsvector('simple', m.content_markdown) @@ phraseto_tsquery('simple', $1)
+    OR to_tsvector('simple', m.content_markdown) @@ plainto_tsquery('simple', $1)
+  )` + exclusionClause + `
+ORDER BY GREATEST(
+  ts_rank_cd(to_tsvector('simple', m.content_markdown), websearch_to_tsquery('simple', $1)),
+  ts_rank_cd(to_tsvector('simple', m.content_markdown), phraseto_tsquery('simple', $1)),
+  ts_rank_cd(to_tsvector('simple', m.content_markdown), plainto_tsquery('simple', $1))
+) DESC
 LIMIT $3`
 
 	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)
