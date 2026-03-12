@@ -248,15 +248,22 @@ func Run(ctx context.Context, opts Options) ([]domain.EvalRecord, error) {
 			answerability = qResult.Answerability
 			srcJSON, _ := json.Marshal(qResult.Sources)
 			ragSourcesStr = string(srcJSON)
-			fmt.Printf("          回答取得完了 (%d ms) | 文字数: %d | answerability: %s\n",
-				latencyMS, len(ragAnswer), answerability)
+			fmt.Printf("          回答取得完了 (%d ms) | 文字数: %d | loops: %d | answerability: %s\n",
+				latencyMS, len(ragAnswer), qResult.LoopCount, answerability)
 
 			// ファイル・ページ一致検証（LLM なし）
 			retrievedFilePages, refFileFound, refPageFound, refFilePageFound = evaluateRetrievedSources(qResult.Sources, qa.RefFile, qa.RefPage)
 			fileHit = refFileFound
 			pageHit = refFilePageFound
-			fmt.Printf("          file_hit=%d  page_hit=%d  ref_file_found=%d  ref_page_found=%d  ref_file_page_found=%d\n",
-				fileHit, pageHit, refFileFound, refPageFound, refFilePageFound)
+			fileSymbol := "✗"
+			if refFileFound == 1 {
+				fileSymbol = "✓"
+			}
+			pageSymbol := "✗"
+			if refFilePageFound == 1 {
+				pageSymbol = "✓"
+			}
+			fmt.Printf("          src: file=%s  page=%s\n", fileSymbol, pageSymbol)
 			fmt.Printf("          retrieved=%s\n", truncate(retrievedFilePages, 220))
 		}
 

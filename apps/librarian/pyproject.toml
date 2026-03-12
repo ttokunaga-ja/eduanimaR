@@ -21,6 +21,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Phase 3: PostgreSQL Checkpointer（耐障害性）
+# LIBRARIAN_DATABASE_URL を設定した環境でのみ必要
+# インストール: pip install "eduanima-librarian[postgres]"
+postgres = [
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "psycopg[binary]>=3.1.1",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

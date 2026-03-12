@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "librarian_agent": "./src/librarian/graph.py:build_graph"
+  },
+  "env": ".env",
+  "python_version": "3.12"
+}

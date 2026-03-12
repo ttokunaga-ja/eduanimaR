@@ -65,6 +65,13 @@ class Config:
         )
     )
 
+    # ─── Phase 3: PostgreSQL Checkpointer 設定 ──────────────────────────
+    # LIBRARIAN_DATABASE_URL が設定されている場合、LangGraph の状態を PostgreSQL に永続化する
+    # 未設定（空文字）の場合は MemorySaver を使用（開発・テスト用）
+    # 例: postgresql://eduanima:pass@localhost:5432/eduanima_professor
+    # ※ [postgres] extra が必要: pip install "eduanima-librarian[postgres]"
+    database_url: str = field(default_factory=lambda: os.getenv("LIBRARIAN_DATABASE_URL", ""))
+
     # ロギング
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
